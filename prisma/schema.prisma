@@ -407,6 +407,7 @@ model Order {
   giftCardAppliedCents Int    @default(0) // portion of the total covered by a gift card, if any
   stripeSessionId String?
   items           OrderItem[]
+giftCardRedemptions GiftCardRedemption[]    
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
