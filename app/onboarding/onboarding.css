@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+
+.ob-mono {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.ob-display {
+  font-family: 'Fraunces', serif;
+}
+
+.ob-input {
+  width: 100%;
+  border: 1px solid #DDD8C8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #20241D;
+}

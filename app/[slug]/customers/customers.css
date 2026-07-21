@@ -1,0 +1,8 @@
+@media (max-width: 640px) {
+  .customers-table > div {
+    grid-template-columns: 1fr !important;
+  }
+  .customers-table .head-only {
+    display: none;
+  }
+}

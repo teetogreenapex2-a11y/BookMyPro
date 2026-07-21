@@ -1,0 +1,547 @@
+// Prisma schema for Tee to Green Golf — multi-tenant version.
+// Default datasource is SQLite for easy local dev.
+// For production on Vercel, switch provider to "postgresql" and set DATABASE_URL
+// to a hosted Postgres instance (e.g. Vercel Postgres, Supabase, Neon).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// --- Tenancy ---
+
+model Business {
+  id     String @id @default(cuid())
+  slug   String @unique // URL-friendly identifier, e.g. "tee-to-green" -> /tee-to-green/book
+  name   String @default("My Golf Business")
+  email  String @default("")
+  hours  String @default("Mon–Sat, 8:00 AM – 5:00 PM")
+  lessonRate String @default("$120/hr")
+  instructorName String? // shown to players as "with {instructorName}" — separate from the business name
+
+  // Stripe Connect — each business gets its own connected account so payments
+  // go directly to them. Null until they complete Stripe onboarding.
+  // Each business picks one payment processor. Stripe fields are used when
+  // paymentProvider is "stripe" (the default, for backward compatibility
+  // with businesses that connected before Square support existed); Square
+  // fields are used when it's "square".
+  paymentProvider String  @default("stripe") // "stripe" | "square"
+  stripeAccountId String?
+
+  squareMerchantId     String?
+  squareAccessToken    String?
+  squareRefreshToken   String?
+  squareTokenExpiresAt DateTime?
+
+  packageSingleEnabled Boolean @default(true)
+  packagePlayingEnabled Boolean @default(true)
+  packageVideoEnabled  Boolean @default(true)
+  packageThreeEnabled  Boolean @default(true)
+  packageFiveEnabled   Boolean @default(true)
+  packageTenEnabled    Boolean @default(true)
+
+  packageSinglePriceCents Int @default(12000)
+  packagePlayingPriceCents Int @default(0) // 0 = "TBD" — not yet priced by the instructor
+  packageVideoPriceCents  Int @default(0) // 0 = "TBD" — open price, same convention as Playing lesson
+  packageThreePriceCents  Int @default(30000)
+  packageFivePriceCents   Int @default(48000)
+  packageTenPriceCents    Int @default(90000)
+
+  fittingDriverEnabled Boolean @default(true)
+  fittingIronEnabled   Boolean @default(true)
+  fittingFullEnabled   Boolean @default(true)
+
+  fittingDriverPriceCents Int @default(8000)
+  fittingIronPriceCents   Int @default(10000)
+  fittingFullPriceCents   Int @default(20000)
+
+  // If enabled, players can reserve a lesson package without paying online
+  // and settle up in person at their first lesson instead. Off by default —
+  // this is a deliberate business risk tradeoff (no-show/non-payment risk
+  // vs. lower booking friction), so each business opts in explicitly.
+  allowPayLater Boolean @default(false)
+
+  // If enabled, new bookings are held as "pending" until the instructor
+  // confirms or denies them, instead of being confirmed immediately.
+  requireBookingApproval Boolean @default(true)
+  bookingWindowDays Int @default(28) // how far ahead players can see/pick open slots
+
+  // Which calendar system the instructor's sync connects to. Google is the
+  // default for backward compatibility with businesses that connected
+  // before Outlook support existed.
+  calendarProvider String @default("google") // "google" | "outlook"
+
+  // Email alert sent to the instructor whenever a booking happens — both
+  // instant-confirmed bookings and pending requests trigger one. Off by
+  // default. Falls back to the business's public `email` field if
+  // notificationEmail isn't set separately.
+  notifyOnBooking  Boolean @default(false)
+  notificationEmail String?
+
+  memberships  Membership[]
+  availability Availability[]
+  bookings     Booking[]
+  packages     Package[]
+  syncLogs     SyncLog[]
+  videoSubmissions VideoSubmission[]
+  swingSketches SwingSketch[]
+  products     Product[]
+  orders       Order[]
+  giftCards    GiftCard[]
+  // Daily.co API key for remote/video-call lessons — same "bring your own
+  // account" pattern as Stripe Connect, Square, and Google/Outlook
+  // Calendar. Never sent to the client; only used server-side to create
+  // call rooms when a remote booking is confirmed.
+  dailyApiKey  String?
+  // Find a Pro directory — opt-in, not automatic. Some instructors build
+  // their following entirely through their own shared link and may not
+  // want to be discoverable by strangers browsing a public directory, so
+  // this defaults to off rather than listing every business by default.
+  // City/state text search only for now, not true geographic radius
+  // search — that would need a geocoding service (a real external
+  // dependency), which isn't worth adding before there are enough listed
+  // businesses for radius search to actually matter.
+  listedInDirectory Boolean @default(false)
+  city              String?
+  state             String?
+  zipCode           String?
+  createdAt    DateTime @default(now())
+}
+
+// Links a person (global User) to a business with a role. A single Google
+// login can be a player at one business and the owner/instructor at another —
+// role and history are always scoped to a specific business via this table.
+model Membership {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String
+  role       String   // "owner" | "instructor" | "player"
+  specialty  String?  // short tagline shown to players, e.g. "Short game, junior coaching" — only meaningful for owner/instructor roles
+
+  // Google Calendar sync token — set when this member (as an instructor)
+  // connects their calendar for this specific business.
+  googleRefreshToken String?
+
+  // Outlook/Microsoft 365 equivalent. Unlike Google (where the googleapis
+  // client refreshes access tokens internally from just the refresh token),
+  // Microsoft Graph access tokens expire quickly (~1hr) and must be
+  // refreshed and re-persisted explicitly — see lib/outlook.ts.
+  outlookAccessToken    String?
+  outlookRefreshToken   String?
+  outlookTokenExpiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  assignedBookings Booking[]
+  soldPackages Package[]
+  availability Availability[]
+  videoSubmissions VideoSubmission[]
+  swingSketches SwingSketch[]
+
+  // Per-instructor pricing — each instructor on staff sets their own rates,
+  // rather than one shared business-wide price. Mirrors the exact same
+  // field names as Business's own pricing fields (see below) on purpose:
+  // lib/pricing.ts's helpers are untyped (Record<string, any>), so passing
+  // a Membership object works identically to passing a Business object,
+  // no separate code path needed. Defaults match Business's defaults, so a
+  // newly added instructor starts with sensible pricing rather than
+  // everything disabled/unpriced.
+  packageSingleEnabled Boolean @default(true)
+  packagePlayingEnabled Boolean @default(true)
+  packageVideoEnabled  Boolean @default(true)
+  packageThreeEnabled  Boolean @default(true)
+  packageFiveEnabled   Boolean @default(true)
+  packageTenEnabled    Boolean @default(true)
+
+  packageSinglePriceCents Int @default(12000)
+  packagePlayingPriceCents Int @default(0) // 0 = "TBD" — not yet priced by the instructor
+  packageVideoPriceCents  Int @default(0) // 0 = "TBD" — open price, same convention as Playing lesson
+  packageThreePriceCents  Int @default(30000)
+  packageFivePriceCents   Int @default(48000)
+  packageTenPriceCents    Int @default(90000)
+
+  fittingDriverEnabled Boolean @default(true)
+  fittingIronEnabled   Boolean @default(true)
+  fittingFullEnabled   Boolean @default(true)
+
+  fittingDriverPriceCents Int @default(8000)
+  fittingIronPriceCents   Int @default(10000)
+  fittingFullPriceCents   Int @default(20000)
+
+  @@unique([userId, businessId])
+}
+
+// --- Identity (global — not tenant-scoped) ---
+
+model User {
+  id             String       @id @default(cuid())
+  name           String?
+  email          String       @unique
+  emailVerified  DateTime?    // required by NextAuth's Prisma adapter, even though this app doesn't use email-verification sign-in
+  image          String?
+  phone          String?
+  emailReminders Boolean      @default(true)
+  textReminders  Boolean      @default(true)
+  reminderHours  Int          @default(24)
+  // Golf profile — filled in once by the player, visible to the instructor
+  // on every booking (not booking-specific, since these don't change visit
+  // to visit).
+  handedness     String?      // "right" | "left"
+  scoreOrHandicap String?
+  commonIssues   String?
+  memberships    Membership[]
+  packages       Package[]
+  bookings       Booking[]
+  videoSubmissions VideoSubmission[]
+  swingSketches SwingSketch[]
+  orders         Order[]
+  giftCardsPurchased GiftCard[] @relation("PurchasedGiftCards")
+  accounts       Account[]
+  sessions       Session[]
+  createdAt      DateTime     @default(now())
+}
+
+// --- Business-scoped data ---
+
+model Package {
+  id               String    @id @default(cuid())
+  business         Business  @relation(fields: [businessId], references: [id])
+  businessId       String
+  user             User      @relation(fields: [userId], references: [id])
+  userId           String
+  // Which instructor this package's credits are for — pricing is now
+  // per-instructor, so a package is really "N lessons with this specific
+  // person at their rate," not a generic credit any instructor can redeem.
+  // Nullable for backward compatibility with packages that predate this field.
+  instructor       Membership? @relation(fields: [instructorMembershipId], references: [id])
+  instructorMembershipId String?
+  type             String    // single | three | five | ten
+  lessonsTotal     Int
+  lessonsRemaining Int
+  pricePaidCents   Int       // the full listed price of this package, before any credit
+  creditCents      Int       @default(0) // amount credited from a prior package when upgrading (e.g. single -> 3-pack)
+  upgradedFromId   String?   // the package this one replaced, if created via an upgrade
+  paymentStatus    String    @default("paid") // "paid" | "pending" (pay-at-first-lesson, or amount due after credit on an upgrade)
+  paidAt           DateTime?
+  stripeSessionId  String?
+  squareOrderId    String?
+  createdAt        DateTime  @default(now())
+  bookings         Booking[]
+}
+
+model Availability {
+  id             String   @id @default(cuid())
+  business       Business @relation(fields: [businessId], references: [id])
+  businessId     String
+  // Each instructor has their own independent timeline now — two
+  // instructors can be booked at the same startTime, each with a different
+  // student, since they're two different people. (Calendar sync stays
+  // shared/single regardless — see lib/calendar.ts — this is purely about
+  // who's free when.)
+  instructor     Membership @relation(fields: [instructorMembershipId], references: [id])
+  instructorMembershipId String
+  startTime      DateTime
+  status         String   @default("open") // open | closed | booked
+  closedReason   String?  // "manual" | "calendar"
+  blockedEventId String?
+  booking        Booking?
+
+  @@unique([businessId, instructorMembershipId, startTime])
+}
+
+model Booking {
+  id                    String        @id @default(cuid())
+  business              Business      @relation(fields: [businessId], references: [id])
+  businessId            String
+  player                User          @relation(fields: [playerId], references: [id])
+  playerId              String
+  // Which staff member (owner or instructor role) is delivering this
+  // session — the business still has one shared timeline (a slot is either
+  // open or booked, same as always), this just records who it's with,
+  // since a business can now have more than one instructor on staff.
+  instructor            Membership?   @relation(fields: [instructorMembershipId], references: [id])
+  instructorMembershipId String?
+  serviceType           String        // lesson | fitting
+  fittingType           String?       // driver | iron | full
+  // Remote lessons — only meaningful when serviceType is "lesson". The
+  // video call room is created once the booking is confirmed (same moment
+  // calendar sync happens), not at booking time, so a pending request
+  // doesn't spin up a room before anyone's actually agreed to meet.
+  isRemote              Boolean       @default(false)
+  videoCallUrl          String?
+  startTime             DateTime
+  status                String        @default("confirmed") // confirmed | cancelled
+  priceCents            Int
+  contactName           String?
+  contactPhone          String?
+  contactEmail          String?
+  package               Package?      @relation(fields: [packageId], references: [id])
+  packageId             String?
+  stripeSessionId       String?
+  squareOrderId         String?
+  googleCalendarEventId String?
+  availability          Availability? @relation(fields: [availabilityId], references: [id])
+  availabilityId        String?       @unique
+  note                  Note?
+  swingSketches         SwingSketch[]
+  giftCardRedemptions   GiftCardRedemption[]
+  createdAt             DateTime      @default(now())
+}
+
+// Swing analysis: a player submits a video, the instructor reviews it and
+// leaves comments pinned to specific moments in the footage. This is
+// deliberately timestamped text comments rather than frame-by-frame visual
+// annotation (drawing lines on the video) — a real, useful v1 without the
+// much larger scope a full annotation tool would take on.
+model VideoSubmission {
+  id                      String    @id @default(cuid())
+  business                Business  @relation(fields: [businessId], references: [id])
+  businessId              String
+  player                  User      @relation(fields: [playerId], references: [id])
+  playerId                String
+  instructor              Membership @relation(fields: [instructorMembershipId], references: [id])
+  instructorMembershipId  String
+  videoUrl                String
+  title                   String?   // e.g. "Driver, face-on"
+  playerNote              String?   // context the player adds when submitting, e.g. "slicing lately"
+  status                  String    @default("pending") // pending | reviewed
+  submittedAt             DateTime  @default(now())
+  reviewedAt              DateTime?
+  comments                VideoComment[]
+}
+
+model VideoComment {
+  id                String          @id @default(cuid())
+  submission        VideoSubmission @relation(fields: [submissionId], references: [id])
+  submissionId      String
+  timestampSeconds  Float           // where in the video this comment applies
+  text              String
+  createdAt         DateTime        @default(now())
+}
+
+// Swing Sketch: an instructor draws directly on a photo/frame (lines,
+// angles, arrows, circles, labels) to illustrate a swing position —
+// deliberately separate from swing video review above. That's a player
+// submitting a clip for the instructor to comment on; this is the
+// instructor actively marking up a still image, usually live in a lesson.
+model SwingSketch {
+  id                      String     @id @default(cuid())
+  business                Business   @relation(fields: [businessId], references: [id])
+  businessId              String
+  player                  User       @relation(fields: [playerId], references: [id])
+  playerId                String
+  instructor              Membership @relation(fields: [instructorMembershipId], references: [id])
+  instructorMembershipId  String
+  booking                 Booking?   @relation(fields: [bookingId], references: [id])
+  bookingId               String?
+  imageUrl                String     // the flattened, annotated PNG
+  sourceUrl               String?    // the original unmarked photo, kept so it can be re-edited later
+  shapesJson              String     // raw shapes array as JSON — what actually makes it re-editable, not just a flat image
+  label                   String?    // e.g. "Impact position", "Top of backswing"
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
+
+  @@index([businessId])
+  @@index([playerId])
+  @@index([bookingId])
+}
+
+// --- Shop: real inventory (clubs, apparel, accessories) ---
+// Deliberately kept simple for v1: one price per product, optional
+// lightweight variants (size, flex, etc.) that only differ by label and
+// stock count — not per-variant pricing. Good enough for how a single-
+// location pro shop actually sells; a full variant-pricing matrix would
+// be real added complexity most small shops don't need.
+model Product {
+  id          String            @id @default(cuid())
+  business    Business          @relation(fields: [businessId], references: [id])
+  businessId  String
+  name        String
+  description String?
+  category    String?           // freeform — "Clubs", "Apparel", "Accessories", etc.
+  imageUrl    String?
+  priceCents  Int
+  enabled     Boolean           @default(true)
+  // Stock lives here directly for products with no variants. Products
+  // WITH variants track stock per-variant instead (see below) — this
+  // field is ignored for those, kept only so a variant-less product
+  // doesn't need a dummy variant just to have a stock count.
+  stockQuantity Int?
+  variants    ProductVariant[]
+  orderItems  OrderItem[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([businessId])
+}
+
+model ProductVariant {
+  id            String      @id @default(cuid())
+  product       Product     @relation(fields: [productId], references: [id])
+  productId     String
+  label         String      // e.g. "Men's L", "Right-handed, Stiff flex", "10.5°"
+  stockQuantity Int         @default(0)
+  orderItems    OrderItem[]
+
+  @@index([productId])
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  business        Business    @relation(fields: [businessId], references: [id])
+  businessId      String
+  buyer           User        @relation(fields: [buyerId], references: [id])
+  buyerId         String
+  status          String      @default("pending") // pending | paid | fulfilled | cancelled
+  fulfillmentType String      // "pickup" | "shipping"
+  shippingName    String?
+  shippingAddress String?
+  contactPhone    String?
+  contactEmail    String?
+  totalCents      Int
+  giftCardAppliedCents Int    @default(0) // portion of the total covered by a gift card, if any
+  stripeSessionId String?
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([businessId])
+  @@index([buyerId])
+}
+
+model OrderItem {
+  id                   String          @id @default(cuid())
+  order                Order           @relation(fields: [orderId], references: [id])
+  orderId              String
+  product              Product         @relation(fields: [productId], references: [id])
+  productId            String
+  variant              ProductVariant? @relation(fields: [variantId], references: [id])
+  variantId            String?
+  quantity             Int
+  priceCentsAtPurchase Int             // snapshot at purchase time — price changes later shouldn't rewrite old orders
+
+  @@index([orderId])
+}
+
+// --- Gift cards ---
+// A stored balance, not a fixed voucher — can be partially redeemed
+// across more than one purchase (e.g. $50 card used $30 on a lesson
+// package, $20 later on a shop order), same as how gift cards actually
+// work at most real businesses.
+model GiftCard {
+  id                  String   @id @default(cuid())
+  business            Business @relation(fields: [businessId], references: [id])
+  businessId          String
+  code                String   @unique // redemption code, e.g. "TTG-4F2K-9XQP"
+  initialValueCents   Int
+  remainingValueCents Int
+  purchasedBy         User?    @relation("PurchasedGiftCards", fields: [purchasedByUserId], references: [id])
+  purchasedByUserId   String?
+  recipientName       String?
+  recipientEmail      String?
+  message             String?
+  stripeSessionId     String?
+  status              String   @default("active") // active | depleted | expired
+  createdAt           DateTime @default(now())
+  redemptions         GiftCardRedemption[]
+
+  @@index([businessId])
+}
+
+model GiftCardRedemption {
+  id          String   @id @default(cuid())
+  giftCard    GiftCard @relation(fields: [giftCardId], references: [id])
+  giftCardId  String
+  amountCents Int
+  booking     Booking? @relation(fields: [bookingId], references: [id])
+  bookingId   String?
+  order       Order?   @relation(fields: [orderId], references: [id])
+  orderId     String?
+  redeemedAt  DateTime @default(now())
+
+  @@index([giftCardId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  bookingId String   @unique
+  text      String
+  updatedAt DateTime @updatedAt
+}
+
+model SyncLog {
+  id              String   @id @default(cuid())
+  business        Business @relation(fields: [businessId], references: [id])
+  businessId      String
+  ranAt           DateTime @default(now())
+  success         Boolean
+  bookingsCreated Int      @default(0)
+  slotsBlocked    Int      @default(0)
+  slotsUnblocked  Int      @default(0)
+  message         String?
+  triggeredBy     String   @default("manual") // "manual" | "cron"
+}
+
+// Square's Order reference_id is too short to carry full checkout metadata
+// the way Stripe's session.metadata does, so a pending payment's details are
+// stashed here first — this record's id becomes the reference_id sent to
+// Square, and the webhook looks the details back up by that id. Consumed
+// (deleted) once the webhook successfully processes the payment; stale
+// unconsumed rows (abandoned checkouts) can be purged periodically.
+model PendingSquarePayment {
+  id            String   @id @default(cuid())
+  businessId    String
+  userId        String
+  kind          String   // "package" | "fitting"
+  packageType   String?
+  availabilityId String?
+  fittingType   String?
+  contactName   String?
+  contactPhone  String?
+  contactEmail  String?
+  instructorMembershipId String?
+  isRemote      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+// --- NextAuth required models (global — a login is not tenant-scoped) ---
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
