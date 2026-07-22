@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { User } from "lucide-react";
-import { formatTime12h } from "@/lib/time";
+import { formatTime12h, wallClockToUTC } from "@/lib/time";
 
 const TIMES = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"];
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -609,9 +609,8 @@ export default function InstructorClient({
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {TIMES.map((time) => {
-                      const [h, m] = time.split(":").map(Number);
-                      const dt = new Date(dayDate);
-                      dt.setHours(h, m, 0, 0);
+                      const [h, m] = time.split(":").map(Number);                      
+                      const dt = wallClockToUTC(dayDate, h, m);
                       const key = dt.toISOString();
                       const slot = slotsByKey[key];
                       if (!slot) return null;
