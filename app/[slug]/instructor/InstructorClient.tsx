@@ -301,11 +301,11 @@ export default function InstructorClient({
     <div style={{ minHeight: "100vh" }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
             <span className="mono" style={{ fontSize: 12, letterSpacing: "0.1em", color: "var(--gold)" }}>
               INSTRUCTOR
             </span>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <a href={`${basePath}/customers`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Customers</a>
               <a href={`${basePath}/instructor/videos`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Swing videos</a>
               <a href={`${basePath}/instructor/swing-sketch`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Swing Sketch</a>
