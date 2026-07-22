@@ -141,6 +141,7 @@ export default function CustomersClient({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            className="contact-input"
             placeholder="Search by name or email…"
             style={{
               width: "100%", border: "none", borderRadius: 8, padding: "10px 12px",

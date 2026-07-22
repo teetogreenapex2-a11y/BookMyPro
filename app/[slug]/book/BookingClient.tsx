@@ -711,12 +711,14 @@ export default function BookingClient({
               <input
                 value={contact.name}
                 onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
+                className="contact-input"
                 placeholder="Full name"
                 style={contactInputStyle}
               />
               <input
                 value={contact.phone}
                 onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+                className="contact-input"
                 placeholder="Phone number"
                 type="tel"
                 style={contactInputStyle}
@@ -724,6 +726,7 @@ export default function BookingClient({
               <input
                 value={contact.email}
                 onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+                className="contact-input"
                 placeholder="Email address"
                 type="email"
                 style={contactInputStyle}

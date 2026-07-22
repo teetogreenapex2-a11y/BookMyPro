@@ -28,6 +28,8 @@ body {
 button {
   font-family: inherit;
   cursor: pointer;
+}.contact-input::placeholder {
+  color: rgba(246, 244, 238, 0.65);
 }
 
 .mono {
