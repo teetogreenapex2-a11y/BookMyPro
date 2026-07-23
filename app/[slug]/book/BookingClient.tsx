@@ -158,7 +158,7 @@ export default function BookingClient({
 
   // Books directly against an already-owned package — no payment involved.
 async function saveProfileFieldsIfProvided() {
-    const updates = {};
+    const updates: Record<string, string> = {};
     if (contact.handedness) updates.handedness = contact.handedness;
     if (contact.scoreOrHandicap.trim()) updates.scoreOrHandicap = contact.scoreOrHandicap.trim();
     if (contact.commonIssues.trim()) updates.commonIssues = contact.commonIssues.trim();
