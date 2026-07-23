@@ -50,7 +50,7 @@ export default function LoginPage() {
           Continue with Google
         </button>
         <a href="/find-a-pro" style={{ display: "block", marginTop: 16, fontSize: 12.5, color: "var(--faint)" }}>
-          Don't have a link from your instructor? Find a Pro near you ->
+          Don't have a link from your instructor? Find a Pro near you &gt;
         </a>
       </div>
     </div>
