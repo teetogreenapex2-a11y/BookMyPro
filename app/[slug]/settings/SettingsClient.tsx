@@ -16,6 +16,7 @@ type User = {
 
 type Business = {
   name: string;
+  logoUrl: string | null;
   email: string;
   hours: string;
   lessonRate: string;
@@ -96,6 +97,23 @@ export default function SettingsClient({
     reminderHours: user.reminderHours,
   });
   const [biz, setBiz] = useState(business);
+const [uploadingLogo, setUploadingLogo] = useState(false);
+ const [logoError, setLogoError] = useState("");
+
+  async function uploadLogo(file) {
+    setUploadingLogo(true);
+    setLogoError(null);
+    const form = new FormData();
+    form.append("logo", file);
+    const res = await fetch(`${apiBase}/business/logo`, { method: "POST", body: form });
+    const data = await res.json();
+    setUploadingLogo(false);
+    if (!res.ok) {
+      setLogoError(data.error || "Something went wrong.");
+      return;
+    }
+    setBiz((b) => ({ ...b, logoUrl: data.logoUrl }));
+  }
   const [saved, setSaved] = useState(false);
   const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; chargesEnabled: boolean; detailsSubmitted?: boolean } | null>(null);
   const [squareStatus, setSquareStatus] = useState<{ connected: boolean; expired: boolean } | null>(null);
@@ -505,7 +523,32 @@ export default function SettingsClient({
                 </div>
               )}
             </div>
-
+<div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Business logo</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                {biz.logoUrl ? (
+                  <img src={biz.logoUrl} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: 56, height: 56, borderRadius: 10, background: "var(--closed)", flexShrink: 0 }} />
+                )}
+                <div>
+                  <label style={{ display: "inline-block", fontSize: 12, fontWeight: 700, color: "var(--fairway)", background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 12px", cursor: "pointer" }}>
+                    {uploadingLogo ? "Uploading..." : biz.logoUrl ? "Change logo" : "Upload a logo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      disabled={uploadingLogo}
+                      onChange={(e) => { const f = e.target.files[0]; if (f) uploadLogo(f); }}
+                    />
+                  </label>
+                  {logoError && <p style={{ fontSize: 11, color: "#B23A3A", margin: "6px 0 0" }}>{logoError}</p>}
+                  <p style={{ fontSize: 11, color: "var(--faint)", margin: "6px 0 0" }}>
+                    Shown on your booking page instead of just your business name.
+                  </p>
+                </div>
+              </div>
+            </div>
             <Field label="Business name" value={biz.name} onChange={(v) => setBiz((b) => ({ ...b, name: v }))} />
             <Field
               label="Instructor name"
