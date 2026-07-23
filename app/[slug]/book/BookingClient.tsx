@@ -58,7 +58,7 @@ export default function BookingClient({
   }, [selected]);
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [contact, setContact] = useState({ name: "", phone: "", email: "" });
+  const [contact, setContact] = useState({ name: "", phone: "", email: "", handedness: "", scoreOrHandicap: "", commonIssues: "" });
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
   const [myBookings, setMyBookings] = useState<{
@@ -157,8 +157,24 @@ export default function BookingClient({
   }
 
   // Books directly against an already-owned package — no payment involved.
+async function saveProfileFieldsIfProvided() {
+    const updates = {};
+    if (contact.handedness) updates.handedness = contact.handedness;
+    if (contact.scoreOrHandicap.trim()) updates.scoreOrHandicap = contact.scoreOrHandicap.trim();
+    if (contact.commonIssues.trim()) updates.commonIssues = contact.commonIssues.trim();
+    if (Object.keys(updates).length === 0) return;
+    try {
+      await fetch("/api/user", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+    } catch {
+    }
+  }
   async function bookLesson() {
     if (!selected || !selectedPackage || !selectedInstructorId || !contactValid()) return;
+saveProfileFieldsIfProvided();
     setConfirming(true);
     const res = await fetch(`${apiBase}/bookings`, {
       method: "POST",
@@ -198,6 +214,7 @@ export default function BookingClient({
   // slot with the first credit, all in one step (see the webhook).
   async function buyPackageAndBookSlot() {
     if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
+saveProfileFieldsIfProvided();
     setConfirming(true);
     const res = await fetch(`${apiBase}/packages/checkout`, {
       method: "POST",
@@ -220,6 +237,7 @@ export default function BookingClient({
 
   async function bookFitting() {
     if (!selected || !fittingType || !selectedInstructorId || !contactValid()) return;
+saveProfileFieldsIfProvided();
     setConfirming(true);
     const res = await fetch(`${apiBase}/fittings/checkout`, {
       method: "POST",
@@ -730,6 +748,50 @@ export default function BookingClient({
                 placeholder="Email address"
                 type="email"
                 style={contactInputStyle}
+<div className="mono" style={{ fontSize: 10.5, color: "#9DB8A9", letterSpacing: "0.05em", marginTop: 4 }}>
+                OPTIONAL - HELPS YOUR INSTRUCTOR PREPARE
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => setContact((c) => ({ ...c, handedness: c.handedness === "right" ? "" : "right" }))}
+                  style={{
+                    flex: 1, padding: "8px", borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+                    border: contact.handedness === "right" ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.15)",
+                    background: contact.handedness === "right" ? "rgba(184,134,43,0.18)" : "rgba(255,255,255,0.06)",
+                    color: "var(--chalk)",
+                  }}
+                >
+                  Right-handed
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setContact((c) => ({ ...c, handedness: c.handedness === "left" ? "" : "left" }))}
+                  style={{
+                    flex: 1, padding: "8px", borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+                    border: contact.handedness === "left" ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.15)",
+                    background: contact.handedness === "left" ? "rgba(184,134,43,0.18)" : "rgba(255,255,255,0.06)",
+                    color: "var(--chalk)",
+                  }}
+                >
+                  Left-handed
+                </button>
+              </div>
+              <input
+                value={contact.scoreOrHandicap}
+                onChange={(e) => setContact((c) => ({ ...c, scoreOrHandicap: e.target.value }))}
+                placeholder="Handicap or average score"
+                className="contact-input"
+                style={contactInputStyle}
+              />
+              <textarea
+                value={contact.commonIssues}
+                onChange={(e) => setContact((c) => ({ ...c, commonIssues: e.target.value }))}
+                placeholder="Anything you're working on or struggle with?"
+                rows={2}
+                className="contact-input"
+                style={{ ...contactInputStyle, resize: "vertical" }}
+              />
               />
             </div>
 
