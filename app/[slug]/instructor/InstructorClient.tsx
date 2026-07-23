@@ -80,7 +80,12 @@ export default function InstructorClient({
   });
   const [newBookingError, setNewBookingError] = useState<string | null>(null);
   const [creatingBooking, setCreatingBooking] = useState(false);
-
+  const [addingNewPlayer, setAddingNewPlayer] = useState(false);
+  const [newPlayerName, setNewPlayerName] = useState("");
+  const [newPlayerEmail, setNewPlayerEmail] = useState("");
+  const [newPlayerPhone, setNewPlayerPhone] = useState("");
+  const [newPlayerError, setNewPlayerError] = useState<string | null>(null);
+  const [creatingPlayer, setCreatingPlayer] = useState(false);
   async function loadPendingBookings() {
     const res = await fetch(`${apiBase}/bookings`);
     if (res.ok) {
@@ -138,7 +143,31 @@ export default function InstructorClient({
       setNewBookingError(data.error || "Something went wrong.");
     }
   }
-
+async function createNewPlayer() {
+    if (!newPlayerName.trim() || !newPlayerEmail.trim()) {
+      setNewPlayerError("Name and email are required.");
+      return;
+    }
+    setCreatingPlayer(true);
+    setNewPlayerError(null);
+    const res = await fetch(`${apiBase}/players/manual`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newPlayerName, email: newPlayerEmail, phone: newPlayerPhone }),
+    });
+    const data = await res.json();
+    setCreatingPlayer(false);
+    if (!res.ok) {
+      setNewPlayerError(data.error || "Something went wrong.");
+      return;
+    }
+    setPlayers((prev) => [...prev, { id: data.id, name: data.name, email: data.email, phone: data.phone, packages: [] }]);
+    setNewBookingForm((f) => ({ ...f, playerId: data.id }));
+    setAddingNewPlayer(false);
+    setNewPlayerName("");
+    setNewPlayerEmail("");
+    setNewPlayerPhone("");
+  }
   async function loadSyncLog() {
     const res = await fetch(`${apiBase}/calendar/sync-log`);
     if (res.ok) setSyncLogs(await res.json());
@@ -496,29 +525,81 @@ export default function InstructorClient({
                   </select>
                 </label>
 
-                <label>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Player</div>
-                  <select
-                    value={newBookingForm.playerId}
-                    onChange={(e) => setNewBookingForm((f) => ({ ...f, playerId: e.target.value, packageId: "" }))}
-                    style={selectStyle}
-                  >
-                    <option value="">Choose a player…</option>
-                    {players.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name || p.email}</option>
-                    ))}
-                  </select>
-                  {players.length === 0 && (
-                    <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 4 }}>
-                      No players yet — someone needs to sign in and book once before they'll show up here.
-                    </div>
-                  )}
-                </label>
+                
 
                 {newBookingForm.serviceType === "lesson" && selectedPlayer && (
                   <label>
                     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>
-                      Package (optional — leave blank for a free-standing booking, e.g. pay in person)
+        <label>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Player</div>
+                  {!addingNewPlayer ? (
+                    <>
+                      <select
+                        value={newBookingForm.playerId}
+                        onChange={(e) => setNewBookingForm((f) => ({ ...f, playerId: e.target.value, packageId: "" }))}
+                        style={selectStyle}
+                      >
+                        <option value="">Choose a player…</option>
+                        {players.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name || p.email}</option>
+                        ))}
+                      </select>
+                      {players.length === 0 && (
+                        <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 4 }}>
+                          No players yet - someone needs to sign in and book once before they'll show up here.
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setAddingNewPlayer(true)}
+                        style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fairway)", background: "none", border: "none", padding: "6px 0 0", cursor: "pointer" }}
+                      >
+                        + New player
+                      </button>
+                    </>
+                  ) : (
+                    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: 10 }}>
+                      <input
+                        value={newPlayerName}
+                        onChange={(e) => setNewPlayerName(e.target.value)}
+                        placeholder="Full name"
+                        style={{ ...selectStyle, marginBottom: 6 }}
+                      />
+                      <input
+                        value={newPlayerEmail}
+                        onChange={(e) => setNewPlayerEmail(e.target.value)}
+                        placeholder="Email"
+                        type="email"
+                        style={{ ...selectStyle, marginBottom: 6 }}
+                      />
+                      <input
+                        value={newPlayerPhone}
+                        onChange={(e) => setNewPlayerPhone(e.target.value)}
+                        placeholder="Phone (optional)"
+                        type="tel"
+                        style={{ ...selectStyle, marginBottom: 6 }}
+                      />
+                      {newPlayerError && <p style={{ fontSize: 11, color: "#B23A3A", margin: "0 0 6px" }}>{newPlayerError}</p>}
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => { setAddingNewPlayer(false); setNewPlayerError(null); }}
+                          style={{ flex: 1, fontSize: 11.5, fontWeight: 600, background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "6px", cursor: "pointer" }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={createNewPlayer}
+                          disabled={creatingPlayer}
+                          style={{ flex: 2, fontSize: 11.5, fontWeight: 700, background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 6, padding: "6px", cursor: "pointer", opacity: creatingPlayer ? 0.7 : 1 }}
+                        >
+                          {creatingPlayer ? "Adding…" : "Add & select"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </label>              Package (optional — leave blank for a free-standing booking, e.g. pay in person)
                     </div>
                     <select
                       value={newBookingForm.packageId}
