@@ -1,8 +1,12 @@
-"use client";
+﻿"use client";
 
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
+
   return (
     <div
       style={{
@@ -31,7 +35,7 @@ export default function LoginPage() {
           Sign in to book
         </h1>
         <button
-          onClick={() => signIn("google", { callbackUrl: "/" })}
+          onClick={() => signIn("google", { callbackUrl })}
           style={{
             width: "100%",
             background: "var(--fairway)",
@@ -46,7 +50,7 @@ export default function LoginPage() {
           Continue with Google
         </button>
         <a href="/find-a-pro" style={{ display: "block", marginTop: 16, fontSize: 12.5, color: "var(--faint)" }}>
-          Don't have a link from your instructor? Find a Pro near you →
+          Don't have a link from your instructor? Find a Pro near you ->
         </a>
       </div>
     </div>

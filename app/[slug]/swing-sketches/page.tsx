@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import { loginRedirectUrl } from "@/lib/businessUrl";
 import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, ensureMembership, getBasePaths } from "@/lib/tenant";
@@ -6,8 +7,7 @@ import SwingSketchesPlayerClient from "./SwingSketchesPlayerClient";
 
 export default async function SwingSketchesPlayerPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
-
+  if (!session) redirect(loginRedirectUrl(`/${params.slug}/swing-sketches`))
   const business = await getBusinessBySlug(params.slug);
   if (!business) notFound();
 

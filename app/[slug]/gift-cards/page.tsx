@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import { loginRedirectUrl } from "@/lib/businessUrl";
 import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, ensureMembership, getBasePaths } from "@/lib/tenant";
@@ -6,7 +7,7 @@ import GiftCardsClient from "./GiftCardsClient";
 
 export default async function GiftCardsPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
+  if (!session) redirect(loginRedirectUrl(`/${params.slug}/gift-cards`));
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) notFound();
