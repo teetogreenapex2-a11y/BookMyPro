@@ -46,7 +46,7 @@ type Player = {
   packages: { id: string; label: string; lessonsRemaining: number; lessonsTotal: number }[];
 };
 
-export default function InstructorClient({calendarConnected calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, slug, basePath, apiBase, businessName, businessLogoUrl,
+export default function InstructorClient({calendarConnected,calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, slug, basePath, apiBase, businessName, businessLogoUrl,
 }: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [slots, setSlots] = useState<Slot[]>([]);
