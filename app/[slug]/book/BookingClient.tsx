@@ -305,8 +305,13 @@ saveProfileFieldsIfProvided();
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
-            <span className="display" style={{ fontSize: 18, fontWeight: 700, color: "var(--chalk)" }}>
-              {business.name}
+           <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {business.logoUrl && (
+                <img src={business.logoUrl} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
+              )}
+              <span className="display" style={{ fontSize: 18, fontWeight: 700, color: "var(--chalk)" }}>
+                {business.name}
+              </span>
             </span>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <a href={`${basePath}/videos`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>

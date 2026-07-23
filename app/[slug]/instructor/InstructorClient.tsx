@@ -46,9 +46,8 @@ type Player = {
   packages: { id: string; label: string; lessonsRemaining: number; lessonsTotal: number }[];
 };
 
-export default function InstructorClient({
-  calendarConnected, calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, slug, basePath, apiBase,
-}: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; slug: string; basePath: string; apiBase: string }) {
+export default function InstructorClient({calendarConnected calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, slug, basePath, apiBase, businessName, businessLogoUrl,
+}: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
@@ -331,8 +330,13 @@ async function createNewPlayer() {
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
-            <span className="mono" style={{ fontSize: 12, letterSpacing: "0.1em", color: "var(--gold)" }}>
-              INSTRUCTOR
+           <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {businessLogoUrl && (
+                <img src={businessLogoUrl} alt="" style={{ width: 24, height: 24, borderRadius: 5, objectFit: "cover" }} />
+              )}
+              <span className="mono" style={{ fontSize: 12, letterSpacing: "0.1em", color: "var(--gold)" }}>
+                INSTRUCTOR - {businessName.toUpperCase()}
+              </span>
             </span>
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <a href={`${basePath}/customers`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Customers</a>

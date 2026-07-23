@@ -18,6 +18,7 @@ model Business {
   id     String @id @default(cuid())
   slug   String @unique // URL-friendly identifier, e.g. "tee-to-green" -> /tee-to-green/book
   name   String @default("My Golf Business")
+  logoUrl String?
   email  String @default("")
   hours  String @default("Mon–Sat, 8:00 AM – 5:00 PM")
   lessonRate String @default("$120/hr")

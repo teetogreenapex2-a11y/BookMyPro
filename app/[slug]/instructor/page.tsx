@@ -8,7 +8,11 @@ import InstructorClient from "./InstructorClient";
 export default async function InstructorPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
-
+<InstructorClient
+      slug={params.slug}
+      businessName={business.name}
+      businessLogoUrl={business.logoUrl}
+      calendarConnected={hasCalendarConnected(business, membership)}
   const business = await getBusinessBySlug(params.slug);
   if (!business) notFound();
 
@@ -17,9 +21,7 @@ export default async function InstructorPage({ params }: { params: { slug: strin
   if (!membership) redirect(`${basePath}/book`);
 
   return (
-    <InstructorClient
-      slug={params.slug}
-      calendarConnected={hasCalendarConnected(business, membership)}
+    
       calendarProvider={business.calendarProvider}
       remoteLessonsEnabled={!!business.dailyApiKey}
       viewerMembershipId={membership.id}
