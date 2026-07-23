@@ -1,15 +1,9 @@
-import { getServerSession } from "next-auth";
+﻿import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { businessDestination } from "@/lib/businessUrl";
 
-// With multi-tenancy, there's no single "the business" to redirect to
-// anymore — a user's landing spot depends on which business(es) they're a
-// member of. Note: players never actually hit the "0 memberships" branch in
-// practice, since visiting any /{slug}/book page auto-creates a player
-// Membership for them — so reaching "/" with zero memberships means this is
-// someone new to the app entirely, which is exactly who onboarding is for.
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
@@ -27,10 +21,28 @@ export default async function HomePage() {
   }
 
   if (memberships.length === 0) {
-    redirect("/onboarding");
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "sans-serif", background: "#1B3A2F" }}>
+        <div style={{ background: "#F6F4EE", borderRadius: 16, padding: "36px 32px", maxWidth: 380, width: "100%", textAlign: "center" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#B8862B", marginBottom: 14 }}>BOOKMYPRO</div>
+          <h1 style={{ fontSize: 22, marginBottom: 24, color: "#1B3A2F" }}>What brings you here?</h1>
+          
+            href="/find-a-pro"
+            style={{ display: "block", background: "#1B3A2F", color: "#F6F4EE", borderRadius: 8, padding: "13px 20px", fontWeight: 700, fontSize: 14, textDecoration: "none", marginBottom: 10 }}
+          >
+            I'm looking to book a lesson
+          </a>
+          
+            href="/onboarding"
+            style={{ display: "block", background: "none", color: "#1B3A2F", border: "1px solid #E3D9C9", borderRadius: 8, padding: "13px 20px", fontWeight: 600, fontSize: 14, textDecoration: "none" }}
+          >
+            I'm a coach or instructor
+          </a>
+        </div>
+      </div>
+    );
   }
 
-  // Belongs to more than one business — show a simple picker.
   return (
     <div style={{ minHeight: "100vh", padding: 24, fontFamily: "sans-serif" }}>
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#B8862B", marginBottom: 8 }}>BOOKMYPRO</div>
@@ -41,7 +53,7 @@ export default async function HomePage() {
           return (
             <li key={m.id}>
               <a href={businessDestination(m.business.slug, `/${destination}`)} style={{ color: "#1B3A2F", fontWeight: 600 }}>
-                {m.business.name} — <span style={{ fontWeight: 400, color: "#5C6459" }}>{m.role}</span>
+                {m.business.name} - <span style={{ fontWeight: 400, color: "#5C6459" }}>{m.role}</span>
               </a>
             </li>
           );
