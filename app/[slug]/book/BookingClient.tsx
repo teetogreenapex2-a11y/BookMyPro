@@ -748,7 +748,8 @@ saveProfileFieldsIfProvided();
                 placeholder="Email address"
                 type="email"
                 style={contactInputStyle}
-<div className="mono" style={{ fontSize: 10.5, color: "#9DB8A9", letterSpacing: "0.05em", marginTop: 4 }}>
+              />
+              <div className="mono"style={{ fontSize: 10.5, color: "#9DB8A9", letterSpacing: "0.05em", marginTop: 4 }}>
                 OPTIONAL - HELPS YOUR INSTRUCTOR PREPARE
               </div>
               <div style={{ display: "flex", gap: 6 }}>
@@ -791,7 +792,6 @@ saveProfileFieldsIfProvided();
                 rows={2}
                 className="contact-input"
                 style={{ ...contactInputStyle, resize: "vertical" }}
-              />
               />
             </div>
 
