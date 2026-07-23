@@ -5,7 +5,7 @@ import { signOut } from "next-auth/react";
 import { FITTING_TYPES, centsToDollars, enabledPackages, enabledFittings, getFittingPriceCents } from "@/lib/pricing";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 
-const TIMES = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"];
+const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean };
