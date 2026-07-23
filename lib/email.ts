@@ -100,7 +100,18 @@ export async function sendGiftCardEmail(to: string, details: { businessName: str
     <div style="font-family: sans-serif; max-width: 480px;">
       <h2 style="margin-bottom: 4px;">${details.recipientName ? `A gift for you, ${details.recipientName}` : "Your gift card"}</h2>
       <p style="color: #5C6459; margin-top: 0;">${details.businessName}</p>
-      ${details.message ? `<p style="font-style: italic; padding: 12px; background: #F6F4EE; border-radius: 8px;">"${details.message}"</p>` : ""}
+      ${details.message ? `<p style="font-style: italic; padding: 12px; background: #F6F4EE; border-radius: 8px;">"${details.message}"</p>` : ""}export async function sendMagicLinkEmail(to: string, url: string, businessName?: string) {
+  const subject = businessName ? `Sign in to ${businessName}` : "Sign in to BookMyPro";
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">Sign in</h2>
+      <p style="color: #5C6459; margin-top: 0;">Click below to sign in - this link works once and expires shortly for security.</p>
+      <a href="${url}" style="display:inline-block;background:#1B3A2F;color:#F6F4EE;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">Sign in</a>
+      <p style="color: #8A8571; font-size: 12px; margin-top: 20px;">If you didn't request this, you can safely ignore this email.</p>
+    </div>
+  `;
+  await sendEmail(to, subject, html);
+}
       <p>Value: <strong>$${dollars}</strong></p>
       <p>Code: <strong style="font-family: monospace; font-size: 16px;">${details.code}</strong></p>
       <p style="color: #5C6459; font-size: 13px;">Use this code at checkout for lessons, fittings, or the shop.</p>
