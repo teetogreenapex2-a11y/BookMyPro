@@ -90,6 +90,7 @@ model Business {
   syncLogs     SyncLog[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
+  pushSubscriptions PushSubscription[]
   products     Product[]
   orders       Order[]
   giftCards    GiftCard[]
@@ -454,7 +455,17 @@ model GiftCard {
 
   @@index([businessId])
 }
+model PushSubscription {
+  id           String     @id @default(cuid())
+  membership   Membership @relation(fields: [membershipId], references: [id])
+  membershipId String
+  endpoint     String     @unique
+  p256dh       String
+  auth         String
+  createdAt    DateTime   @default(now())
 
+  @@index([membershipId])
+}
 model GiftCardRedemption {
   id          String   @id @default(cuid())
   giftCard    GiftCard @relation(fields: [giftCardId], references: [id])

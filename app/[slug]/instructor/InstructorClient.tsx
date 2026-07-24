@@ -86,6 +86,45 @@ export default function InstructorClient({
   const [newPlayerPhone, setNewPlayerPhone] = useState("");
   const [newPlayerError, setNewPlayerError] = useState<string | null>(null);
   const [creatingPlayer, setCreatingPlayer] = useState(false);
+  const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "off" | "on" | "enabling">("unknown");
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushStatus("unsupported");
+      return;
+    }
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      reg?.pushManager.getSubscription().then((sub) => setPushStatus(sub ? "on" : "off"));
+    }).catch(() => setPushStatus("off"));
+  }, []);
+
+  async function enablePushNotifications() {
+    setPushStatus("enabling");
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushStatus("off");
+        return;
+      }
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+      await fetch(`${apiBase}/push/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription.toJSON()),
+      });
+      setPushStatus("on");
+    } catch (err) {
+      console.error("Failed to enable push notifications:", err);
+      setPushStatus("off");
+    }
+  }
+
 
   async function loadPendingBookings() {
     const res = await fetch(`${apiBase}/bookings`);
@@ -466,6 +505,24 @@ export default function InstructorClient({
         <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>
           Tap a slot to open or close it. Tap a booked slot to add or edit a note.
         </p>
+
+        {(pushStatus === "off" || pushStatus === "enabling") && (
+          <button
+            onClick={enablePushNotifications}
+            disabled={pushStatus === "enabling"}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, background: "var(--card)", color: "var(--fairway)",
+              border: "1px solid var(--border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: 16,
+            }}
+          >
+            {pushStatus === "enabling" ? "Enabling…" : "🔔 Get notified when a booking comes in"}
+          </button>
+        )}
+        {pushStatus === "on" && (
+          <p style={{ fontSize: 12, color: "var(--fairway)", marginBottom: 16 }}>
+            🔔 Notifications are on — you'll get an alert the moment a new booking comes in.
+          </p>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
           <span style={{ fontSize: 11, color: "var(--faint)", fontWeight: 600 }}>Powered by</span>
@@ -918,6 +975,19 @@ const selectStyle: React.CSSProperties = {
   width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px",
   fontFamily: "inherit", fontSize: 13, background: "#FFF",
 };
+
+// Standard conversion PushManager requires - the VAPID key is generated
+// and stored as a base64url string, but subscribe() needs it as raw bytes.
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 function startOfWeek(d: Date) {
   const date = new Date(d);
