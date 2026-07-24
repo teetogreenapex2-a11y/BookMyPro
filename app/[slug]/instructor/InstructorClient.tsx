@@ -111,11 +111,8 @@ export default function InstructorClient({calendarConnected,calendarProvider, re
     }
   }
 
-  async function createManualBooking() {
-    const { slotId, serviceType, fittingType, playerId, packageId, instructorMembershipId, isRemote } = newBookingForm;
-    if (!slotId || !playerId || !instructorMembershipId) {
-      setNewBookingError("Pick a time, a player, and an instructor.");
-      return;
+  async function createManualBooking(formOverride) {
+    const { slotId, serviceType, fittingType, playerId, packageId, instructorMembershipId, isRemote } = formOverride || newBookingForm;
     }
     setCreatingBooking(true);
     setNewBookingError(null);
@@ -224,14 +221,18 @@ async function createNewPlayer() {
     setSlots(await res.json());
     setLoading(false);
   }
-
-  async function toggleSlot(slot: Slot) {
+async function toggleSlot(slot: Slot) {
     if (slot.status === "booked") {
       await openNoteFor(slot);
       return;
     }
     if (slot.status === "pending") {
       await openReviewFor(slot);
+      return;
+    }
+    if (newBookingOpen && slot.status === "open" && newBookingForm.playerId && newBookingForm.instructorMembershipId) {
+      setNewBookingForm((f) => ({ ...f, slotId: slot.id }));
+      await createManualBooking({ ...newBookingForm, slotId: slot.id });
       return;
     }
     const nextStatus = slot.status === "open" ? "closed" : "open";
@@ -467,8 +468,7 @@ async function createNewPlayer() {
         </button>
 
         {newBookingOpen && (() => {
-          const openSlots = slots.filter((s) => s.status === "open");
-          const selectedPlayer = players.find((p) => p.id === newBookingForm.playerId);
+         const selectedPlayer = players.find((p) => p.id === newBookingForm.playerId);
           return (
             <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>New booking</div>
@@ -493,18 +493,7 @@ async function createNewPlayer() {
                   </label>
                 )}
 
-                <label>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Time slot (this week)</div>
-                  <select
-                    value={newBookingForm.slotId}
-                    onChange={(e) => setNewBookingForm((f) => ({ ...f, slotId: e.target.value }))}
-                    style={selectStyle}
-                  >
-                    <option value="">Choose a slot…</option>
-                    {openSlots.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {new Date(s.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                      </option>
+                
                     ))}
                   </select>
                 </label>
@@ -620,18 +609,21 @@ async function createNewPlayer() {
                   </label>
                 )}
 
-                {newBookingError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{newBookingError}</p>}
+              {newBookingError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{newBookingError}</p>}
 
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                {newBookingForm.playerId && newBookingForm.instructorMembershipId ? (
+                  <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fairway)", background: "var(--open)", borderRadius: 8, padding: "10px 12px", margin: 0 }}>
+                    Tap an open time on the calendar below to book it{selectedPlayer ? ` for ${selectedPlayer.name || selectedPlayer.email}` : ""}.
+                  </p>
+                ) : (
+                  <p style={{ fontSize: 12, color: "var(--faint)", margin: 0 }}>
+                    Choose a player{teamInstructors.length > 1 ? " and instructor" : ""} above, then tap an open time on the calendar below.
+                  </p>
+                )}
+
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <button onClick={() => setNewBookingOpen(false)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>
                     Cancel
-                  </button>
-                  <button
-                    onClick={createManualBooking}
-                    disabled={creatingBooking}
-                    style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700 }}
-                  >
-                    {creatingBooking ? "Booking…" : "Create booking"}
                   </button>
                 </div>
               </div>
@@ -703,8 +695,19 @@ async function createNewPlayer() {
                       let bg = "var(--closed)";
                       let color = "var(--ink)";
                       let border = "none";
+                      const slot = slotsByKey[key];
+                      if (!slot) return null;
+                      const isPast = dt.getTime() < Date.now();
+                      const isArmedForBooking = newBookingOpen && !!newBookingForm.playerId && !!newBookingForm.instructorMembershipId;
+
+                      let bg = "var(--closed)";
+                      let color = "var(--ink)";
+                      let border = "none";
+                      let opacity = 1;
                       if (slot.status === "open") {
                         bg = "var(--open)";
+                        if (isPast) opacity = 0.35;
+                        else if (isArmedForBooking) border = "2px solid var(--gold)";
                       } else if (slot.status === "pending") {
                         bg = "#FBF3DE";
                         border = "1px dashed #B8862B";
@@ -718,17 +721,13 @@ async function createNewPlayer() {
                       }
 
                       return (
-                        <button key={time} onClick={() => toggleSlot(slot)} style={{
+                        <button key={time} onClick={() => toggleSlot(slot)} disabled={creatingBooking} style={{
                           padding: "8px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600, border,
-                          background: bg, color,
+                          background: bg, color, opacity: creatingBooking ? opacity * 0.6 : opacity,
                         }}>
                           {slot.status === "pending" ? "⏳" : formatTime12h(time)}
                         </button>
                       );
-                    })}
-                  </div>
-                </div>
-              );
             })}
           </div>
         )}

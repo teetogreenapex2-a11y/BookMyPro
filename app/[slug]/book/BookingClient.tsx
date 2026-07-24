@@ -675,7 +675,8 @@ saveProfileFieldsIfProvided();
                       const isBooked = slot.status === "booked";
                       const isPending = slot.status === "pending";
                       const isSelected = selected?.id === slot.id;
-                      const canPick = isOpen && (service === "lesson" ? canPickLessonSlot : !!fittingType && !!selectedInstructorId);
+                      const isTooSoon = dt.getTime() < Date.now() + 24 * 60 * 60 * 1000;
+                      const canPick = isOpen && !isTooSoon && (service === "lesson" ? canPickLessonSlot : !!fittingType && !!selectedInstructorId);
                       const bookedBg = slot.bookedServiceType === "fitting"
                         ? "#B8862B"
                         : slot.bookedIsRemote
