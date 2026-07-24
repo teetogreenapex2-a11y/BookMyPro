@@ -86,15 +86,45 @@ export default function InstructorClient({
   const [newPlayerPhone, setNewPlayerPhone] = useState("");
   const [newPlayerError, setNewPlayerError] = useState<string | null>(null);
   const [creatingPlayer, setCreatingPlayer] = useState(false);
-  const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "off" | "on" | "enabling">("unknown");
+  const [pushStatus, setPushStatus] = useState<
+    "unknown" | "unsupported" | "off" | "on" | "enabling" | "ios-needs-install" | "android-needs-install"
+  >("unknown");
+  const [showIOSInstallHelp, setShowIOSInstallHelp] = useState(false);
 
   useEffect(() => {
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+    const isAndroid = /Android/.test(ua);
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone === true;
+
+    if (isIOS && !isStandalone) {
+      // iOS Safari (not installed to home screen) never supports the Push API,
+      // regardless of browser feature checks below - catch this case first
+      // so we can tell the person what to actually do about it.
+      setPushStatus("ios-needs-install");
+      return;
+    }
+    // Android Chrome *can* do push from a regular browser tab, so this isn't
+    // a hard requirement like iOS - but push permission prompts get silently
+    // dropped far more often in a plain tab than after installing, and the
+    // install flow itself doubles as priming for the permission prompt. So
+    // we still steer people through it, just as a strong nudge rather than
+    // the iOS hard block.
+    if (isAndroid && !isStandalone && !("Notification" in window && Notification.permission === "granted")) {
+      setPushStatus("android-needs-install");
+      return;
+    }
+
     if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
       setPushStatus("unsupported");
       return;
     }
     navigator.serviceWorker.getRegistration().then((reg) => {
-      reg?.pushManager.getSubscription().then((sub) => setPushStatus(sub ? "on" : "off"));
+      if (!reg) {
+        setPushStatus("off");
+        return;
+      }
+      reg.pushManager.getSubscription().then((sub) => setPushStatus(sub ? "on" : "off"));
     }).catch(() => setPushStatus("off"));
   }, []);
 
@@ -522,6 +552,76 @@ export default function InstructorClient({
           <p style={{ fontSize: 12, color: "var(--fairway)", marginBottom: 16 }}>
             🔔 Notifications are on — you'll get an alert the moment a new booking comes in.
           </p>
+        )}
+        {(pushStatus === "ios-needs-install" || pushStatus === "android-needs-install") && (
+          <button
+            onClick={() => setShowIOSInstallHelp(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, background: "var(--card)", color: "var(--fairway)",
+              border: "1px solid var(--border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: 16,
+            }}
+          >
+            📲 Get notified when a booking comes in — tap to see how
+          </button>
+        )}
+
+        {showIOSInstallHelp && (
+          <div
+            onClick={() => setShowIOSInstallHelp(false)}
+            style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000,
+              display: "flex", alignItems: "flex-end", justifyContent: "center",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "#FFF", borderRadius: "16px 16px 0 0", padding: 20, width: "100%", maxWidth: 480,
+                boxShadow: "0 -4px 20px rgba(0,0,0,0.15)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "var(--fairway)" }}>Turn on booking alerts</div>
+                <button
+                  onClick={() => setShowIOSInstallHelp(false)}
+                  style={{ background: "none", border: "none", fontSize: 20, color: "var(--faint)", padding: 4, lineHeight: 1 }}
+                >
+                  ✕
+                </button>
+              </div>
+              <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 16 }}>
+                {pushStatus === "ios-needs-install"
+                  ? "iPhone only allows alerts for apps added to your Home Screen. It takes about 15 seconds:"
+                  : "Add this app to your Home Screen for the most reliable alerts. It takes about 15 seconds:"}
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+                {pushStatus === "ios-needs-install" ? (
+                  <>
+                    <Step number={1} text="Tap the Share icon in Safari's toolbar" icon="⬆️" />
+                    <Step number={2} text={'Scroll down and tap "Add to Home Screen"'} icon="➕" />
+                    <Step number={3} text={'Tap "Add" in the top right'} icon="✅" />
+                    <Step number={4} text="Open the app from the new icon, then tap the notification button again" icon="📲" />
+                  </>
+                ) : (
+                  <>
+                    <Step number={1} text="Tap the ⋮ menu in the top right of Chrome" icon="⋮" />
+                    <Step number={2} text={'Tap "Install app" (or "Add to Home screen")'} icon="➕" />
+                    <Step number={3} text={'Tap "Install" to confirm'} icon="✅" />
+                    <Step number={4} text="Open the app from the new icon, then tap the notification button again" icon="📲" />
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => setShowIOSInstallHelp(false)}
+                style={{
+                  width: "100%", background: "var(--fairway)", color: "var(--chalk)", border: "none",
+                  borderRadius: 8, padding: "11px 14px", fontSize: 13.5, fontWeight: 700,
+                }}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
@@ -963,6 +1063,23 @@ function Legend({ color, label }: { color: string; label: string }) {
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <div style={{ width: 12, height: 12, borderRadius: 4, background: color }} />
       {label}
+    </div>
+  );
+}
+
+function Step({ number, text, icon }: { number: number; text: string; icon: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{
+        width: 26, height: 26, borderRadius: "50%", background: "var(--card)", border: "1px solid var(--border)",
+        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "var(--fairway)",
+        flexShrink: 0,
+      }}>
+        {number}
+      </div>
+      <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+        <span>{icon}</span> {text}
+      </div>
     </div>
   );
 }
