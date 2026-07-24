@@ -90,7 +90,7 @@ model Business {
   syncLogs     SyncLog[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
-  pushSubscriptions PushSubscription[]
+  
   products     Product[]
   orders       Order[]
   giftCards    GiftCard[]
@@ -201,6 +201,7 @@ model User {
   bookings       Booking[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
+  pushSubscriptions PushSubscription[]
   orders         Order[]
   giftCardsPurchased GiftCard[] @relation("PurchasedGiftCards")
   accounts       Account[]
