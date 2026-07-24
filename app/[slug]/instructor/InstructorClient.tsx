@@ -8,7 +8,7 @@ import { formatTime12h, wallClockToUTC } from "@/lib/time";
 const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// A slot is a single shared moment in the day — an instructor can only run
+// A slot is a single shared moment in the day - an instructor can only run
 // one lesson or one fitting at a time, so there's exactly one timeline, not
 // a separate one per service. `bookedServiceType` (set once something has
 // requested or booked the slot) is what determines its color.
@@ -46,12 +46,13 @@ type Player = {
   packages: { id: string; label: string; lessonsRemaining: number; lessonsTotal: number }[];
 };
 
-export default function InstructorClient({calendarConnected,calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, slug, basePath, apiBase, businessName, businessLogoUrl,
+export default function InstructorClient({
+  calendarConnected, calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, slug, basePath, apiBase, businessName, businessLogoUrl,
 }: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
-  // Which instructor's own calendar is currently shown — defaults to your
+  // Which instructor's own calendar is currently shown - defaults to your
   // own, since each instructor now has their own independent timeline.
   const [viewingInstructorId, setViewingInstructorId] = useState(viewerMembershipId);
   const [noteSlot, setNoteSlot] = useState<Slot | null>(null);
@@ -85,6 +86,7 @@ export default function InstructorClient({calendarConnected,calendarProvider, re
   const [newPlayerPhone, setNewPlayerPhone] = useState("");
   const [newPlayerError, setNewPlayerError] = useState<string | null>(null);
   const [creatingPlayer, setCreatingPlayer] = useState(false);
+
   async function loadPendingBookings() {
     const res = await fetch(`${apiBase}/bookings`);
     if (res.ok) {
@@ -103,7 +105,7 @@ export default function InstructorClient({calendarConnected,calendarProvider, re
     if (res.ok) {
       const list = await res.json();
       setTeamInstructors(list);
-      // Most businesses have exactly one instructor — pre-fill it rather
+      // Most businesses have exactly one instructor - pre-fill it rather
       // than making the instructor pick themselves every time.
       if (list.length === 1) {
         setNewBookingForm((f) => ({ ...f, instructorMembershipId: list[0].id }));
@@ -111,8 +113,11 @@ export default function InstructorClient({calendarConnected,calendarProvider, re
     }
   }
 
-  async function createManualBooking(formOverride) {
+  async function createManualBooking(formOverride?: typeof newBookingForm) {
     const { slotId, serviceType, fittingType, playerId, packageId, instructorMembershipId, isRemote } = formOverride || newBookingForm;
+    if (!slotId || !playerId || !instructorMembershipId) {
+      setNewBookingError("Pick a time, a player, and an instructor.");
+      return;
     }
     setCreatingBooking(true);
     setNewBookingError(null);
@@ -139,7 +144,8 @@ export default function InstructorClient({calendarConnected,calendarProvider, re
       setNewBookingError(data.error || "Something went wrong.");
     }
   }
-async function createNewPlayer() {
+
+  async function createNewPlayer() {
     if (!newPlayerName.trim() || !newPlayerEmail.trim()) {
       setNewPlayerError("Name and email are required.");
       return;
@@ -157,6 +163,9 @@ async function createNewPlayer() {
       setNewPlayerError(data.error || "Something went wrong.");
       return;
     }
+    // Add the new player to the list in place, then immediately select
+    // them in the booking form - no need to close and reopen anything,
+    // this picks up right where the instructor left off.
     setPlayers((prev) => [...prev, { id: data.id, name: data.name, email: data.email, phone: data.phone, packages: [] }]);
     setNewBookingForm((f) => ({ ...f, playerId: data.id }));
     setAddingNewPlayer(false);
@@ -164,6 +173,7 @@ async function createNewPlayer() {
     setNewPlayerEmail("");
     setNewPlayerPhone("");
   }
+
   async function loadSyncLog() {
     const res = await fetch(`${apiBase}/calendar/sync-log`);
     if (res.ok) setSyncLogs(await res.json());
@@ -187,7 +197,7 @@ async function createNewPlayer() {
         setSyncMessage(data.error || data.reason || "Sync failed");
       } else {
         setSyncMessage(
-          `Synced — ${data.bookingsCreated} booking${data.bookingsCreated === 1 ? "" : "s"} created, ` +
+          `Synced - ${data.bookingsCreated} booking${data.bookingsCreated === 1 ? "" : "s"} created, ` +
           `${data.slotsBlocked} slot${data.slotsBlocked === 1 ? "" : "s"} blocked, ` +
           `${data.slotsUnblocked} slot${data.slotsUnblocked === 1 ? "" : "s"} reopened`
         );
@@ -205,7 +215,7 @@ async function createNewPlayer() {
   }, [weekStart, viewingInstructorId]);
 
   // The review panel renders below the calendar grid, which can easily run
-  // longer than the screen — without this, tapping a pending slot near the
+  // longer than the screen - without this, tapping a pending slot near the
   // top leaves the Confirm/Deny buttons scrolled out of view.
   useEffect(() => {
     if (reviewingBooking) {
@@ -221,7 +231,8 @@ async function createNewPlayer() {
     setSlots(await res.json());
     setLoading(false);
   }
-async function toggleSlot(slot: Slot) {
+
+  async function toggleSlot(slot: Slot) {
     if (slot.status === "booked") {
       await openNoteFor(slot);
       return;
@@ -230,6 +241,10 @@ async function toggleSlot(slot: Slot) {
       await openReviewFor(slot);
       return;
     }
+    // If the New Booking form is open with a player and instructor already
+    // chosen, tapping an open slot on the calendar completes the booking
+    // directly - no separate "pick a time" dropdown needed, since the
+    // calendar itself already shows exactly what's open.
     if (newBookingOpen && slot.status === "open" && newBookingForm.playerId && newBookingForm.instructorMembershipId) {
       setNewBookingForm((f) => ({ ...f, slotId: slot.id }));
       await createManualBooking({ ...newBookingForm, slotId: slot.id });
@@ -278,7 +293,7 @@ async function toggleSlot(slot: Slot) {
       loadSlots();
       loadPendingBookings();
       if (data.refundNeeded) {
-        setReviewMessage("Denied — this was a paid booking, so remember to refund the player outside the app.");
+        setReviewMessage("Denied - this was a paid booking, so remember to refund the player outside the app.");
       }
     } else {
       setReviewMessage(data.error || "Something went wrong.");
@@ -295,9 +310,9 @@ async function toggleSlot(slot: Slot) {
       setBookingId(match.id);
       setNoteText(match.note?.text || "");
       setBookingContact({
-        name: match.contactName || match.player?.name || "—",
-        phone: match.contactPhone || "—",
-        email: match.contactEmail || match.player?.email || "—",
+        name: match.contactName || match.player?.name || "-",
+        phone: match.contactPhone || "-",
+        email: match.contactEmail || match.player?.email || "-",
         handedness: match.player?.handedness || null,
         scoreOrHandicap: match.player?.scoreOrHandicap || null,
         commonIssues: match.player?.commonIssues || null,
@@ -331,7 +346,7 @@ async function toggleSlot(slot: Slot) {
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
-           <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {businessLogoUrl && (
                 <img src={businessLogoUrl} alt="" style={{ width: 24, height: 24, borderRadius: 5, objectFit: "cover" }} />
               )}
@@ -339,7 +354,7 @@ async function toggleSlot(slot: Slot) {
                 INSTRUCTOR - {businessName.toUpperCase()}
               </span>
             </span>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <a href={`${basePath}/customers`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Customers</a>
               <a href={`${basePath}/instructor/videos`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Swing videos</a>
               <a href={`${basePath}/instructor/swing-sketch`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Swing Sketch</a>
@@ -468,7 +483,7 @@ async function toggleSlot(slot: Slot) {
         </button>
 
         {newBookingOpen && (() => {
-         const selectedPlayer = players.find((p) => p.id === newBookingForm.playerId);
+          const selectedPlayer = players.find((p) => p.id === newBookingForm.playerId);
           return (
             <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>New booking</div>
@@ -493,11 +508,6 @@ async function toggleSlot(slot: Slot) {
                   </label>
                 )}
 
-                
-                    ))}
-                  </select>
-                </label>
-
                 <label>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Type</div>
                   <select
@@ -511,19 +521,14 @@ async function toggleSlot(slot: Slot) {
                     style={selectStyle}
                   >
                     <option value="lesson">Lesson</option>
-                    {remoteLessonsEnabled && <option value="lesson-remote">Lesson — remote (video call)</option>}
+                    {remoteLessonsEnabled && <option value="lesson-remote">Lesson - remote (video call)</option>}
                     <option value="fitting-driver">Driver fitting</option>
                     <option value="fitting-iron">Iron fitting</option>
                     <option value="fitting-full">Full bag fitting</option>
                   </select>
                 </label>
 
-                
-
-                {newBookingForm.serviceType === "lesson" && selectedPlayer && (
-                  <label>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>
-        <label>
+                <label>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Player</div>
                   {!addingNewPlayer ? (
                     <>
@@ -592,14 +597,19 @@ async function toggleSlot(slot: Slot) {
                       </div>
                     </div>
                   )}
-                </label>              Package (optional — leave blank for a free-standing booking, e.g. pay in person)
+                </label>
+
+                {newBookingForm.serviceType === "lesson" && selectedPlayer && (
+                  <label>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>
+                      Package (optional - leave blank for a free-standing booking, e.g. pay in person)
                     </div>
                     <select
                       value={newBookingForm.packageId}
                       onChange={(e) => setNewBookingForm((f) => ({ ...f, packageId: e.target.value }))}
                       style={selectStyle}
                     >
-                      <option value="">No package — free-standing booking</option>
+                      <option value="">No package - free-standing booking</option>
                       {selectedPlayer.packages.map((pkg) => (
                         <option key={pkg.id} value={pkg.id}>
                           {pkg.label} ({pkg.lessonsRemaining} of {pkg.lessonsTotal} left)
@@ -609,7 +619,7 @@ async function toggleSlot(slot: Slot) {
                   </label>
                 )}
 
-              {newBookingError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{newBookingError}</p>}
+                {newBookingError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{newBookingError}</p>}
 
                 {newBookingForm.playerId && newBookingForm.instructorMembershipId ? (
                   <p style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fairway)", background: "var(--open)", borderRadius: 8, padding: "10px 12px", margin: 0 }}>
@@ -648,7 +658,7 @@ async function toggleSlot(slot: Slot) {
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{b.contactName || b.player?.name || "—"}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{b.contactName || b.player?.name || "-"}</div>
                     <div className="mono" style={{ fontSize: 11, color: "#8A8571" }}>
                       {b.serviceType === "fitting" ? "Fitting" : "Lesson"} ·{" "}
                       {new Date(b.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
@@ -686,15 +696,13 @@ async function toggleSlot(slot: Slot) {
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {TIMES.map((time) => {
-                      const [h, m] = time.split(":").map(Number);                      
+                      const [h, m] = time.split(":").map(Number);
+                      // Timezone-safe conversion - matches how the slot was
+                      // originally stored server-side. Using the browser's
+                      // ambiguous local time here (setHours) is exactly what
+                      // caused only 3 of 8 daily slots to ever match.
                       const dt = wallClockToUTC(dayDate, h, m);
                       const key = dt.toISOString();
-                      const slot = slotsByKey[key];
-                      if (!slot) return null;
-
-                      let bg = "var(--closed)";
-                      let color = "var(--ink)";
-                      let border = "none";
                       const slot = slotsByKey[key];
                       if (!slot) return null;
                       const isPast = dt.getTime() < Date.now();
@@ -706,7 +714,15 @@ async function toggleSlot(slot: Slot) {
                       let opacity = 1;
                       if (slot.status === "open") {
                         bg = "var(--open)";
+                        // A slot that's already passed and never got booked
+                        // isn't "open" in any meaningful sense anymore -
+                        // fading it out keeps it from reading as a real,
+                        // currently-available time.
                         if (isPast) opacity = 0.35;
+                        // While a booking is armed (player + instructor
+                        // chosen), give bookable slots a visible highlight -
+                        // makes it obvious at a glance which buttons will
+                        // actually complete the booking when tapped.
                         else if (isArmedForBooking) border = "2px solid var(--gold)";
                       } else if (slot.status === "pending") {
                         bg = "#FBF3DE";
@@ -728,6 +744,10 @@ async function toggleSlot(slot: Slot) {
                           {slot.status === "pending" ? "⏳" : formatTime12h(time)}
                         </button>
                       );
+                    })}
+                  </div>
+                </div>
+              );
             })}
           </div>
         )}
@@ -757,9 +777,9 @@ async function toggleSlot(slot: Slot) {
             }}>
               <User size={14} color="var(--fairway)" />
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>{reviewingBooking.contactName || reviewingBooking.player?.name || "—"}</div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{reviewingBooking.contactName || reviewingBooking.player?.name || "-"}</div>
                 <div className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>
-                  {reviewingBooking.contactPhone || "—"} · {reviewingBooking.contactEmail || reviewingBooking.player?.email || "—"}
+                  {reviewingBooking.contactPhone || "-"} · {reviewingBooking.contactEmail || reviewingBooking.player?.email || "-"}
                 </div>
               </div>
             </div>
