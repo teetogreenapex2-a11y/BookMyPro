@@ -18,7 +18,7 @@ model Business {
   id     String @id @default(cuid())
   slug   String @unique // URL-friendly identifier, e.g. "tee-to-green" -> /tee-to-green/book
   name   String @default("My Golf Business")
-  logoUrl String?
+  logoUrl String? // uploaded via Settings - shown on this business's own booking/instructor pages instead of the platform's generic branding
   email  String @default("")
   hours  String @default("Mon–Sat, 8:00 AM – 5:00 PM")
   lessonRate String @default("$120/hr")
@@ -90,7 +90,6 @@ model Business {
   syncLogs     SyncLog[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
-  
   products     Product[]
   orders       Order[]
   giftCards    GiftCard[]
@@ -144,6 +143,7 @@ model Membership {
   availability Availability[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
+  pushSubscriptions PushSubscription[]
 
   // Per-instructor pricing — each instructor on staff sets their own rates,
   // rather than one shared business-wide price. Mirrors the exact same
@@ -201,7 +201,6 @@ model User {
   bookings       Booking[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
-  pushSubscriptions PushSubscription[]
   orders         Order[]
   giftCardsPurchased GiftCard[] @relation("PurchasedGiftCards")
   accounts       Account[]
@@ -410,7 +409,7 @@ model Order {
   giftCardAppliedCents Int    @default(0) // portion of the total covered by a gift card, if any
   stripeSessionId String?
   items           OrderItem[]
-giftCardRedemptions GiftCardRedemption[]    
+  giftCardRedemptions GiftCardRedemption[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -456,6 +455,11 @@ model GiftCard {
 
   @@index([businessId])
 }
+
+// A single browser/device that's granted notification permission. One
+// membership can have multiple (phone + laptop, say) - each gets its own
+// row and its own push, since a subscription is tied to one specific
+// browser's push service registration, not to the person in the abstract.
 model PushSubscription {
   id           String     @id @default(cuid())
   membership   Membership @relation(fields: [membershipId], references: [id])
@@ -467,6 +471,7 @@ model PushSubscription {
 
   @@index([membershipId])
 }
+
 model GiftCardRedemption {
   id          String   @id @default(cuid())
   giftCard    GiftCard @relation(fields: [giftCardId], references: [id])
