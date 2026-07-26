@@ -114,7 +114,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span className="display" style={{ fontSize: 18, fontWeight: 700 }}>Swing videos</span>
             <a href={`${basePath}/instructor`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
-              ← Back to dashboard
+             Back to dashboard
             </a>
           </div>
           <h1 className="display" style={{ fontSize: 24, margin: 0 }}>Review submissions</h1>
@@ -286,4 +286,6 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
       </main>
     </div>
   );
+}
+);
 }
