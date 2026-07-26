@@ -102,14 +102,21 @@ model Business {
   // their following entirely through their own shared link and may not
   // want to be discoverable by strangers browsing a public directory, so
   // this defaults to off rather than listing every business by default.
-  // City/state text search only for now, not true geographic radius
-  // search — that would need a geocoding service (a real external
-  // dependency), which isn't worth adding before there are enough listed
-  // businesses for radius search to actually matter.
+  // Find a Pro directory - opt-in, not automatic. Some instructors build
+  // their following entirely through their own shared link and may not
+  // want to be discoverable by strangers browsing a public directory, so
+  // this defaults to off rather than listing every business by default.
   listedInDirectory Boolean @default(false)
   city              String?
   state             String?
   zipCode           String?
+  // Geocoded once when city/state/zip is saved (see lib/geocoding.ts) -
+  // lets Find a Pro do genuine distance-based search ("within 25 miles")
+  // instead of exact text matching. Null until geocoding succeeds, which
+  // just means this business falls back to not showing up in a radius
+  // search until it's set - text search elsewhere isn't affected.
+  latitude          Float?
+  longitude         Float?
   createdAt    DateTime @default(now())
 }
 

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership, getBusinessInstructors } from "@/lib/tenant";
 import { seedInstructorAvailability } from "@/lib/seedAvailability";
+import { geocodeLocation } from "@/lib/geocoding";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const business = await getBusinessBySlug(params.slug);
@@ -36,6 +37,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   ];
   const data: Record<string, unknown> = {};
   for (const key of allowed) if (key in body) data[key] = body[key];
+
+  // City/state/zip changed - geocode it so distance-based search actually
+  // has something to work with. Runs once here rather than per search,
+  // since a business's location doesn't change often.
+  if ("city" in data || "state" in data || "zipCode" in data) {
+    const city = (data.city as string) || business.city || "";
+    const state = (data.state as string) || business.state || "";
+    const zipCode = (data.zipCode as string) || business.zipCode || undefined;
+    const coords = await geocodeLocation(city, state, zipCode);
+    if (coords) {
+      data.latitude = coords.latitude;
+      data.longitude = coords.longitude;
+    }
+  }
 
   const updated = await prisma.business.update({ where: { id: business.id }, data });
 
