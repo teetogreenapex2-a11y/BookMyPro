@@ -143,7 +143,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Title (optional) — e.g. Driver, face-on"
+            placeholder="Title (optional) - e.g. Driver, face-on"
             style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8 }}
           />
           <textarea
@@ -170,7 +170,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
               padding: "10px 18px", fontSize: 13, fontWeight: 700, opacity: uploading ? 0.7 : 1,
             }}
           >
-            {uploading ? "Uploading…" : "Submit video"}
+            {uploading ? "Uploading..." : "Submit video"}
           </button>
         </div>
 
@@ -179,7 +179,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
         </div>
 
         {loading ? (
-          <p style={{ fontSize: 13, color: "var(--faint)" }}>Loading…</p>
+          <p style={{ fontSize: 13, color: "var(--faint)" }}>Loading...</p>
         ) : submissions.length === 0 ? (
           <p style={{ fontSize: 13, color: "var(--faint)" }}>Nothing submitted yet.</p>
         ) : (
@@ -193,7 +193,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{s.title || "Untitled video"}</div>
                     <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>
-                      with {s.instructorName || "your instructor"} · {new Date(s.submittedAt).toLocaleDateString()}
+                      with {s.instructorName || "your instructor"} - {new Date(s.submittedAt).toLocaleDateString()}
                     </div>
                   </div>
                   <span className="mono" style={{
@@ -217,7 +217,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
                       onClick={() => downloadVideo(s.videoUrl, `${s.title || "swing-video"}.mp4`)}
                       style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fairway)", background: "none", border: "none", padding: "6px 0 0", cursor: "pointer" }}
                     >
-                      ⬇ Download
+                      v Download
                     </button>
                     {s.playerNote && (
                       <p style={{ fontSize: 12, color: "var(--faint)", margin: "8px 0 0", fontStyle: "italic" }}>
@@ -244,7 +244,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
                       </div>
                     ) : (
                       <p style={{ fontSize: 12, color: "var(--faint)", margin: "10px 0 0" }}>
-                        No comments yet — check back once your instructor's had a chance to watch.
+                        No comments yet - check back once your instructor's had a chance to watch.
                       </p>
                     )}
                   </div>

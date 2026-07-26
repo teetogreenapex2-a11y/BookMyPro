@@ -114,7 +114,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span className="display" style={{ fontSize: 18, fontWeight: 700 }}>Swing videos</span>
             <a href={`${basePath}/instructor`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
-              ← Back to dashboard
+              <- Back to dashboard
             </a>
           </div>
           <h1 className="display" style={{ fontSize: 24, margin: 0 }}>Review submissions</h1>
@@ -136,7 +136,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
           {uploadOpen && (
             <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
               <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 12px" }}>
-                Footage you recorded yourself — an in-person lesson, say — attributed to a player's history for reference later.
+                Footage you recorded yourself - an in-person lesson, say - attributed to a player's history for reference later.
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <select
@@ -144,7 +144,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   onChange={(e) => setUploadPlayerId(e.target.value)}
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, background: "#FFF" }}
                 >
-                  <option value="">Choose a player…</option>
+                  <option value="">Choose a player...</option>
                   {players.map((p) => (
                     <option key={p.id} value={p.id}>{p.name || p.email}</option>
                   ))}
@@ -152,12 +152,12 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                 <input
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder="Title (optional) — e.g. \"Driver, face-on\""
+                  placeholder="Title (optional) - e.g. \"Driver, face-on\""
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }}
                 />
                 {uploadError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{uploadError}</p>}
                 <label style={{ display: "inline-block", textAlign: "center", background: "var(--gold)", color: "var(--fairway)", borderRadius: 8, padding: "10px 16px", fontWeight: 700, fontSize: 13, cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}>
-                  {uploading ? "Uploading…" : "Choose video file"}
+                  {uploading ? "Uploading..." : "Choose video file"}
                   <input
                     type="file"
                     accept="video/mp4,video/quicktime,video/webm,video/x-m4v"
@@ -174,7 +174,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
         <div style={{ display: "flex", gap: 20, paddingTop: 4, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 260px", minWidth: 240 }}>
             {loading ? (
-              <p style={{ fontSize: 13, color: "var(--faint)" }}>Loading…</p>
+              <p style={{ fontSize: 13, color: "var(--faint)" }}>Loading...</p>
             ) : submissions.length === 0 ? (
               <p style={{ fontSize: 13, color: "var(--faint)" }}>No videos submitted yet.</p>
             ) : (
@@ -236,7 +236,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{selected.title || "Untitled video"}</div>
                 <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 8 }}>
-                  {selected.playerName} · {new Date(selected.submittedAt).toLocaleDateString()}
+                  {selected.playerName} - {new Date(selected.submittedAt).toLocaleDateString()}
                 </div>
                 {selected.playerNote && (
                   <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", marginBottom: 10 }}>
@@ -248,14 +248,14 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   onClick={() => downloadVideo(selected.videoUrl, `${selected.title || selected.playerName || "swing-video"}.mp4`)}
                   style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fairway)", background: "none", border: "none", padding: "0 0 12px", cursor: "pointer" }}
                 >
-                  ⬇ Download
+                  v Download
                 </button>
 
                 <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                   <input
                     value={commentDraft}
                     onChange={(e) => setCommentDraft(e.target.value)}
-                    placeholder="Comment at the current point in the video…"
+                    placeholder="Comment at the current point in the video..."
                     style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
                   />
                   <button

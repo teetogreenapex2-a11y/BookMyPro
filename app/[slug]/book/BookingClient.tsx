@@ -69,7 +69,7 @@ export default function BookingClient({
   }, [selected]);
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  // Same reasoning as above, for the other half of the flow — a booking
+  // Same reasoning as above, for the other half of the flow - a booking
   // that succeeds while the customer is scrolled down at the confirm
   // button shouldn't show its confirmation somewhere they can't see,
   // which is exactly what was happening before this.
@@ -466,8 +466,8 @@ export default function BookingClient({
                     </div>
                     <div className="mono" style={{ fontSize: 11, fontWeight: 600 }}>
                       {selectedPackage
-                        ? `${selectedPackage.lessonsRemaining} of ${selectedPackage.lessonsTotal} left${selectedPackage.paymentStatus === "pending" ? " · pay at lesson" : ""}`
-                        : `${centsToDollars(pendingPackageInfo!.priceCents)} · pick a time, then pay`}
+                        ? `${selectedPackage.lessonsRemaining} of ${selectedPackage.lessonsTotal} left${selectedPackage.paymentStatus === "pending" ? " - pay at lesson" : ""}`
+                        : `${centsToDollars(pendingPackageInfo!.priceCents)} - pick a time, then pay`}
                     </div>
                   </button>
                 </div>
@@ -537,7 +537,7 @@ export default function BookingClient({
                   }}>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{f.label}</div>
                     <div className="mono" style={{ fontSize: 11, fontWeight: 600 }}>
-                      {centsToDollars(f.priceCents)} · {f.durationMin} min
+                      {centsToDollars(f.priceCents)} - {f.durationMin} min
                     </div>
                   </button>
                 ))
@@ -636,14 +636,14 @@ export default function BookingClient({
                 {isBuyingPackage ? (
                   <>
                     Buying: <span style={{ color: "var(--gold)" }}>{pendingPackageInfo!.label}</span>
-                    <span className="mono" style={{ color: "var(--muted)", fontWeight: 500 }}> · {centsToDollars(pendingPackageInfo!.priceCents)}</span>
+                    <span className="mono" style={{ color: "var(--muted)", fontWeight: 500 }}> - {centsToDollars(pendingPackageInfo!.priceCents)}</span>
                   </>
                 ) : (
                   <>
                     Booking from: <span style={{ color: "var(--gold)" }}>{selectedPackage!.type}</span>
-                    <span className="mono" style={{ color: "var(--muted)", fontWeight: 500 }}> · {selectedPackage!.lessonsRemaining} of {selectedPackage!.lessonsTotal} left</span>
+                    <span className="mono" style={{ color: "var(--muted)", fontWeight: 500 }}> - {selectedPackage!.lessonsRemaining} of {selectedPackage!.lessonsTotal} left</span>
                     {selectedPackage!.paymentStatus === "pending" && (
-                      <span className="mono" style={{ color: "#9A7A1E", fontWeight: 600 }}> · payment due at first lesson</span>
+                      <span className="mono" style={{ color: "#9A7A1E", fontWeight: 600 }}> - payment due at first lesson</span>
                     )}
                   </>
                 )}
@@ -658,7 +658,7 @@ export default function BookingClient({
             }}>
               <span style={{ fontSize: 13, fontWeight: 600 }}>
                 Booking from: <span style={{ color: "var(--gold)" }}>{activeFitting.label}</span>
-                <span className="mono" style={{ color: "var(--muted)", fontWeight: 500 }}> · {centsToDollars(activeFitting.priceCents)} · {activeFitting.durationMin} min</span>
+                <span className="mono" style={{ color: "var(--muted)", fontWeight: 500 }}> - {centsToDollars(activeFitting.priceCents)} - {activeFitting.durationMin} min</span>
               </span>
             </div>
           )
@@ -666,17 +666,17 @@ export default function BookingClient({
 
         <div ref={calendarRef} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>
-            {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} –{" "}
+            {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} -{" "}
             {new Date(weekStart.getTime() + 6 * DAY_MS).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => setWeekStart(new Date(weekStart.getTime() - 7 * DAY_MS))} style={navBtnStyle}>←</button>
-            <button onClick={() => setWeekStart(new Date(weekStart.getTime() + 7 * DAY_MS))} style={navBtnStyle}>→</button>
+            <button onClick={() => setWeekStart(new Date(weekStart.getTime() - 7 * DAY_MS))} style={navBtnStyle}><-</button>
+            <button onClick={() => setWeekStart(new Date(weekStart.getTime() + 7 * DAY_MS))} style={navBtnStyle}>-></button>
           </div>
         </div>
 
         {loading ? (
-          <p style={{ color: "var(--muted)", fontSize: 14 }}>Loading availability…</p>
+          <p style={{ color: "var(--muted)", fontSize: 14 }}>Loading availability...</p>
         ) : (
           <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
             {Array.from({ length: 7 }).map((_, dayIdx) => {
@@ -723,7 +723,7 @@ export default function BookingClient({
                             cursor: canPick ? "pointer" : "default",
                           }}
                         >
-                          {isPending ? "⏳" : formatTime12h(time)}
+                          {isPending ? "(pending)" : formatTime12h(time)}
                         </button>
                       );
                     })}
@@ -753,9 +753,9 @@ export default function BookingClient({
               <div className="mono" style={{ fontSize: 11, color: "#9DB8A9" }}>
                 {service === "lesson"
                   ? isBuyingPackage
-                    ? `${pendingPackageInfo!.label} · ${centsToDollars(pendingPackageInfo!.priceCents)}`
+                    ? `${pendingPackageInfo!.label} - ${centsToDollars(pendingPackageInfo!.priceCents)}`
                     : `Uses 1 of ${selectedPackage?.lessonsRemaining ?? 0} remaining`
-                  : activeFitting ? `${activeFitting.label} · ${centsToDollars(activeFitting.priceCents)}` : ""}
+                  : activeFitting ? `${activeFitting.label} - ${centsToDollars(activeFitting.priceCents)}` : ""}
               </div>
             </div>
 
@@ -839,7 +839,7 @@ export default function BookingClient({
                 opacity: confirming || !contactValid() || !selectedInstructorId || (service === "lesson" && !canPickLessonSlot) ? 0.6 : 1,
               }}
             >
-              {confirming ? "…" : service === "lesson" && !isBuyingPackage ? "Confirm" : "Pay & Confirm"}
+              {confirming ? "..." : service === "lesson" && !isBuyingPackage ? "Confirm" : "Pay & Confirm"}
             </button>
           </div>
         )}
