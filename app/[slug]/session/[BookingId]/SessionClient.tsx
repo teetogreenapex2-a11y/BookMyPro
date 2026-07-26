@@ -1,13 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import SwingCanvas, { SwingCanvasHandle } from "@/components/SwingCanvas";
 
 declare global {
   interface Window {
-    DailyIframe?: any;
+    Daily?: any;
   }
 }
+
+// One entry per participant currently in the call - tracks their video/audio
+// MediaStreamTrack objects as Daily reports them starting and stopping.
+// This is the actual point of Call Object mode over Prebuilt: these are
+// real, raw tracks we have direct access to, not something walled off
+// inside an iframe - which is what buffering/replay (Phase 2) will need.
+type ParticipantMedia = {
+  sessionId: string;
+  isLocal: boolean;
+  userName: string;
+  videoTrack: MediaStreamTrack | null;
+  audioTrack: MediaStreamTrack | null;
+};
 
 export default function SessionClient({
   videoCallUrl,
@@ -24,8 +37,7 @@ export default function SessionClient({
   basePath: string;
   apiBase: string;
 }) {
-  const videoContainerRef = useRef<HTMLDivElement | null>(null);
-  const callFrameRef = useRef<any>(null);
+  const callRef = useRef<any>(null);
   const canvasHandleRef = useRef<SwingCanvasHandle | null>(null);
   const [sketchStarted, setSketchStarted] = useState(false);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
@@ -33,11 +45,21 @@ export default function SessionClient({
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  // Load Daily via a plain script tag rather than an npm dependency - the
-  // exact approach Daily's own docs recommend for embedding, and it
-  // sidesteps needing to add and version a new package for this alone.
+  const [participants, setParticipants] = useState<Record<string, ParticipantMedia>>({});
+  const [joined, setJoined] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [micOn, setMicOn] = useState(true);
+  const [cameraOn, setCameraOn] = useState(true);
+
+  const updateParticipant = useCallback((sessionId: string, patch: Partial<ParticipantMedia>) => {
+    setParticipants((prev) => ({
+      ...prev,
+      [sessionId]: { sessionId, isLocal: false, userName: "", videoTrack: null, audioTrack: null, ...prev[sessionId], ...patch },
+    }));
+  }, []);
+
   useEffect(() => {
-    if (window.DailyIframe) {
+    if (window.Daily) {
       joinCall();
       return;
     }
@@ -47,19 +69,71 @@ export default function SessionClient({
     script.onload = joinCall;
     document.body.appendChild(script);
     return () => {
-      callFrameRef.current?.destroy();
+      callRef.current?.leave();
+      callRef.current?.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function joinCall() {
-    if (!videoContainerRef.current || !window.DailyIframe || callFrameRef.current) return;
-    const callFrame = window.DailyIframe.createFrame(videoContainerRef.current, {
-      iframeStyle: { width: "100%", height: "100%", border: "0" },
-      showLeaveButton: true,
+    if (!window.Daily || callRef.current) return;
+
+    // subscribeToTracksAutomatically: true - the simple default for a
+    // one-on-one lesson (two participants only), so we don't need to
+    // manually manage subscriptions the way a larger group call would.
+    const call = window.Daily.createCallObject({ subscribeToTracksAutomatically: true });
+    callRef.current = call;
+
+    call.on("track-started", (ev: any) => {
+      const sessionId = ev.participant?.session_id;
+      if (!sessionId) return;
+      updateParticipant(sessionId, {
+        isLocal: !!ev.participant?.local,
+        userName: ev.participant?.local ? "You" : (isInstructor ? playerName : "Instructor"),
+        ...(ev.track.kind === "video" ? { videoTrack: ev.track } : { audioTrack: ev.track }),
+      });
     });
-    callFrame.join({ url: videoCallUrl });
-    callFrameRef.current = callFrame;
+
+    call.on("track-stopped", (ev: any) => {
+      const sessionId = ev.participant?.session_id;
+      if (!sessionId) return;
+      updateParticipant(sessionId, ev.track?.kind === "video" ? { videoTrack: null } : { audioTrack: null });
+    });
+
+    call.on("participant-left", (ev: any) => {
+      const sessionId = ev.participant?.session_id;
+      if (!sessionId) return;
+      setParticipants((prev) => {
+        const next = { ...prev };
+        delete next[sessionId];
+        return next;
+      });
+    });
+
+    call.on("error", (ev: any) => {
+      setJoinError(ev?.errorMsg || "Something went wrong with the call.");
+    });
+
+    call
+      .join({ url: videoCallUrl })
+      .then(() => setJoined(true))
+      .catch((err: any) => setJoinError(err?.message || "Couldn't join the call."));
+  }
+
+  function toggleMic() {
+    const next = !micOn;
+    callRef.current?.setLocalAudio(next);
+    setMicOn(next);
+  }
+
+  function toggleCamera() {
+    const next = !cameraOn;
+    callRef.current?.setLocalVideo(next);
+    setCameraOn(next);
+  }
+
+  function leaveCall() {
+    callRef.current?.leave();
   }
 
   async function uploadSourcePhoto(file: File) {
@@ -111,7 +185,42 @@ export default function SessionClient({
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, padding: "0 12px 12px" }}>
-        <div ref={videoContainerRef} style={{ width: "100%", height: "45vh", background: "#000", borderRadius: 12, overflow: "hidden" }} />
+        <div style={{ width: "100%", minHeight: "45vh", background: "#000", borderRadius: 12, overflow: "hidden", position: "relative", display: "flex", flexWrap: "wrap", gap: 2 }}>
+          {joinError && (
+            <p style={{ color: "#FFF", padding: 20, fontSize: 13 }}>{joinError}</p>
+          )}
+          {!joined && !joinError && (
+            <p style={{ color: "#FFF", padding: 20, fontSize: 13 }}>Joining...</p>
+          )}
+          {Object.values(participants)
+            .filter((p) => !p.isLocal)
+            .map((p) => (
+              <VideoTile key={p.sessionId} participant={p} />
+            ))}
+          {/* Local self-view - small, corner-positioned, like any normal call UI */}
+          {Object.values(participants)
+            .filter((p) => p.isLocal)
+            .map((p) => (
+              <div key={p.sessionId} style={{ position: "absolute", bottom: 10, right: 10, width: 100, height: 75, borderRadius: 8, overflow: "hidden", border: "2px solid rgba(255,255,255,0.3)" }}>
+                <VideoTile participant={p} muted />
+              </div>
+            ))}
+        </div>
+
+        {joined && (
+          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+            <button onClick={toggleMic} style={{ background: micOn ? "#333" : "#B23A3A", color: "#FFF", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 700 }}>
+              {micOn ? "Mute" : "Unmute"}
+            </button>
+            <button onClick={toggleCamera} style={{ background: cameraOn ? "#333" : "#B23A3A", color: "#FFF", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 700 }}>
+              {cameraOn ? "Camera off" : "Camera on"}
+            </button>
+            <button onClick={leaveCall} style={{ background: "#B23A3A", color: "#FFF", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 700 }}>
+              Leave
+            </button>
+          </div>
+        )}
+
 
         <div style={{ flex: 1, background: "#FFF", borderRadius: 12, padding: 14, minHeight: 320 }}>
           {!isInstructor ? (
@@ -152,6 +261,35 @@ export default function SessionClient({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// A single video tile - the actual reason Call Object mode was worth the
+// extra build effort over Prebuilt: this attaches the raw MediaStreamTrack
+// directly, giving real, direct access to the video data. React doesn't
+// support srcObject as a normal prop, so it's set imperatively via a ref,
+// same pattern Daily's own docs use for custom UI.
+function VideoTile({ participant, muted }: { participant: ParticipantMedia; muted?: boolean }) {
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const el = videoElRef.current;
+    if (!el) return;
+    const tracks: MediaStreamTrack[] = [];
+    if (participant.videoTrack) tracks.push(participant.videoTrack);
+    if (participant.audioTrack && !muted) tracks.push(participant.audioTrack);
+    el.srcObject = tracks.length > 0 ? new MediaStream(tracks) : null;
+  }, [participant.videoTrack, participant.audioTrack, muted]);
+
+  return (
+    <div style={{ position: "relative", flex: "1 1 300px", minHeight: 200, background: "#111" }}>
+      <video ref={videoElRef} autoPlay playsInline muted={muted} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      {!participant.videoTrack && (
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#888", fontSize: 12 }}>
+          {participant.userName || "Waiting..."}
+        </div>
+      )}
     </div>
   );
 }
