@@ -31,10 +31,10 @@ export default function BookingClient({
   const [isRemote, setIsRemote] = useState(false);
   const [packages, setPackages] = useState<Package[]>(initialPackages);
   // Which package is auto/selected depends on which instructor is chosen
-  // (pricing and ownership are both per-instructor now) — set once
+  // (pricing and ownership are both per-instructor now) - set once
   // instructors load, see the effect below, rather than at mount.
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
-  // A package the player has chosen to BUY but hasn't paid for yet — distinct
+  // A package the player has chosen to BUY but hasn't paid for yet - distinct
   // from selectedPackageId, which is an already-owned package with credits.
   // Having either one set is what lets them pick a day/time; the "Confirm"
   // button then either books directly (owned) or sends them to pay (pending),
@@ -47,15 +47,25 @@ export default function BookingClient({
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Slot | null>(null);
   const confirmCardRef = useRef<HTMLDivElement>(null);
+  const messageRef = useRef<HTMLDivElement>(null);
 
   // Picking a time slot is easy to miss following up on if the confirm card
-  // is off-screen below the calendar — scroll it into view automatically so
+  // is off-screen below the calendar - scroll it into view automatically so
   // there's no chance of "I picked a time but nothing happened."
   useEffect(() => {
     if (selected && confirmCardRef.current) {
       confirmCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [selected]);
+  // Same reasoning as above, for the other half of the flow — a booking
+  // that succeeds while the customer is scrolled down at the confirm
+  // button shouldn't show its confirmation somewhere they can't see,
+  // which is exactly what was happening before this.
+  useEffect(() => {
+    if (message && messageRef.current) {
+      messageRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [message]);
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [contact, setContact] = useState({ name: "", phone: "", email: "", handedness: "", scoreOrHandicap: "", commonIssues: "" });
@@ -83,7 +93,7 @@ export default function BookingClient({
       .then((r) => r.json())
       .then((list: Instructor[]) => {
         setInstructors(list);
-        // Most businesses have exactly one instructor — don't make players
+        // Most businesses have exactly one instructor - don't make players
         // click through a picker with only one option in it.
         if (list.length === 1) setSelectedInstructorId(list[0].id);
       })
@@ -93,7 +103,7 @@ export default function BookingClient({
 
   // Packages are tied to a specific instructor (pricing is per-instructor),
   // so switching who you're booking with should surface whatever you
-  // already own *with them* — not a package bought from someone else.
+  // already own *with them* - not a package bought from someone else.
   useEffect(() => {
     if (!selectedInstructorId) {
       setSelectedPackageId(null);
@@ -156,8 +166,8 @@ export default function BookingClient({
     }
   }
 
-  // Books directly against an already-owned package — no payment involved.
-async function saveProfileFieldsIfProvided() {
+  // Books directly against an already-owned package - no payment involved.
+  async function saveProfileFieldsIfProvided() {
     const updates: Record<string, string> = {};
     if (contact.handedness) updates.handedness = contact.handedness;
     if (contact.scoreOrHandicap.trim()) updates.scoreOrHandicap = contact.scoreOrHandicap.trim();
@@ -170,11 +180,13 @@ async function saveProfileFieldsIfProvided() {
         body: JSON.stringify(updates),
       });
     } catch {
+      // Non-critical - the booking itself doesn't depend on this succeeding.
     }
   }
+
   async function bookLesson() {
     if (!selected || !selectedPackage || !selectedInstructorId || !contactValid()) return;
-saveProfileFieldsIfProvided();
+    saveProfileFieldsIfProvided();
     setConfirming(true);
     const res = await fetch(`${apiBase}/bookings`, {
       method: "POST",
@@ -194,9 +206,9 @@ saveProfileFieldsIfProvided();
       const created = await res.json();
       setMessage(
         created.status === "pending"
-          ? "Request sent — this time is held for you. You'll be confirmed shortly."
+          ? "Request sent - this time is held for you. You'll be confirmed shortly."
           : created.videoCallUrl
-          ? "Lesson booked — your video call link is ready below."
+          ? "Lesson booked - your video call link is ready below."
           : "Lesson booked and synced to the calendar."
       );
       setSelected(null);
@@ -209,12 +221,12 @@ saveProfileFieldsIfProvided();
     }
   }
 
-  // Buying a brand new package for a specific slot — the slot comes along in
+  // Buying a brand new package for a specific slot - the slot comes along in
   // checkout metadata, so paying both purchases the package AND books that
   // slot with the first credit, all in one step (see the webhook).
   async function buyPackageAndBookSlot() {
     if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
-saveProfileFieldsIfProvided();
+    saveProfileFieldsIfProvided();
     setConfirming(true);
     const res = await fetch(`${apiBase}/packages/checkout`, {
       method: "POST",
@@ -237,7 +249,7 @@ saveProfileFieldsIfProvided();
 
   async function bookFitting() {
     if (!selected || !fittingType || !selectedInstructorId || !contactValid()) return;
-saveProfileFieldsIfProvided();
+    saveProfileFieldsIfProvided();
     setConfirming(true);
     const res = await fetch(`${apiBase}/fittings/checkout`, {
       method: "POST",
@@ -266,7 +278,7 @@ saveProfileFieldsIfProvided();
   const selectedInstructor = instructors.find((i) => i.id === selectedInstructorId) || null;
   const selectedPackage = packages.find((p) => p.id === selectedPackageId) || null;
   // A "Video lesson" package is pointless to show if the business never
-  // configured Daily.co — the booking would go through but never get a
+  // configured Daily.co - the booking would go through but never get a
   // working call link, which is a worse experience than just not offering
   // it. Computed once and reused everywhere the package list renders.
   function visiblePackages(inst: any) {
@@ -276,7 +288,7 @@ saveProfileFieldsIfProvided();
 
   const pendingPackageInfo = pendingPackageType && selectedInstructor ? visiblePackages(selectedInstructor).find((p) => p.id === pendingPackageType) || null : null;
 
-  // The "Video lesson" package is inherently remote — no need to also flip
+  // The "Video lesson" package is inherently remote - no need to also flip
   // a separate toggle for it. Any other package still goes through the
   // toggle normally (a player can take a regular lesson remotely too).
   const isVideoPackage = selectedPackage?.type === "video" || pendingPackageType === "video";
@@ -286,7 +298,7 @@ saveProfileFieldsIfProvided();
   const activeFitting = fittingType && selectedInstructor
     ? { ...FITTING_TYPES.find((f) => f.id === fittingType)!, priceCents: getFittingPriceCents(selectedInstructor, fittingType) }
     : null;
-  // Either an owned package with credits, or a tier chosen to buy — either is enough to pick a slot, but only once an instructor is chosen too.
+  // Either an owned package with credits, or a tier chosen to buy - either is enough to pick a slot, but only once an instructor is chosen too.
   const canPickLessonSlot = !!selectedInstructorId && ((!!selectedPackage && selectedPackage.lessonsRemaining > 0) || !!pendingPackageType);
   const isBuyingPackage = !selectedPackage && !!pendingPackageType;
 
@@ -305,7 +317,7 @@ saveProfileFieldsIfProvided();
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
-           <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {business.logoUrl && (
                 <img src={business.logoUrl} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
               )}
@@ -313,7 +325,7 @@ saveProfileFieldsIfProvided();
                 {business.name}
               </span>
             </span>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <a href={`${basePath}/videos`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
                 Swing videos
               </a>
@@ -420,7 +432,7 @@ saveProfileFieldsIfProvided();
           )}
           {service === "lesson" && isVideoPackage && (
             <p className="mono" style={{ fontSize: 11, color: "#9DB8A9", marginBottom: 14 }}>
-              This is a remote lesson — you'll get a video call link once it's confirmed.
+              This is a remote lesson - you'll get a video call link once it's confirmed.
             </p>
           )}
 
@@ -529,7 +541,7 @@ saveProfileFieldsIfProvided();
 
       <main style={{ maxWidth: 720, margin: "0 auto", padding: "22px 20px 60px" }}>
         {message && (
-          <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 16, fontSize: 13 }}>
+          <div ref={messageRef} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 16, fontSize: 13 }}>
             {message}{" "}
             <button onClick={() => setMessage(null)} style={{ background: "none", border: "none", color: "var(--gold)", fontWeight: 600, fontSize: 13 }}>
               Dismiss
@@ -667,7 +679,10 @@ saveProfileFieldsIfProvided();
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {TIMES.map((time) => {
                       const [h, m] = time.split(":").map(Number);
-                      const dt = wallClockToUTC(dayDate, h, m);                      
+                      // Timezone-safe conversion - see lib/time.ts. Naive
+                      // setHours() here is what caused this same lookup to
+                      // silently miss most slots.
+                      const dt = wallClockToUTC(dayDate, h, m);
                       const key = dt.toISOString();
                       const slot = slotsByKey[key];
                       if (!slot) return null;
@@ -675,6 +690,9 @@ saveProfileFieldsIfProvided();
                       const isBooked = slot.status === "booked";
                       const isPending = slot.status === "pending";
                       const isSelected = selected?.id === slot.id;
+                      // Anything less than 24 hours out isn't bookable -
+                      // most instructors have their day already planned by
+                      // that point, same as most people.
                       const isTooSoon = dt.getTime() < Date.now() + 24 * 60 * 60 * 1000;
                       const canPick = isOpen && !isTooSoon && (service === "lesson" ? canPickLessonSlot : !!fittingType && !!selectedInstructorId);
                       const bookedBg = slot.bookedServiceType === "fitting"
@@ -735,27 +753,28 @@ saveProfileFieldsIfProvided();
               <input
                 value={contact.name}
                 onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
-                className="contact-input"
                 placeholder="Full name"
+                className="contact-input"
                 style={contactInputStyle}
               />
               <input
                 value={contact.phone}
                 onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
-                className="contact-input"
                 placeholder="Phone number"
                 type="tel"
+                className="contact-input"
                 style={contactInputStyle}
               />
               <input
                 value={contact.email}
                 onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
-                className="contact-input"
                 placeholder="Email address"
                 type="email"
+                className="contact-input"
                 style={contactInputStyle}
               />
-              <div className="mono"style={{ fontSize: 10.5, color: "#9DB8A9", letterSpacing: "0.05em", marginTop: 4 }}>
+
+              <div className="mono" style={{ fontSize: 10.5, color: "#9DB8A9", letterSpacing: "0.05em", marginTop: 4 }}>
                 OPTIONAL - HELPS YOUR INSTRUCTOR PREPARE
               </div>
               <div style={{ display: "flex", gap: 6 }}>
