@@ -4,9 +4,11 @@ import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, requireMembership, getBasePaths } from "@/lib/tenant";
 import InstructorVideosClient from "./InstructorVideosClient";
 
+import { loginRedirectUrl } from "@/lib/businessUrl";
+
 export default async function InstructorVideosPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
+  if (!session) redirect(loginRedirectUrl(`/${params.slug}/instructor/videos`));
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) notFound();
@@ -15,5 +17,5 @@ export default async function InstructorVideosPage({ params }: { params: { slug:
   const { basePath, apiBase } = getBasePaths(params.slug);
   if (!membership) redirect(`${basePath}/book`);
 
-  return <InstructorVideosClient slug={params.slug} basePath={basePath} apiBase={apiBase} />;
+ return <InstructorVideosClient slug={params.slug} basePath={basePath} apiBase={apiBase} viewerMembershipId={membership.id} />;
 }
