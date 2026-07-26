@@ -107,7 +107,7 @@ export default function SessionClient({
           <div className="mono" style={{ fontSize: 11, letterSpacing: "0.08em", color: "#B8862B" }}>REMOTE SESSION</div>
           <div style={{ color: "#F6F4EE", fontWeight: 700, fontSize: 15 }}>with {playerName}</div>
         </div>
-        <a href={`${basePath}/instructor`} style={{ color: "#D7DED9", fontSize: 13, textDecoration: "none" }}><- Back to dashboard</a>
+        <a href={`${basePath}/instructor`} style={{ color: "#D7DED9", fontSize: 13, textDecoration: "none" }}>Back to dashboard</a>
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, padding: "0 12px 12px" }}>
