@@ -14,13 +14,65 @@ function formatTimestamp(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function InstructorVideosClient({ slug, basePath, apiBase }: { slug: string; basePath: string; apiBase: string }) {
+// See VideosClient.tsx for why this fetches the file rather than using a
+// plain download link - same cross-origin reasoning applies here too.
+async function downloadVideo(url: string, filename: string) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
+type Player = { id: string; name: string | null; email: string };
+
+export default function InstructorVideosClient({ slug, basePath, apiBase, viewerMembershipId }: { slug: string; basePath: string; apiBase: string; viewerMembershipId: string }) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
   const [posting, setPosting] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadPlayerId, setUploadPlayerId] = useState("");
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  function loadPlayers() {
+    fetch(`${apiBase}/players`).then((r) => r.json()).then((list) => setPlayers(Array.isArray(list) ? list : [])).catch(() => {});
+  }
+
+  async function uploadVideo(file: File) {
+    if (!uploadPlayerId) {
+      setUploadError("Choose which player this is for first.");
+      return;
+    }
+    setUploading(true);
+    setUploadError(null);
+    const form = new FormData();
+    form.append("video", file);
+    form.append("instructorMembershipId", viewerMembershipId);
+    form.append("playerId", uploadPlayerId);
+    if (uploadTitle.trim()) form.append("title", uploadTitle.trim());
+    const res = await fetch(`${apiBase}/videos`, { method: "POST", body: form });
+    setUploading(false);
+    if (res.ok) {
+      setUploadOpen(false);
+      setUploadPlayerId("");
+      setUploadTitle("");
+      load();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setUploadError(data.error || "Something went wrong.");
+    }
+  }
 
   function load() {
     fetch(`${apiBase}/videos`).then((r) => r.json()).then((list) => {
@@ -32,6 +84,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase }: { sl
 
   useEffect(() => {
     load();
+    loadPlayers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -69,7 +122,56 @@ export default function InstructorVideosClient({ slug, basePath, apiBase }: { sl
       </header>
 
       <main style={{ maxWidth: 800, margin: "0 auto", padding: "0 20px 60px", background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh" }}>
-        <div style={{ display: "flex", gap: 20, paddingTop: 20, flexWrap: "wrap" }}>
+        <div style={{ paddingTop: 20 }}>
+          <button
+            onClick={() => { setUploadOpen((o) => !o); setUploadError(null); }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, background: "var(--fairway)", color: "var(--chalk)",
+              border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: uploadOpen ? 12 : 20,
+            }}
+          >
+            + Upload a video
+          </button>
+
+          {uploadOpen && (
+            <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+              <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 12px" }}>
+                Footage you recorded yourself — an in-person lesson, say — attributed to a player's history for reference later.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <select
+                  value={uploadPlayerId}
+                  onChange={(e) => setUploadPlayerId(e.target.value)}
+                  style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, background: "#FFF" }}
+                >
+                  <option value="">Choose a player…</option>
+                  {players.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name || p.email}</option>
+                  ))}
+                </select>
+                <input
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  placeholder="Title (optional) — e.g. \"Driver, face-on\""
+                  style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }}
+                />
+                {uploadError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{uploadError}</p>}
+                <label style={{ display: "inline-block", textAlign: "center", background: "var(--gold)", color: "var(--fairway)", borderRadius: 8, padding: "10px 16px", fontWeight: 700, fontSize: 13, cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}>
+                  {uploading ? "Uploading…" : "Choose video file"}
+                  <input
+                    type="file"
+                    accept="video/mp4,video/quicktime,video/webm,video/x-m4v"
+                    style={{ display: "none" }}
+                    disabled={uploading}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo(f); }}
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 20, paddingTop: 4, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 260px", minWidth: 240 }}>
             {loading ? (
               <p style={{ fontSize: 13, color: "var(--faint)" }}>Loading…</p>
@@ -141,7 +243,13 @@ export default function InstructorVideosClient({ slug, basePath, apiBase }: { sl
                     "{selected.playerNote}"
                   </p>
                 )}
-                <video ref={videoRef} src={selected.videoUrl} controls style={{ width: "100%", borderRadius: 8, background: "#000", marginBottom: 12 }} />
+                <video ref={videoRef} src={selected.videoUrl} controls style={{ width: "100%", borderRadius: 8, background: "#000", marginBottom: 6 }} />
+                <button
+                  onClick={() => downloadVideo(selected.videoUrl, `${selected.title || selected.playerName || "swing-video"}.mp4`)}
+                  style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fairway)", background: "none", border: "none", padding: "0 0 12px", cursor: "pointer" }}
+                >
+                  ⬇ Download
+                </button>
 
                 <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                   <input

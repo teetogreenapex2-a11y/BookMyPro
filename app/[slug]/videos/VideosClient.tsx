@@ -17,6 +17,24 @@ function formatTimestamp(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// A plain <a download> doesn't reliably force a download for a
+// cross-origin file like these (Vercel Blob lives on a different domain
+// than the app) - most browsers just navigate to it instead. Fetching it
+// as a blob first, then downloading from that local blob URL, works
+// consistently everywhere.
+async function downloadVideo(url: string, filename: string) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
 export default function VideosClient({ slug, basePath, apiBase }: { slug: string; basePath: string; apiBase: string }) {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -195,6 +213,12 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
                       controls
                       style={{ width: "100%", borderRadius: 8, background: "#000" }}
                     />
+                    <button
+                      onClick={() => downloadVideo(s.videoUrl, `${s.title || "swing-video"}.mp4`)}
+                      style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fairway)", background: "none", border: "none", padding: "6px 0 0", cursor: "pointer" }}
+                    >
+                      ⬇ Download
+                    </button>
                     {s.playerNote && (
                       <p style={{ fontSize: 12, color: "var(--faint)", margin: "8px 0 0", fontStyle: "italic" }}>
                         Your note: {s.playerNote}

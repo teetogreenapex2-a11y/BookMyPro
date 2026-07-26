@@ -48,6 +48,16 @@ export default function BookingClient({
   const [selected, setSelected] = useState<Slot | null>(null);
   const confirmCardRef = useRef<HTMLDivElement>(null);
   const messageRef = useRef<HTMLDivElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
+  // Scrolls the calendar into view once a package or fitting is chosen -
+  // this used to happen somewhat by accident, just from how the old page
+  // layout happened to lay out; making it explicit here so it keeps
+  // working regardless of how much content ends up above the calendar.
+  useEffect(() => {
+    if ((selectedPackageId || pendingPackageType || fittingType) && calendarRef.current) {
+      calendarRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedPackageId, pendingPackageType, fittingType]);
 
   // Picking a time slot is easy to miss following up on if the confirm card
   // is off-screen below the calendar - scroll it into view automatically so
@@ -654,7 +664,7 @@ export default function BookingClient({
           )
         )}
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div ref={calendarRef} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>
             {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} –{" "}
             {new Date(weekStart.getTime() + 6 * DAY_MS).toLocaleDateString(undefined, { month: "short", day: "numeric" })}

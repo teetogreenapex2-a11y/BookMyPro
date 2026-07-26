@@ -3,7 +3,7 @@
 // account to set up, just `npm install @vercel/blob` and a
 // BLOB_READ_WRITE_TOKEN env var (Vercel generates this for you the moment
 // you enable Blob storage in your project's Storage tab).
-import { put } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB — generous for a phone-recorded swing clip, not unlimited
 const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/webm", "video/x-m4v"];
@@ -19,4 +19,16 @@ export async function uploadSwingVideo(file: File, businessId: string): Promise<
   const filename = `swing-videos/${businessId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "")}`;
   const blob = await put(filename, file, { access: "public" });
   return { url: blob.url };
+}
+
+// Used by the 90-day retention job - deletes the actual stored file, not
+// just the database row referencing it. Without this, "deleting" a video
+// would only remove it from view while the file itself kept sitting in
+// (and being billed for in) Blob storage forever.
+export async function deleteSwingVideo(url: string) {
+  try {
+    await del(url);
+  } catch (err) {
+    console.error("Failed to delete video from storage:", err);
+  }
 }
