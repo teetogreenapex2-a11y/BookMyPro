@@ -114,7 +114,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span className="display" style={{ fontSize: 18, fontWeight: 700 }}>Swing videos</span>
             <a href={`${basePath}/instructor`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
-             Back to dashboard
+              Back to dashboard
             </a>
           </div>
           <h1 className="display" style={{ fontSize: 24, margin: 0 }}>Review submissions</h1>
@@ -130,7 +130,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
               border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: uploadOpen ? 12 : 20,
             }}
           >
-            + Upload a video
+            Upload a video
           </button>
 
           {uploadOpen && (
@@ -152,7 +152,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                 <input
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder="Title (optional) - e.g. \"Driver, face-on\""
+                  placeholder="Title (optional)"
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }}
                 />
                 {uploadError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{uploadError}</p>}
@@ -240,7 +240,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                 </div>
                 {selected.playerNote && (
                   <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", marginBottom: 10 }}>
-                    "{selected.playerNote}"
+                    {selected.playerNote}
                   </p>
                 )}
                 <video ref={videoRef} src={selected.videoUrl} controls style={{ width: "100%", borderRadius: 8, background: "#000", marginBottom: 6 }} />
@@ -248,7 +248,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   onClick={() => downloadVideo(selected.videoUrl, `${selected.title || selected.playerName || "swing-video"}.mp4`)}
                   style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fairway)", background: "none", border: "none", padding: "0 0 12px", cursor: "pointer" }}
                 >
-                  v Download
+                  Download
                 </button>
 
                 <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -286,6 +286,4 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
       </main>
     </div>
   );
-}
-);
 }
