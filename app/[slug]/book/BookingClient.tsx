@@ -57,6 +57,8 @@ export default function BookingClient({
       confirmCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [selected]);
+  const [confirming, setConfirming] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   // Same reasoning as above, for the other half of the flow — a booking
   // that succeeds while the customer is scrolled down at the confirm
   // button shouldn't show its confirmation somewhere they can't see,
@@ -66,8 +68,6 @@ export default function BookingClient({
       messageRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [message]);
-  const [confirming, setConfirming] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [contact, setContact] = useState({ name: "", phone: "", email: "", handedness: "", scoreOrHandicap: "", commonIssues: "" });
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
