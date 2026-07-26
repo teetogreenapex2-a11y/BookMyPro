@@ -6,7 +6,7 @@ import InstructorVideosClient from "./InstructorVideosClient";
 
 import { loginRedirectUrl } from "@/lib/businessUrl";
 
-import { loginRedirectUrl } from "@/lib/businessUrl";
+
 
 export default async function InstructorVideosPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
