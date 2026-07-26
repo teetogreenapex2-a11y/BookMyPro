@@ -7,6 +7,7 @@ import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
 import { sendBookingNotification } from "@/lib/email";
 import { sendPushToMembership } from "@/lib/pushNotifications";
+import { BUSINESS_TIMEZONE } from "@/lib/time";
 import { businessDestination } from "@/lib/businessUrl";
 
 // POST /api/{slug}/bookings  { availabilityId, packageId, instructorMembershipId, contactName, contactPhone, contactEmail }
@@ -159,7 +160,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   await sendPushToMembership(instructorMembershipId, {
     title: needsApproval ? "New booking request" : "New booking",
-    body: `${contactName.trim()} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`,
+    body: `${contactName.trim()} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: BUSINESS_TIMEZONE })}`,
     url: businessDestination(business.slug, "/instructor"),
   });
 
