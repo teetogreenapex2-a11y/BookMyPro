@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
+import { upload } from "@vercel/blob/client";
 
 type Instructor = { id: string; name: string | null; email: string };
 type Comment = { id: string; timestampSeconds: number; text: string };
@@ -76,22 +77,24 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
     }
     setUploading(true);
     setError(null);
-    const form = new FormData();
-    form.append("video", file);
-    form.append("instructorMembershipId", instructorMembershipId);
-    if (title.trim()) form.append("title", title.trim());
-    if (playerNote.trim()) form.append("playerNote", playerNote.trim());
-
-    const res = await fetch(`${apiBase}/videos`, { method: "POST", body: form });
-    setUploading(false);
-    if (res.ok) {
+    try {
+      await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: `${apiBase}/videos/upload-token`,
+        clientPayload: JSON.stringify({
+          instructorMembershipId,
+          title: title.trim() || undefined,
+          playerNote: playerNote.trim() || undefined,
+        }),
+      });
       setTitle("");
       setPlayerNote("");
       setFile(null);
       load();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "Something went wrong uploading that.");
+    } catch (err: any) {
+      setError(err?.message || "Something went wrong uploading that.");
+    } finally {
+      setUploading(false);
     }
   }
 

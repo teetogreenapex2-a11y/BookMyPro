@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 
 type Comment = { id: string; timestampSeconds: number; text: string };
 type Submission = {
@@ -56,21 +57,24 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
     }
     setUploading(true);
     setUploadError(null);
-    const form = new FormData();
-    form.append("video", file);
-    form.append("instructorMembershipId", viewerMembershipId);
-    form.append("playerId", uploadPlayerId);
-    if (uploadTitle.trim()) form.append("title", uploadTitle.trim());
-    const res = await fetch(`${apiBase}/videos`, { method: "POST", body: form });
-    setUploading(false);
-    if (res.ok) {
+    try {
+      await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: `${apiBase}/videos/upload-token`,
+        clientPayload: JSON.stringify({
+          instructorMembershipId: viewerMembershipId,
+          playerId: uploadPlayerId,
+          title: uploadTitle.trim() || undefined,
+        }),
+      });
       setUploadOpen(false);
       setUploadPlayerId("");
       setUploadTitle("");
       load();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setUploadError(data.error || "Something went wrong.");
+    } catch (err: any) {
+      setUploadError(err?.message || "Something went wrong.");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -130,7 +134,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
               border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: uploadOpen ? 12 : 20,
             }}
           >
-            Upload a video
+            + Upload a video
           </button>
 
           {uploadOpen && (
@@ -152,7 +156,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                 <input
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder="Title (optional)"
+                  placeholder="Title (optional) - e.g. \"Driver, face-on\""
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }}
                 />
                 {uploadError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{uploadError}</p>}
@@ -240,7 +244,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                 </div>
                 {selected.playerNote && (
                   <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", marginBottom: 10 }}>
-                    {selected.playerNote}
+                    "{selected.playerNote}"
                   </p>
                 )}
                 <video ref={videoRef} src={selected.videoUrl} controls style={{ width: "100%", borderRadius: 8, background: "#000", marginBottom: 6 }} />
@@ -248,7 +252,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   onClick={() => downloadVideo(selected.videoUrl, `${selected.title || selected.playerName || "swing-video"}.mp4`)}
                   style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fairway)", background: "none", border: "none", padding: "0 0 12px", cursor: "pointer" }}
                 >
-                  Download
+                  v Download
                 </button>
 
                 <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
