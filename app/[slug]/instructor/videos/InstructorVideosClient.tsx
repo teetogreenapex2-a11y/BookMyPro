@@ -45,6 +45,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   function loadPlayers() {
     fetch(`${apiBase}/players`).then((r) => r.json()).then((list) => setPlayers(Array.isArray(list) ? list : [])).catch(() => {});
@@ -108,6 +109,24 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
     if (res.ok) {
       setCommentDraft("");
       load();
+    }
+  }
+
+  async function deleteVideo() {
+    if (!selected) return;
+    const confirmed = window.confirm(
+      `Delete "${selected.title || "this video"}"? This can't be undone - the file and all comments will be permanently removed.`
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    const res = await fetch(`${apiBase}/videos/${selected.id}`, { method: "DELETE" });
+    setDeleting(false);
+    if (res.ok) {
+      setSelectedId(null);
+      load();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Couldn't delete this video. Try again.");
     }
   }
 
@@ -238,9 +257,24 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
               <p style={{ fontSize: 13, color: "var(--faint)" }}>Pick a video from the list to review it.</p>
             ) : (
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>{selected.title || "Untitled video"}</div>
-                <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 8 }}>
-                  {selected.playerName} - {new Date(selected.submittedAt).toLocaleDateString()}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700 }}>{selected.title || "Untitled video"}</div>
+                    <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 8 }}>
+                      {selected.playerName} - {new Date(selected.submittedAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <button
+                    onClick={deleteVideo}
+                    disabled={deleting}
+                    style={{
+                      fontSize: 11.5, fontWeight: 700, color: "#B23A3A", background: "none",
+                      border: "1px solid #B23A3A", borderRadius: 6, padding: "5px 10px",
+                      cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.6 : 1, flexShrink: 0,
+                    }}
+                  >
+                    {deleting ? "Deleting..." : "Delete"}
+                  </button>
                 </div>
                 {selected.playerNote && (
                   <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", marginBottom: 10 }}>
@@ -252,7 +286,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   onClick={() => downloadVideo(selected.videoUrl, `${selected.title || selected.playerName || "swing-video"}.mp4`)}
                   style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fairway)", background: "none", border: "none", padding: "0 0 12px", cursor: "pointer" }}
                 >
-                  v Download
+                  Download
                 </button>
 
                 <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
