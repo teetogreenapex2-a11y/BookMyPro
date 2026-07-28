@@ -52,3 +52,36 @@ export async function sendPushToMembership(membershipId: string, payload: { titl
     })
   );
 }
+
+// Checks a package after it's just been decremented, and notifies both
+// sides once it hits exactly one lesson left - the natural moment for
+// the instructor to think about renewal and the player to know they're
+// running low. Only fires right at 1, not every time below that, so it's
+// a single heads-up rather than a repeated nag on every remaining visit.
+export async function checkAndNotifyLowPackage(packageId: string) {
+  const pkg = await prisma.package.findUnique({
+    where: { id: packageId },
+    include: { business: { select: { slug: true } } },
+  });
+  if (!pkg || pkg.lessonsRemaining !== 1) return;
+
+  const { businessDestination } = await import("./businessUrl");
+  const { getMembership } = await import("./tenant");
+
+  const playerMembership = await getMembership(pkg.userId, pkg.businessId);
+  if (playerMembership) {
+    await sendPushToMembership(playerMembership.id, {
+      title: "One lesson left",
+      body: `Your ${pkg.type} package is down to its last lesson.`,
+      url: businessDestination(pkg.business.slug, "/book"),
+    });
+  }
+
+  if (pkg.instructorMembershipId) {
+    await sendPushToMembership(pkg.instructorMembershipId, {
+      title: "Player's package is running low",
+      body: `A player's ${pkg.type} package has one lesson left.`,
+      url: businessDestination(pkg.business.slug, "/instructor"),
+    });
+  }
+}

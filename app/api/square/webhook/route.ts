@@ -6,7 +6,8 @@ import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
 import { getBusinessInstructor, ensureMembership } from "@/lib/tenant";
 import { sendBookingNotification } from "@/lib/email";
-import { sendPushToMembership } from "@/lib/pushNotifications";
+import { sendPushToMembership, checkAndNotifyLowPackage } from "@/lib/pushNotifications";
+import { BUSINESS_TIMEZONE } from "@/lib/time";
 import { businessDestination } from "@/lib/businessUrl";
 
 // Square webhook — subscribe to "payment.updated" in the Square Developer
@@ -113,6 +114,8 @@ export async function POST(req: NextRequest) {
             });
           });
 
+          await checkAndNotifyLowPackage(createdPackage.id);
+
           if (!needsApproval) {
             let videoCallUrl: string | null = null;
             if (booking.isRemote && business.dailyApiKey) {
@@ -154,7 +157,7 @@ export async function POST(req: NextRequest) {
           }
           await sendPushToMembership(pending.instructorMembershipId, {
             title: needsApproval ? "New booking request" : "New booking",
-            body: `${pending.contactName || "A player"} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`,
+            body: `${pending.contactName || "A player"} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: BUSINESS_TIMEZONE })}`,
             url: businessDestination(business.slug, "/instructor"),
           });
         }

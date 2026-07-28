@@ -5,9 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
 
 // POST /api/{slug}/push/subscribe  { endpoint, keys: { p256dh, auth } }
-// Owner/instructor only for now, since v1 is instructor-side notifications
-// only - the same route would work for players too once that's built,
-// just with a wider allowed-roles list.
+// Any role can subscribe now - players get booking/feedback notifications,
+// instructors get booking/submission notifications, both share the same
+// underlying mechanism.
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
@@ -15,8 +15,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
-  const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor"]);
-  if (!membership) return NextResponse.json({ error: "Owner or instructor access required" }, { status: 403 });
+  const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor", "player"]);
+  if (!membership) return NextResponse.json({ error: "Membership required" }, { status: 403 });
 
   const { endpoint, keys } = await req.json();
   if (!endpoint || !keys?.p256dh || !keys?.auth) {

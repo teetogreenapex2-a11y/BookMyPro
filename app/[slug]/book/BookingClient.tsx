@@ -81,6 +81,49 @@ export default function BookingClient({
   const [contact, setContact] = useState({ name: "", phone: "", email: "", handedness: "", scoreOrHandicap: "", commonIssues: "" });
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
+  const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "off" | "on" | "enabling">("unknown");
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushStatus("unsupported");
+      return;
+    }
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (!reg) {
+        setPushStatus("off");
+        return;
+      }
+      reg.pushManager.getSubscription().then((sub) => setPushStatus(sub ? "on" : "off"));
+    }).catch(() => setPushStatus("off"));
+  }, []);
+
+  async function enablePushNotifications() {
+    setPushStatus("enabling");
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushStatus("off");
+        return;
+      }
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+      await fetch(`${apiBase}/push/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription.toJSON()),
+      });
+      setPushStatus("on");
+    } catch (err) {
+      console.error("Failed to enable push notifications:", err);
+      setPushStatus("off");
+    }
+  }
+
   const [myBookings, setMyBookings] = useState<{
     id: string; serviceType: string; fittingType: string | null; startTime: string;
     status: string; isRemote: boolean; videoCallUrl: string | null; instructorName: string | null;
@@ -559,6 +602,19 @@ export default function BookingClient({
           </div>
         )}
 
+        {(pushStatus === "off" || pushStatus === "enabling") && (
+          <button
+            onClick={enablePushNotifications}
+            disabled={pushStatus === "enabling"}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, background: "var(--card)", color: "var(--fairway)",
+              border: "1px solid var(--border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: 16,
+            }}
+          >
+            {pushStatus === "enabling" ? "Enabling..." : "Get notified about your bookings"}
+          </button>
+        )}
+
         {myBookings.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 8, letterSpacing: "0.04em" }}>
@@ -862,6 +918,17 @@ const contactInputStyle: React.CSSProperties = {
 const navBtnStyle: React.CSSProperties = {
   border: "1px solid var(--border)", background: "#FFF", borderRadius: 8, padding: "6px 12px", fontSize: 14,
 };
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 function startOfWeek(d: Date) {
   const date = new Date(d);

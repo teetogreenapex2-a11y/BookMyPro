@@ -2,13 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, getMembership, ensureMembership, getInstructorById } from "@/lib/tenant";
-import { uploadSwingVideo } from "@/lib/videoStorage";
+import { getBusinessBySlug, getMembership } from "@/lib/tenant";
+import { deleteSwingVideo } from "@/lib/videoStorage";
 
-// GET /api/{slug}/videos — a player sees their own submissions; an
-// instructor/owner sees submissions assigned to them (owner sees all,
-// matching how the rest of the app scopes "assigned to me" data).
-export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
+// GET /api/{slug}/videos/{id} — the player who submitted it, or the
+// instructor it's assigned to (or the owner), can view it.
+export async function GET(req: NextRequest, { params }: { params: { slug: string; id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
 
@@ -16,105 +15,98 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
   const userId = (session.user as any).id;
-  const membership = await getMembership(userId, business.id);
-
-  const isStaff = membership?.role === "owner" || membership?.role === "instructor";
-  const submissions = await prisma.videoSubmission.findMany({
-    where: isStaff
-      ? { businessId: business.id, ...(membership!.role === "instructor" ? { instructorMembershipId: membership!.id } : {}) }
-      : { businessId: business.id, playerId: userId },
+  const submission = await prisma.videoSubmission.findFirst({
+    where: { id: params.id, businessId: business.id },
     include: {
       player: { select: { name: true, email: true } },
       instructor: { include: { user: { select: { name: true } } } },
       comments: { orderBy: { timestampSeconds: "asc" } },
     },
-    orderBy: { submittedAt: "desc" },
   });
+  if (!submission) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const shaped = submissions.map((s) => ({
-    id: s.id,
-    videoUrl: s.videoUrl,
-    title: s.title,
-    playerNote: s.playerNote,
-    status: s.status,
-    submittedAt: s.submittedAt,
-    reviewedAt: s.reviewedAt,
-    playerName: s.player.name || s.player.email,
-    instructorName: s.instructor.user.name,
-    instructorMembershipId: s.instructorMembershipId,
-    comments: s.comments.map((c) => ({ id: c.id, timestampSeconds: c.timestampSeconds, text: c.text, createdAt: c.createdAt })),
-  }));
+  const membership = await getMembership(userId, business.id);
+  const isOwner = membership?.role === "owner";
+  const isAssignedInstructor = submission.instructorMembershipId === membership?.id;
+  const isSubmitter = submission.playerId === userId;
+  if (!isOwner && !isAssignedInstructor && !isSubmitter) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
-  return NextResponse.json(shaped);
+  return NextResponse.json({
+    id: submission.id,
+    videoUrl: submission.videoUrl,
+    title: submission.title,
+    playerNote: submission.playerNote,
+    status: submission.status,
+    submittedAt: submission.submittedAt,
+    reviewedAt: submission.reviewedAt,
+    playerName: submission.player.name || submission.player.email,
+    instructorName: submission.instructor.user.name,
+    instructorMembershipId: submission.instructorMembershipId,
+    comments: submission.comments.map((c) => ({ id: c.id, timestampSeconds: c.timestampSeconds, text: c.text, createdAt: c.createdAt })),
+  });
 }
 
-// POST /api/{slug}/videos — multipart form: video (file), instructorMembershipId, title?, playerNote?
-// If the uploader is staff, also accepts playerId — footage they recorded
-// themselves (an in-person lesson, say) attributed to a specific player,
-// rather than the upload always being treated as that player's own
-// self-submission. Marked "reviewed" immediately in that case, since it's
-// the instructor's own footage, not something sitting in a queue waiting
-// for them to look at it.
-export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
+// PATCH /api/{slug}/videos/{id}  { status: "reviewed" }
+// The assigned instructor (or the owner) marks a submission as reviewed —
+// separate from leaving comments, since an instructor might watch and
+// decide there's nothing worth flagging, or wants to explicitly close it
+// out after adding comments.
+export async function PATCH(req: NextRequest, { params }: { params: { slug: string; id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
-  const userId = (session.user as any).id;
-  const uploaderMembership = await getMembership(userId, business.id);
-  const uploaderIsStaff = uploaderMembership?.role === "owner" || uploaderMembership?.role === "instructor";
+  const submission = await prisma.videoSubmission.findFirst({ where: { id: params.id, businessId: business.id } });
+  if (!submission) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const form = await req.formData();
-  const file = form.get("video");
-  const instructorMembershipId = form.get("instructorMembershipId")?.toString();
-  const title = form.get("title")?.toString() || null;
-  const playerNote = form.get("playerNote")?.toString() || null;
-  const suppliedPlayerId = form.get("playerId")?.toString();
-
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "No video file was included" }, { status: 400 });
-  }
-  if (!instructorMembershipId) {
-    return NextResponse.json({ error: "Choose which instructor this is for" }, { status: 400 });
-  }
-  const instructorMembership = await getInstructorById(business.id, instructorMembershipId);
-  if (!instructorMembership) {
-    return NextResponse.json({ error: "That instructor isn't available at this business" }, { status: 400 });
+  const membership = await getMembership((session.user as any).id, business.id);
+  const isOwner = membership?.role === "owner";
+  const isAssignedInstructor = submission.instructorMembershipId === membership?.id;
+  if (!isOwner && !isAssignedInstructor) {
+    return NextResponse.json({ error: "Only the assigned instructor can update this" }, { status: 403 });
   }
 
-  let playerId: string;
-  if (uploaderIsStaff) {
-    if (!suppliedPlayerId) {
-      return NextResponse.json({ error: "Choose which player this video is for" }, { status: 400 });
-    }
-    const playerMembership = await getMembership(suppliedPlayerId, business.id);
-    if (!playerMembership || playerMembership.role !== "player") {
-      return NextResponse.json({ error: "That player isn't part of this business" }, { status: 400 });
-    }
-    playerId = suppliedPlayerId;
-  } else {
-    await ensureMembership(userId, business.id, "player");
-    playerId = userId;
+  const { status } = await req.json();
+  if (status !== "reviewed" && status !== "pending") {
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
-  const uploaded = await uploadSwingVideo(file, business.id);
-  if ("error" in uploaded) {
-    return NextResponse.json({ error: uploaded.error }, { status: 400 });
-  }
-
-  const submission = await prisma.videoSubmission.create({
-    data: {
-      businessId: business.id,
-      playerId,
-      instructorMembershipId,
-      videoUrl: uploaded.url,
-      title,
-      playerNote,
-      ...(uploaderIsStaff ? { status: "reviewed", reviewedAt: new Date() } : {}),
-    },
+  const updated = await prisma.videoSubmission.update({
+    where: { id: submission.id },
+    data: { status, reviewedAt: status === "reviewed" ? new Date() : null },
   });
+  return NextResponse.json(updated);
+}
 
-  return NextResponse.json(submission, { status: 201 });
+// DELETE /api/{slug}/videos/{id}
+// The assigned instructor (or the owner) can delete a submission entirely -
+// removes the actual file from storage, then its comments (no cascade
+// delete configured on that relation, so they have to go first or the
+// submission delete fails on the foreign key), then the submission itself.
+export async function DELETE(req: NextRequest, { params }: { params: { slug: string; id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+
+  const business = await getBusinessBySlug(params.slug);
+  if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
+
+  const submission = await prisma.videoSubmission.findFirst({ where: { id: params.id, businessId: business.id } });
+  if (!submission) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const membership = await getMembership((session.user as any).id, business.id);
+  const isOwner = membership?.role === "owner";
+  const isAssignedInstructor = submission.instructorMembershipId === membership?.id;
+  if (!isOwner && !isAssignedInstructor) {
+    return NextResponse.json({ error: "Only the assigned instructor can delete this" }, { status: 403 });
+  }
+
+  await deleteSwingVideo(submission.videoUrl);
+  await prisma.videoComment.deleteMany({ where: { submissionId: submission.id } });
+  await prisma.videoSubmission.delete({ where: { id: submission.id } });
+
+  return NextResponse.json({ deleted: true });
 }

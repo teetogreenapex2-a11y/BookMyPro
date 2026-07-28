@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getInstructorById, getBusinessInstructor, requireMembership } from "@/lib/tenant";
 import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
-import { findFitting, getFittingPriceCents, isFittingEnabled } from "@/lib/pricing";
+import { findFitting, getFittingPriceCents, isFittingEnabled, findPackage, getPackagePriceCents } from "@/lib/pricing";
+import { checkAndNotifyLowPackage } from "@/lib/pushNotifications";
 
 // POST /api/{slug}/bookings/manual  { availabilityId, serviceType, fittingType?, playerId, packageId?, instructorMembershipId }
 // Owner/instructor only — for walk-ins, phone bookings, or anything the
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor"]);
   if (!membership) return NextResponse.json({ error: "Instructor access required" }, { status: 403 });
 
-  const { availabilityId, serviceType, fittingType, playerId, packageId, instructorMembershipId, isRemote: submittedIsRemote } = await req.json();
+  const { availabilityId, serviceType, fittingType, playerId, packageId, buyNewPackageType, markAsPaid, instructorMembershipId, isRemote: submittedIsRemote } = await req.json();
 
   if (!["lesson", "fitting"].includes(serviceType)) {
     return NextResponse.json({ error: "Invalid service type" }, { status: 400 });
@@ -57,8 +58,16 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "That slot belongs to a different instructor's calendar" }, { status: 400 });
   }
 
+  let newPackageInfo: { lessonsTotal: number; priceCents: number } | null = null;
+  if (serviceType === "lesson" && buyNewPackageType) {
+    const packageDef = findPackage(buyNewPackageType);
+    if (!packageDef) return NextResponse.json({ error: "Unknown package type" }, { status: 400 });
+    if (!instructorMembership) return NextResponse.json({ error: "Choose which instructor this booking is with" }, { status: 400 });
+    newPackageInfo = { lessonsTotal: packageDef.lessons, priceCents: getPackagePriceCents(instructorMembership, buyNewPackageType) };
+  }
+
   // The "video" package is inherently remote regardless of what was submitted.
-  const isRemote = pkg?.type === "video" || !!submittedIsRemote;
+  const isRemote = pkg?.type === "video" || buyNewPackageType === "video" || !!submittedIsRemote;
   let priceCents = 0;
   let fitting = null;
 
@@ -80,10 +89,35 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const booking = await prisma.$transaction(async (tx) => {
     await tx.availability.update({ where: { id: availabilityId }, data: { status: "booked" } });
-    if (serviceType === "lesson" && pkg) {
-      await tx.package.update({ where: { id: pkg.id }, data: { lessonsRemaining: { decrement: 1 } } });
+
+    let bookingPackageId: string | null = serviceType === "lesson" && pkg ? pkg.id : null;
+
+    if (serviceType === "lesson" && newPackageInfo) {
+      const created = await tx.package.create({
+        data: {
+          businessId: business.id,
+          userId: playerId,
+          instructorMembershipId,
+          type: buyNewPackageType,
+          lessonsTotal: newPackageInfo.lessonsTotal,
+          // Starts at the full count, then immediately decremented below for
+          // this lesson - same "buy a package and use the first credit
+          // right away" pattern as buying online and picking a slot at
+          // checkout, just done in person instead.
+          lessonsRemaining: newPackageInfo.lessonsTotal,
+          pricePaidCents: newPackageInfo.priceCents,
+          paymentStatus: markAsPaid === false ? "pending" : "paid",
+          paidAt: markAsPaid === false ? null : new Date(),
+        },
+      });
+      bookingPackageId = created.id;
     }
-    return tx.booking.create({
+
+    if (serviceType === "lesson" && bookingPackageId) {
+      await tx.package.update({ where: { id: bookingPackageId }, data: { lessonsRemaining: { decrement: 1 } } });
+    }
+
+    const created = await tx.booking.create({
       data: {
         businessId: business.id,
         playerId,
@@ -93,7 +127,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         startTime: slot.startTime,
         status: "confirmed",
         priceCents,
-        packageId: serviceType === "lesson" && pkg ? pkg.id : null,
+        packageId: bookingPackageId,
         availabilityId,
         instructorMembershipId,
         contactName: player.user.name,
@@ -101,13 +135,19 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         contactEmail: player.user.email,
       },
     });
+
+    return { booking: created, packageId: bookingPackageId };
   });
+
+  if (serviceType === "lesson" && booking.packageId) {
+    await checkAndNotifyLowPackage(booking.packageId);
+  }
 
   let videoCallUrl: string | null = null;
   if (serviceType === "lesson" && isRemote && business.dailyApiKey) {
     videoCallUrl = await createVideoCallRoom(business.dailyApiKey, slot.startTime);
     if (videoCallUrl) {
-      await prisma.booking.update({ where: { id: booking.id }, data: { videoCallUrl } });
+      await prisma.booking.update({ where: { id: booking.booking.id }, data: { videoCallUrl } });
     }
   }
 
@@ -121,12 +161,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         durationMinutes: fitting ? fitting.durationMin : 60,
       });
       if (eventId) {
-        await prisma.booking.update({ where: { id: booking.id }, data: { googleCalendarEventId: eventId } });
+        await prisma.booking.update({ where: { id: booking.booking.id }, data: { googleCalendarEventId: eventId } });
       }
     } catch (err) {
       console.error("Calendar sync failed:", err);
     }
   }
 
-  return NextResponse.json({ ...booking, videoCallUrl }, { status: 201 });
+  return NextResponse.json({ ...booking.booking, videoCallUrl }, { status: 201 });
 }

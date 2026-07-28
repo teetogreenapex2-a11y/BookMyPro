@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getMembership, ensureMembership, getInstructorById } from "@/lib/tenant";
+import { sendPushToMembership } from "@/lib/pushNotifications";
+import { businessDestination } from "@/lib/businessUrl";
 
 // POST /api/{slug}/videos/upload-token
 //
@@ -20,19 +22,15 @@ import { getBusinessBySlug, getMembership, ensureMembership, getInstructorById }
 // confirms the file genuinely landed - see handleUpload's two callbacks
 // below.
 //
-// IMPORTANT: this route is called twice, by two different callers:
-//   1. The browser calls it first to request an upload token. This call
-//      carries the user's session cookie, so we can check auth here.
-//   2. Vercel's Blob infrastructure calls it a second time, server-to-server,
-//      once the upload finishes (to fire onUploadCompleted). This call has
-//      NO session cookie - it's not from the browser at all. Gating the
-//      entire route behind getServerSession() rejects this second call with
-//      401, silently breaking onUploadCompleted and preventing the
-//      VideoSubmission row from ever being created. So the session check
-//      must live inside onBeforeGenerateToken (step 1 only), not at the
-//      top of the route. handleUpload verifies the completion callback's
-//      authenticity itself via signature, so no separate check is needed
-//      for it.
+// Important: this same route handles TWO very different kinds of
+// requests - the browser's initial token request (which has a real
+// session cookie), and Vercel Blob's own server-to-server callback once
+// the upload finishes (which has no session cookie at all, since it's
+// not coming from the user's browser). The auth check has to live inside
+// onBeforeGenerateToken specifically, not at the top of this function -
+// putting it at the top blocks that second, unauthenticated callback
+// with a 401, which silently prevents the database record from ever
+// being created even though the file itself uploaded successfully.
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
@@ -44,12 +42,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       body,
       request: req,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
-        // Auth check lives here, not at the top of the route, since this
-        // callback only runs for the browser's initial token request -
-        // not for Vercel's server-to-server completion callback.
         const session = await getServerSession(authOptions);
         if (!session) throw new Error("Sign in required");
-
         const userId = (session.user as any).id;
         const uploaderMembership = await getMembership(userId, business.id);
         const uploaderIsStaff = uploaderMembership?.role === "owner" || uploaderMembership?.role === "instructor";
@@ -79,11 +73,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           }),
         };
       },
-      // Fires once Blob confirms the upload actually completed - this is
-      // where the real database record gets created, only after we know
-      // the file genuinely exists in storage. Called server-to-server by
-      // Vercel, with no session cookie - do not add a getServerSession()
-      // check here.
+      // Fires once Blob confirms the upload actually completed - a
+      // server-to-server callback with no session, which is exactly why
+      // everything this needs (businessId, userId, uploaderIsStaff, etc.)
+      // was captured into tokenPayload above during the authenticated
+      // phase, rather than re-checking auth here.
       onUploadCompleted: async ({ blob, tokenPayload }) => {
         if (!tokenPayload) return;
         const meta = JSON.parse(tokenPayload);
@@ -103,6 +97,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
         if (!meta.uploaderIsStaff) {
           await ensureMembership(meta.userId, meta.businessId, "player");
+          await sendPushToMembership(meta.instructorMembershipId, {
+            title: "New swing video submitted",
+            body: meta.title ? `"${meta.title}" is ready to review.` : "A new video is ready to review.",
+            url: businessDestination(business.slug, "/instructor/videos"),
+          });
         }
       },
     });

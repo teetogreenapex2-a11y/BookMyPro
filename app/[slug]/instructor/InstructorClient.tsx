@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { User } from "lucide-react";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
+import { enabledPackages, getPackagePriceCents, centsToDollars } from "@/lib/pricing";
 
 const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -56,6 +57,7 @@ export default function InstructorClient({
   // own, since each instructor now has their own independent timeline.
   const [viewingInstructorId, setViewingInstructorId] = useState(viewerMembershipId);
   const [noteSlot, setNoteSlot] = useState<Slot | null>(null);
+  const notePanelRef = useRef<HTMLDivElement | null>(null);
   const [noteText, setNoteText] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [bookingContact, setBookingContact] = useState<{
@@ -74,9 +76,9 @@ export default function InstructorClient({
   const [reviewMessage, setReviewMessage] = useState<string | null>(null);
   const [newBookingOpen, setNewBookingOpen] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [teamInstructors, setTeamInstructors] = useState<{ id: string; name: string | null; email: string }[]>([]);
+  const [teamInstructors, setTeamInstructors] = useState<{ id: string; name: string | null; email: string; [key: string]: any }[]>([]);
   const [newBookingForm, setNewBookingForm] = useState({
-    slotId: "", serviceType: "lesson", fittingType: "driver", playerId: "", packageId: "", instructorMembershipId: "", isRemote: false,
+    slotId: "", serviceType: "lesson", fittingType: "driver", playerId: "", packageId: "", buyNewPackageType: "", markAsPaid: true, instructorMembershipId: "", isRemote: false,
   });
   const [newBookingError, setNewBookingError] = useState<string | null>(null);
   const [creatingBooking, setCreatingBooking] = useState(false);
@@ -157,7 +159,7 @@ export default function InstructorClient({
   }
 
   async function createManualBooking(formOverride?: typeof newBookingForm) {
-    const { slotId, serviceType, fittingType, playerId, packageId, instructorMembershipId, isRemote } = formOverride || newBookingForm;
+    const { slotId, serviceType, fittingType, playerId, packageId, buyNewPackageType, markAsPaid, instructorMembershipId, isRemote } = formOverride || newBookingForm;
     if (!slotId || !playerId || !instructorMembershipId) {
       setNewBookingError("Pick a time, a player, and an instructor.");
       return;
@@ -173,6 +175,8 @@ export default function InstructorClient({
         fittingType: serviceType === "fitting" ? fittingType : undefined,
         playerId,
         packageId: serviceType === "lesson" && packageId ? packageId : undefined,
+        buyNewPackageType: serviceType === "lesson" && buyNewPackageType ? buyNewPackageType : undefined,
+        markAsPaid,
         instructorMembershipId,
         isRemote: serviceType === "lesson" ? isRemote : false,
       }),
@@ -180,7 +184,7 @@ export default function InstructorClient({
     setCreatingBooking(false);
     if (res.ok) {
       setNewBookingOpen(false);
-      setNewBookingForm((f) => ({ slotId: "", serviceType: "lesson", fittingType: "driver", playerId: "", packageId: "", instructorMembershipId: f.instructorMembershipId, isRemote: false }));
+      setNewBookingForm((f) => ({ slotId: "", serviceType: "lesson", fittingType: "driver", playerId: "", packageId: "", buyNewPackageType: "", markAsPaid: true, instructorMembershipId: f.instructorMembershipId, isRemote: false }));
       loadSlots();
     } else {
       const data = await res.json();
@@ -265,6 +269,15 @@ export default function InstructorClient({
       reviewPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [reviewingBooking]);
+
+  // Same reasoning as the review panel above - tapping a booked slot to
+  // see who it's with and add a note shouldn't require manually scrolling
+  // down to find where that panel actually landed.
+  useEffect(() => {
+    if (noteSlot) {
+      notePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [noteSlot]);
 
   async function loadSlots() {
     setLoading(true);
@@ -660,25 +673,63 @@ export default function InstructorClient({
                   )}
                 </label>
 
-                {newBookingForm.serviceType === "lesson" && selectedPlayer && (
-                  <label>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>
-                      Package (optional - leave blank for a free-standing booking, e.g. pay in person)
-                    </div>
-                    <select
-                      value={newBookingForm.packageId}
-                      onChange={(e) => setNewBookingForm((f) => ({ ...f, packageId: e.target.value }))}
-                      style={selectStyle}
-                    >
-                      <option value="">No package - free-standing booking</option>
-                      {selectedPlayer.packages.map((pkg) => (
-                        <option key={pkg.id} value={pkg.id}>
-                          {pkg.label} ({pkg.lessonsRemaining} of {pkg.lessonsTotal} left)
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
+                {newBookingForm.serviceType === "lesson" && selectedPlayer && (() => {
+                  const sellingInstructor = teamInstructors.find((t) => t.id === newBookingForm.instructorMembershipId);
+                  const sellablePackages = sellingInstructor ? enabledPackages(sellingInstructor).filter((p) => p.priceCents > 0) : [];
+                  const combinedValue = newBookingForm.buyNewPackageType ? `new:${newBookingForm.buyNewPackageType}` : newBookingForm.packageId;
+                  return (
+                    <>
+                      <label>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>
+                          Package (optional - leave blank for a free-standing booking, e.g. pay in person)
+                        </div>
+                        <select
+                          value={combinedValue}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v.startsWith("new:")) {
+                              setNewBookingForm((f) => ({ ...f, packageId: "", buyNewPackageType: v.replace("new:", "") }));
+                            } else {
+                              setNewBookingForm((f) => ({ ...f, packageId: v, buyNewPackageType: "" }));
+                            }
+                          }}
+                          style={selectStyle}
+                        >
+                          <option value="">No package - free-standing booking</option>
+                          {selectedPlayer.packages.length > 0 && (
+                            <optgroup label="Already owns">
+                              {selectedPlayer.packages.map((pkg) => (
+                                <option key={pkg.id} value={pkg.id}>
+                                  {pkg.label} ({pkg.lessonsRemaining} of {pkg.lessonsTotal} left)
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {sellablePackages.length > 0 && (
+                            <optgroup label="Sell a new package right now">
+                              {sellablePackages.map((p) => (
+                                <option key={p.id} value={`new:${p.id}`}>
+                                  {p.label} - {centsToDollars(p.priceCents)}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </select>
+                      </label>
+
+                      {newBookingForm.buyNewPackageType && (
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600, color: "var(--muted)" }}>
+                          <input
+                            type="checkbox"
+                            checked={newBookingForm.markAsPaid}
+                            onChange={(e) => setNewBookingForm((f) => ({ ...f, markAsPaid: e.target.checked }))}
+                          />
+                          Already paid (in person, right now)
+                        </label>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {newBookingError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{newBookingError}</p>}
 
@@ -894,7 +945,7 @@ export default function InstructorClient({
         )}
 
         {noteSlot && (
-          <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginTop: 16 }}>
+          <div ref={notePanelRef} style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginTop: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
               Note for {new Date(noteSlot.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
             </div>

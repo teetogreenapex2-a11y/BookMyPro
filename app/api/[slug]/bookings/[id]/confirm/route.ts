@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, requireMembership, getBusinessInstructor } from "@/lib/tenant";
+import { getBusinessBySlug, requireMembership, getBusinessInstructor, getMembership } from "@/lib/tenant";
 import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
 import { findFitting } from "@/lib/pricing";
+import { sendPushToMembership } from "@/lib/pushNotifications";
+import { businessDestination } from "@/lib/businessUrl";
 
 // POST /api/{slug}/bookings/{id}/confirm — owner/instructor only.
 // Approves a pending booking: marks it confirmed, marks the slot booked,
@@ -63,6 +65,15 @@ export async function POST(
     } catch (err) {
       console.error("Calendar sync failed on confirm:", err);
     }
+  }
+
+  const playerMembership = await getMembership(booking.playerId, business.id);
+  if (playerMembership) {
+    await sendPushToMembership(playerMembership.id, {
+      title: "Booking confirmed",
+      body: `Your ${booking.serviceType === "fitting" ? "fitting" : "lesson"} on ${booking.startTime.toLocaleDateString()} is confirmed.`,
+      url: businessDestination(business.slug, "/book"),
+    });
   }
 
   return NextResponse.json({ ok: true });
