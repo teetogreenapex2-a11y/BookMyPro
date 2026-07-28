@@ -35,12 +35,12 @@ function StepHeader({ step, eyebrow, title, subtitle }: { step: number; eyebrow:
   return (
     <>
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-        {[1, 2, 3, 4].map((n) => (
+        {[1, 2, 3, 4, 5].map((n) => (
           <div key={n} style={{ height: 4, flex: 1, borderRadius: 2, background: n <= step ? "#1B3A2F" : "#E5E0D0" }} />
         ))}
       </div>
       <div className="ob-mono" style={{ fontSize: 12, letterSpacing: "0.1em", color: "#B8862B", marginBottom: 6 }}>
-        STEP {step} OF 4 · {eyebrow}
+        STEP {step} OF 5 · {eyebrow}
       </div>
       <h1 className="ob-display" style={{ fontSize: 24, margin: "0 0 6px", fontFamily: "'Inter', sans-serif", color: "#1B3A2F" }}>
         {title}
@@ -117,6 +117,10 @@ export default function OnboardingClient() {
 
   // Step 4: calendar
   const [calendarResult, setCalendarResult] = useState<"connected" | "error" | null>(null);
+  // Step 5: payments
+  const [paymentResult, setPaymentResult] = useState<"connected" | "error" | null>(null);
+  const [payLaterEnabled, setPayLaterEnabled] = useState(false);
+  const [enablingPayLater, setEnablingPayLater] = useState(false);
 
   const apiBase = createdSlug ? `/api/${createdSlug}` : "";
 
@@ -131,8 +135,12 @@ export default function OnboardingClient() {
     const resumeStep = Number(searchParams.get("step"));
     const calendarParam = searchParams.get("calendar");
     if (calendarParam === "connected" || calendarParam === "error") setCalendarResult(calendarParam);
+    const stripeParam = searchParams.get("stripe");
+    const squareParam = searchParams.get("square");
+    if (stripeParam === "connected" || squareParam === "connected") setPaymentResult("connected");
+    else if (stripeParam === "error" || squareParam === "error") setPaymentResult("error");
 
-    if (resumeSlug && resumeStep >= 2 && resumeStep <= 4) {
+    if (resumeSlug && resumeStep >= 2 && resumeStep <= 5) {
       setCreatedSlug(resumeSlug);
       setStep(resumeStep);
       fetch(`/api/${resumeSlug}/instructors`)
@@ -267,6 +275,17 @@ export default function OnboardingClient() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--fairway, #1B3A2F)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "#F6F4EE", borderRadius: 16, padding: "36px 32px", maxWidth: 460, width: "100%" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+          <img src="/logo.jpg" alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
+          <a
+            href="/features"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 12, fontWeight: 700, color: "#1B3A2F", textDecoration: "none", border: "1px solid #E3D9C9", borderRadius: 8, padding: "8px 12px" }}
+          >
+            See everything included
+          </a>
+        </div>
 
         {step === 1 && (
           <>
@@ -450,6 +469,90 @@ export default function OnboardingClient() {
               >
                 Connect Outlook
               </a>
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setStep(5)}
+                style={{ flex: 1, background: "transparent", color: "#5C6459", border: "1px solid #DDD8C8", borderRadius: 8, padding: "12px 20px", fontWeight: 600, fontSize: 14 }}
+              >
+                Skip for now
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep(5)}
+                style={{ flex: 1, background: "#1B3A2F", color: "#F6F4EE", border: "none", borderRadius: 8, padding: "12px 20px", fontWeight: 700, fontSize: 14 }}
+              >
+                Continue
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 5 && (
+          <>
+            <StepHeader step={5} eyebrow="GET PAID" title="Connect a payment processor" subtitle="Required before you can accept paid bookings online — players can still browse and you can still test everything else without this, but skip it and connect later in Settings if you're not ready." />
+
+            {paymentResult === "connected" && (
+              <div style={{ background: "#E7F0EA", border: "1px solid #B7D6C2", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#1B3A2F", marginBottom: 16 }}>
+                Payment processor connected.
+              </div>
+            )}
+            {paymentResult === "error" && (
+              <div style={{ background: "#FBEAEA", border: "1px solid #E3B0B0", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#B23A3A", marginBottom: 16 }}>
+                That didn't work — you can try again, or skip and connect later in Settings.
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              <a
+                href={`${apiBase}/stripe/connect?from=onboarding`}
+                style={{ display: "block", textAlign: "center", background: "#FFF", color: "#1B3A2F", border: "1px solid #1B3A2F", borderRadius: 8, padding: "11px 20px", fontWeight: 700, fontSize: 13, textDecoration: "none" }}
+              >
+                Connect with Stripe
+              </a>
+              <a
+                href={`${apiBase}/square/connect?from=onboarding`}
+                style={{ display: "block", textAlign: "center", background: "#FFF", color: "#1B3A2F", border: "1px solid #1B3A2F", borderRadius: 8, padding: "11px 20px", fontWeight: 700, fontSize: 13, textDecoration: "none" }}
+              >
+                Connect with Square
+              </a>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "20px 0" }}>
+              <div style={{ flex: 1, height: 1, background: "#E5E0D0" }} />
+              <span style={{ fontSize: 11, color: "#8A8571" }}>OR</span>
+              <div style={{ flex: 1, height: 1, background: "#E5E0D0" }} />
+            </div>
+
+            <div style={{ background: "#FFF", border: "1px solid #E5E0D0", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: "#1B3A2F" }}>Billed through your club instead?</div>
+              <p style={{ fontSize: 12, color: "#8A8571", margin: "0 0 12px" }}>
+                Common for club pros — the club collects payment and reimburses you separately, so there's nothing to connect here. Turn this on and players can book without paying online; you handle it however your club already does.
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  setEnablingPayLater(true);
+                  await fetch(`${apiBase}/business`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ allowPayLater: true }),
+                  });
+                  setEnablingPayLater(false);
+                  setPayLaterEnabled(true);
+                }}
+                disabled={enablingPayLater || payLaterEnabled}
+                style={{
+                  width: "100%", textAlign: "center",
+                  background: payLaterEnabled ? "#E7F0EA" : "#1B3A2F",
+                  color: payLaterEnabled ? "#1B3A2F" : "#F6F4EE",
+                  border: "none", borderRadius: 8, padding: "11px 20px", fontWeight: 700, fontSize: 13,
+                }}
+              >
+                {payLaterEnabled ? "Pay at lesson enabled" : enablingPayLater ? "Enabling…" : "Enable pay at lesson"}
+              </button>
             </div>
 
             <div style={{ display: "flex", gap: 10 }}>
