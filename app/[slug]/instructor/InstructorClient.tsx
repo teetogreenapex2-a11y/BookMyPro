@@ -158,6 +158,28 @@ export default function InstructorClient({
     }
   }
 
+  const [sellingPackageOnly, setSellingPackageOnly] = useState(false);
+
+  async function sellPackageOnly() {
+    const { playerId, buyNewPackageType, markAsPaid, instructorMembershipId } = newBookingForm;
+    if (!playerId || !buyNewPackageType || !instructorMembershipId) return;
+    setSellingPackageOnly(true);
+    setNewBookingError(null);
+    const res = await fetch(`${apiBase}/packages/sell`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId, packageType: buyNewPackageType, instructorMembershipId, markAsPaid }),
+    });
+    setSellingPackageOnly(false);
+    if (res.ok) {
+      setNewBookingOpen(false);
+      setNewBookingForm((f) => ({ slotId: "", serviceType: "lesson", fittingType: "driver", playerId: "", packageId: "", buyNewPackageType: "", markAsPaid: true, instructorMembershipId: f.instructorMembershipId, isRemote: false }));
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setNewBookingError(data.error || "Something went wrong.");
+    }
+  }
+
   async function createManualBooking(formOverride?: typeof newBookingForm) {
     const { slotId, serviceType, fittingType, playerId, packageId, buyNewPackageType, markAsPaid, instructorMembershipId, isRemote } = formOverride || newBookingForm;
     if (!slotId || !playerId || !instructorMembershipId) {
@@ -741,6 +763,16 @@ export default function InstructorClient({
                   <p style={{ fontSize: 12, color: "var(--faint)", margin: 0 }}>
                     Choose a player{teamInstructors.length > 1 ? " and instructor" : ""} above, then tap an open time on the calendar below.
                   </p>
+                )}
+
+                {newBookingForm.playerId && newBookingForm.instructorMembershipId && newBookingForm.buyNewPackageType && (
+                  <button
+                    onClick={sellPackageOnly}
+                    disabled={sellingPackageOnly}
+                    style={{ background: "none", border: "1px dashed var(--border)", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, fontWeight: 600, color: "var(--muted)" }}
+                  >
+                    {sellingPackageOnly ? "Selling..." : "Or just sell the package - they'll book a time later"}
+                  </button>
                 )}
 
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
