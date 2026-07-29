@@ -101,8 +101,8 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
   function jumpTo(submissionId: string, seconds: number) {
     const el = videoRefs.current[submissionId];
     if (el) {
+      el.pause();
       el.currentTime = seconds;
-      el.play();
     }
   }
 

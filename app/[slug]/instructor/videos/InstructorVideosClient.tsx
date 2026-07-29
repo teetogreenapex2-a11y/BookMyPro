@@ -112,8 +112,8 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   function jumpTo(seconds: number) {
     const el = videoRef.current;
     if (el) {
+      el.pause();
       el.currentTime = seconds;
-      el.play();
     }
   }
 
