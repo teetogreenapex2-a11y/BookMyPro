@@ -109,6 +109,14 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
     }
   }
 
+  function jumpTo(seconds: number) {
+    const el = videoRef.current;
+    if (el) {
+      el.currentTime = seconds;
+      el.play();
+    }
+  }
+
   async function addComment() {
     if (!selected || !commentDraft.trim() || !videoRef.current) return;
     setPosting(true);
@@ -295,7 +303,11 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                 {selected.comments.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {selected.comments.map((c) => (
-                      <div key={c.id} style={{ display: "flex", gap: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px" }}>
+                      <div
+                        key={c.id}
+                        onClick={() => jumpTo(c.timestampSeconds)}
+                        style={{ display: "flex", gap: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", cursor: "pointer" }}
+                      >
                         <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", flexShrink: 0 }}>
                           {formatTimestamp(c.timestampSeconds)}
                         </span>
