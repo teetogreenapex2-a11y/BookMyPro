@@ -106,6 +106,15 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
     }
   }
 
+  const FRAME_STEP = 1 / 30;
+  function stepFrame(submissionId: string, direction: 1 | -1) {
+    const el = videoRefs.current[submissionId];
+    if (!el) return;
+    el.pause();
+    const next = el.currentTime + direction * FRAME_STEP;
+    el.currentTime = Math.max(0, Math.min(next, el.duration || next));
+  }
+
   return (
     <div style={{ minHeight: "100vh" }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
@@ -216,6 +225,20 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
                       controls
                       style={{ width: "100%", borderRadius: 8, background: "#000" }}
                     />
+                    <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                      <button
+                        onClick={() => stepFrame(s.id, -1)}
+                        style={{ fontSize: 12, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}
+                      >
+                        {"<"} Frame
+                      </button>
+                      <button
+                        onClick={() => stepFrame(s.id, 1)}
+                        style={{ fontSize: 12, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}
+                      >
+                        Frame {">"}
+                      </button>
+                    </div>
                     <button
                       onClick={() => downloadVideo(s.videoUrl, `${s.title || "swing-video"}.mp4`)}
                       style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fairway)", background: "none", border: "none", padding: "6px 0 0", cursor: "pointer" }}

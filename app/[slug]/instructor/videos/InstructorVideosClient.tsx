@@ -117,6 +117,20 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
     }
   }
 
+  // No browser video element has a true "next frame" API - this nudges by
+  // roughly one frame's worth of time instead (assuming ~30fps, a
+  // reasonable match for most phone-recorded swing footage). Not
+  // frame-perfect on every video, but close enough to actually see a
+  // swing position clearly, which is what this is really for.
+  const FRAME_STEP = 1 / 30;
+  function stepFrame(direction: 1 | -1) {
+    const el = videoRef.current;
+    if (!el) return;
+    el.pause();
+    const next = el.currentTime + direction * FRAME_STEP;
+    el.currentTime = Math.max(0, Math.min(next, el.duration || next));
+  }
+
   async function addComment() {
     if (!selected || !commentDraft.trim() || !videoRef.current) return;
     setPosting(true);
@@ -269,6 +283,20 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   </p>
                 )}
                 <video ref={videoRef} src={selected.videoUrl} controls style={{ width: "100%", borderRadius: 8, background: "#000", marginBottom: 6 }} />
+                <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                  <button
+                    onClick={() => stepFrame(-1)}
+                    style={{ fontSize: 12, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}
+                  >
+                    {"<"} Frame
+                  </button>
+                  <button
+                    onClick={() => stepFrame(1)}
+                    style={{ fontSize: 12, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}
+                  >
+                    Frame {">"}
+                  </button>
+                </div>
                 <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
                   <button
                     onClick={() => downloadVideo(selected.videoUrl, `${selected.title || selected.playerName || "swing-video"}.mp4`)}
