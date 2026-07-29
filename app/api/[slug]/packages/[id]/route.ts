@@ -4,9 +4,11 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
 
-// PATCH /api/{slug}/packages/{id}  { paymentStatus: "paid" }
-// Owner/instructor only — used to mark a pay-later package as collected
-// once the player actually pays in person.
+// PATCH /api/{slug}/packages/{id}  { paymentStatus?: "paid", lessonsRemaining?: number }
+// Owner/instructor only - marks a pay-later package as collected once
+// paid in person, and/or directly adjusts the lesson count for a manual
+// correction (a comp'd lesson, a mistake to fix, etc.) rather than only
+// ever changing through the normal booking/cancel flow.
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { slug: string; id: string } }
@@ -24,15 +26,28 @@ export async function PATCH(
   const pkg = await prisma.package.findFirst({ where: { id: params.id, businessId: business.id } });
   if (!pkg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { paymentStatus } = await req.json();
-  if (paymentStatus !== "paid") {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  const { paymentStatus, lessonsRemaining } = await req.json();
+
+  const data: Record<string, unknown> = {};
+
+  if (paymentStatus !== undefined) {
+    if (paymentStatus !== "paid") return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    data.paymentStatus = "paid";
+    data.paidAt = new Date();
   }
 
-  const updated = await prisma.package.update({
-    where: { id: pkg.id },
-    data: { paymentStatus: "paid", paidAt: new Date() },
-  });
+  if (lessonsRemaining !== undefined) {
+    if (!Number.isInteger(lessonsRemaining) || lessonsRemaining < 0) {
+      return NextResponse.json({ error: "Lessons remaining must be a whole number, 0 or more" }, { status: 400 });
+    }
+    data.lessonsRemaining = lessonsRemaining;
+  }
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  }
+
+  const updated = await prisma.package.update({ where: { id: pkg.id }, data });
 
   return NextResponse.json(updated);
 }

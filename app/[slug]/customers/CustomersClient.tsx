@@ -30,12 +30,36 @@ export default function CustomersClient({
   const [sortBy, setSortBy] = useState<"name" | "remaining">("name");
   const [customers, setCustomers] = useState(initialCustomers);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
+  const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [savingAdjustment, setSavingAdjustment] = useState(false);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [nameValue, setNameValue] = useState("");
+  const [savingName, setSavingName] = useState(false);
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [openUpgradeFor, setOpenUpgradeFor] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ name: "", email: "", phone: "" });
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function deleteCustomer(customerId: string, force = false) {
+    setDeletingId(customerId);
+    const res = await fetch(`${apiBase}/players/${customerId}${force ? "?force=true" : ""}`, { method: "DELETE" });
+    const data = await res.json();
+    setDeletingId(null);
+    if (res.status === 409 && data.warning) {
+      const confirmed = window.confirm(data.message + "\n\nDelete anyway?");
+      if (confirmed) await deleteCustomer(customerId, true);
+      return;
+    }
+    if (res.ok) {
+      setCustomers((prev) => prev.filter((c) => c.id !== customerId));
+    } else {
+      alert(data.error || "Something went wrong.");
+    }
+  }
 
   async function addCustomer() {
     if (!addForm.name.trim() || !addForm.email.trim()) {
@@ -79,6 +103,42 @@ export default function CustomersClient({
       );
     }
     setMarkingPaid(null);
+  }
+
+  async function saveName(customerId: string) {
+    if (!nameValue.trim()) return;
+    setSavingName(true);
+    const res = await fetch(`${apiBase}/players/${customerId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: nameValue.trim() }),
+    });
+    setSavingName(false);
+    if (res.ok) {
+      setCustomers((prev) => prev.map((c) => (c.id === customerId ? { ...c, name: nameValue.trim() } : c)));
+      setEditingNameId(null);
+    }
+  }
+
+  async function saveAdjustment(packageId: string) {
+    const parsed = Number(editValue);
+    if (!Number.isInteger(parsed) || parsed < 0) return;
+    setSavingAdjustment(true);
+    const res = await fetch(`${apiBase}/packages/${packageId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lessonsRemaining: parsed }),
+    });
+    setSavingAdjustment(false);
+    if (res.ok) {
+      setCustomers((prev) =>
+        prev.map((c) => ({
+          ...c,
+          packages: c.packages.map((p) => (p.id === packageId ? { ...p, lessonsRemaining: parsed } : p)),
+        }))
+      );
+      setEditingPackageId(null);
+    }
   }
 
   async function upgradePackage(customerId: string, packageId: string, newType: string) {
@@ -141,8 +201,8 @@ export default function CustomersClient({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="contact-input"
             placeholder="Search by name or email…"
+            className="contact-input"
             style={{
               width: "100%", border: "none", borderRadius: 8, padding: "10px 12px",
               fontFamily: "inherit", fontSize: 14, background: "rgba(255,255,255,0.1)", color: "var(--chalk)",
@@ -232,9 +292,50 @@ export default function CustomersClient({
           {filtered.map((c, idx) => (
             <div key={c.id} style={rowGrid("body", idx)}>
               <div style={bodyCell}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{c.name}</div>
+                {editingNameId === c.id ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                    <input
+                      value={nameValue}
+                      onChange={(e) => setNameValue(e.target.value)}
+                      placeholder="Full name"
+                      style={{ fontSize: 13, padding: "3px 6px", border: "1px solid var(--border)", borderRadius: 4, width: 130 }}
+                    />
+                    <button
+                      onClick={() => saveName(c.id)}
+                      disabled={savingName}
+                      style={{ fontSize: 10, fontWeight: 700, color: "var(--fairway)", background: "none", border: "1px solid var(--border)", borderRadius: 4, padding: "2px 6px", cursor: "pointer" }}
+                    >
+                      {savingName ? "..." : "Save"}
+                    </button>
+                    <button
+                      onClick={() => setEditingNameId(null)}
+                      style={{ fontSize: 10, color: "var(--faint)", background: "none", border: "none", cursor: "pointer" }}
+                    >
+                      cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => { setEditingNameId(c.id); setNameValue(c.name || ""); }}
+                    style={{ fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+                    title="Click to edit name"
+                  >
+                    {c.name || <span style={{ color: "var(--faint)", fontWeight: 400, fontStyle: "italic" }}>No name set - click to add</span>}
+                  </div>
+                )}
                 <div style={{ fontSize: 12, color: "var(--muted)" }}>{c.email}</div>
                 <div style={{ fontSize: 12, color: "var(--faint)" }}>{c.phone}</div>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Delete ${c.name || c.email} from your customer list? Their booking and payment history stays on record, but they'll no longer show up here.`)) {
+                      deleteCustomer(c.id);
+                    }
+                  }}
+                  disabled={deletingId === c.id}
+                  style={{ fontSize: 11, color: "#B23A3A", background: "none", border: "none", padding: 0, marginTop: 4, cursor: "pointer" }}
+                >
+                  {deletingId === c.id ? "Deleting…" : "Delete"}
+                </button>
               </div>
               <div style={bodyCell}>
                 {c.packages.length === 0 ? (
@@ -246,6 +347,37 @@ export default function CustomersClient({
                         <span className="mono" style={{ fontSize: 11, color: "var(--fairway)" }}>
                           {pkg.label} ({pkg.lessonsRemaining}/{pkg.lessonsTotal} left)
                         </span>
+                        {editingPackageId === pkg.id ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              style={{ width: 50, fontSize: 11, padding: "2px 4px", border: "1px solid var(--border)", borderRadius: 4 }}
+                            />
+                            <button
+                              onClick={() => saveAdjustment(pkg.id)}
+                              disabled={savingAdjustment}
+                              style={{ fontSize: 10, fontWeight: 700, color: "var(--fairway)", background: "none", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 6px", cursor: "pointer" }}
+                            >
+                              {savingAdjustment ? "..." : "Save"}
+                            </button>
+                            <button
+                              onClick={() => setEditingPackageId(null)}
+                              style={{ fontSize: 10, color: "var(--faint)", background: "none", border: "none", cursor: "pointer" }}
+                            >
+                              cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setEditingPackageId(pkg.id); setEditValue(String(pkg.lessonsRemaining)); }}
+                            style={{ display: "block", fontSize: 10, color: "var(--faint)", background: "none", border: "none", padding: 0, marginTop: 2, cursor: "pointer", textDecoration: "underline" }}
+                          >
+                            Adjust
+                          </button>
+                        )}
                         {!!pkg.creditCents && (
                           <div style={{ fontSize: 10, color: "var(--faint)" }}>
                             {centsToDollars(pkg.creditCents)} credit applied
