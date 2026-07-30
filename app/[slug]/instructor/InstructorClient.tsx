@@ -413,6 +413,23 @@ export default function InstructorClient({
     setNoteSlot(null);
   }
 
+  const [cancellingBooking, setCancellingBooking] = useState(false);
+
+  async function cancelThisBooking() {
+    if (!bookingId) return;
+    if (!window.confirm("Cancel this booking? Any package credit used will be refunded, and the time slot will reopen.")) return;
+    setCancellingBooking(true);
+    const res = await fetch(`${apiBase}/bookings/${bookingId}/cancel`, { method: "POST" });
+    setCancellingBooking(false);
+    if (res.ok) {
+      setNoteSlot(null);
+      loadSlots();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Couldn't cancel this booking.");
+    }
+  }
+
   const slotsByKey = useMemo(() => {
     const map: Record<string, Slot> = {};
     for (const s of slots) map[s.startTime] = s;
@@ -1037,9 +1054,18 @@ export default function InstructorClient({
                   placeholder="e.g. Focus on grip and takeaway, bring wedges next time"
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: 10, fontFamily: "inherit", fontSize: 13, marginBottom: 12 }}
                 />
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginBottom: 12 }}>
+                  <button
+                    onClick={cancelThisBooking}
+                    disabled={cancellingBooking}
+                    style={{ fontSize: 12.5, fontWeight: 700, color: "#B23A3A", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                  >
+                    {cancellingBooking ? "Cancelling..." : "Cancel this booking"}
+                  </button>
+                </div>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button onClick={() => setNoteSlot(null)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>
-                    Cancel
+                    Close
                   </button>
                   <button onClick={saveNote} style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700 }}>
                     Save note
