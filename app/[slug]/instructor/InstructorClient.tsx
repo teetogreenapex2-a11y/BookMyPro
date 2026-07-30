@@ -844,7 +844,7 @@ export default function InstructorClient({
           </div>
         </div>
 
-        {loading ? (
+        {loading && slots.length === 0 ? (
           <p style={{ color: "var(--muted)", fontSize: 14 }}>Loading…</p>
         ) : (
           <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
