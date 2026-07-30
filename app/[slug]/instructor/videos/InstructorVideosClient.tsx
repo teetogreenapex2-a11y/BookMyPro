@@ -283,16 +283,16 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   </p>
                 )}
                 <video ref={videoRef} src={selected.videoUrl} controls style={{ width: "100%", borderRadius: 8, background: "#000", marginBottom: 6 }} />
-                <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                   <button
                     onClick={() => stepFrame(-1)}
-                    style={{ fontSize: 12, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}
+                    style={{ flex: 1, fontSize: 15, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px", cursor: "pointer" }}
                   >
                     {"<"} Frame
                   </button>
                   <button
                     onClick={() => stepFrame(1)}
-                    style={{ fontSize: 12, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}
+                    style={{ flex: 1, fontSize: 15, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px", cursor: "pointer" }}
                   >
                     Frame {">"}
                   </button>

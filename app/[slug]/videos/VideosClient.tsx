@@ -225,16 +225,16 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
                       controls
                       style={{ width: "100%", borderRadius: 8, background: "#000" }}
                     />
-                    <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                    <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
                       <button
                         onClick={() => stepFrame(s.id, -1)}
-                        style={{ fontSize: 12, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}
+                        style={{ flex: 1, fontSize: 15, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px", cursor: "pointer" }}
                       >
                         {"<"} Frame
                       </button>
                       <button
                         onClick={() => stepFrame(s.id, 1)}
-                        style={{ fontSize: 12, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}
+                        style={{ flex: 1, fontSize: 15, fontWeight: 700, color: "var(--fairway)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px", cursor: "pointer" }}
                       >
                         Frame {">"}
                       </button>
