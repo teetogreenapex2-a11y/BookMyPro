@@ -203,17 +203,32 @@ export default function BookingClient({
     setPendingPackageType(null);
   }
 
-  async function payLaterPackage(packageType: string) {
-    if (!selectedInstructorId) return;
+  async function payLaterAndBookSlot() {
+    if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
+    saveProfileFieldsIfProvided();
+    setConfirming(true);
     const res = await fetch(`${apiBase}/packages/pay-later`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ packageType, instructorMembershipId: selectedInstructorId }),
+      body: JSON.stringify({
+        packageType: pendingPackageType,
+        instructorMembershipId: selectedInstructorId,
+        availabilityId: selected.id,
+        contactName: contact.name,
+        contactPhone: contact.phone,
+        contactEmail: contact.email,
+        isRemote,
+      }),
     });
+    setConfirming(false);
     const data = await res.json();
     if (res.ok) {
       setPackages((prev) => [...prev, data]);
-      chooseOwnedPackage(data.id);
+      setMessage("Reserved - you're all set, and you'll pay in person at your first lesson.");
+      setSelected(null);
+      setPendingPackageType(null);
+      loadSlots();
+      loadMyBookings();
     } else {
       setMessage(data.error || "Something went wrong.");
     }
@@ -543,17 +558,6 @@ export default function BookingClient({
                               {owned ? `${owned.lessonsRemaining} left` : isPriced ? centsToDollars(p.priceCents) : "TBD"}
                             </div>
                           </button>
-                          {!owned && isPriced && business.allowPayLater && (
-                            <button
-                              onClick={() => payLaterPackage(p.id)}
-                              style={{
-                                background: "transparent", color: "#D7DED9", border: "1px dashed rgba(255,255,255,0.3)",
-                                borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 600,
-                              }}
-                            >
-                              Pay at first lesson
-                            </button>
-                          )}
                         </div>
                       );
                     })
@@ -897,6 +901,20 @@ export default function BookingClient({
             >
               {confirming ? "..." : service === "lesson" && !isBuyingPackage ? "Confirm" : "Pay & Confirm"}
             </button>
+
+            {service === "lesson" && isBuyingPackage && business.allowPayLater && (
+              <button
+                onClick={payLaterAndBookSlot}
+                disabled={confirming || !contactValid() || !selectedInstructorId}
+                style={{
+                  width: "100%", background: "none", color: "var(--chalk)", border: "1px dashed rgba(255,255,255,0.4)",
+                  borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 14, marginTop: 8,
+                  opacity: confirming || !contactValid() || !selectedInstructorId ? 0.6 : 1,
+                }}
+              >
+                Reserve - pay at first lesson instead
+              </button>
+            )}
           </div>
         )}
 
