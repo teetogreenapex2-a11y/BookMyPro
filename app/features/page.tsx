@@ -1,3 +1,13 @@
+import type { Metadata } from "next";
+
+// Belt-and-suspenders with robots.txt - this is a more direct, page-level
+// signal to search engines not to index this specific page, which still
+// applies even in edge cases where robots.txt alone might not (e.g. if
+// the page ever gets linked to from somewhere outside this app).
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default function FeaturesPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#F6F4EE", fontFamily: "sans-serif" }}>
