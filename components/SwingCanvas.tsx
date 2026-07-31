@@ -18,6 +18,17 @@ function angleAt(v: { x: number; y: number }, p1: { x: number; y: number }, p2: 
   return (Math.acos(cos) * 180) / Math.PI;
 }
 
+// Shortest distance from a point to a line segment - used to hit-test
+// lines, arrows, and pen strokes, since a click is almost never exactly
+// on the mathematical line itself.
+function distToSegment(p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) {
+  const l2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
+  if (l2 === 0) return dist(p, a);
+  let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return dist(p, { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+}
+
 function drawArrowHead(ctx: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }, size: number, color: string) {
   const angle = Math.atan2(to.y - from.y, to.x - from.x);
   ctx.beginPath();
@@ -40,6 +51,7 @@ const COLORS = [
 ];
 
 const TOOLS = [
+  { id: "move", label: "Move" },
   { id: "pen", label: "Pen" },
   { id: "line", label: "Line" },
   { id: "arrow", label: "Arrow" },
@@ -58,6 +70,58 @@ type Shape =
   | { type: "angle"; color: string; width: number; vertex: Point; p1: Point; p2: Point; degrees: number }
   | { type: "text"; color: string; width: number; point: Point; text: string };
 
+// How close a click needs to be to a shape's actual line/edge to count as
+// hitting it, in canvas pixels - generous enough to comfortably tap a
+// thin line on a phone screen without needing pixel-perfect precision.
+const HIT_TOLERANCE = 16;
+
+function hitTestShape(shape: Shape, p: Point): boolean {
+  switch (shape.type) {
+    case "pen":
+    case "erase":
+      return shape.points.some((pt) => dist(pt, p) < HIT_TOLERANCE);
+    case "line":
+    case "arrow":
+      return distToSegment(p, shape.from, shape.to) < HIT_TOLERANCE;
+    case "circle":
+      return Math.abs(dist(shape.center, p) - shape.radius) < HIT_TOLERANCE;
+    case "angle":
+      return (
+        distToSegment(p, shape.vertex, shape.p1) < HIT_TOLERANCE ||
+        distToSegment(p, shape.vertex, shape.p2) < HIT_TOLERANCE
+      );
+    case "text":
+      // Text has no stored width, so this uses a fixed-size box around
+      // its anchor point - generous enough for most short labels.
+      return Math.abs(shape.point.x - p.x) < 60 && Math.abs(shape.point.y - p.y) < 20;
+  }
+}
+
+// Shifts every coordinate in a shape by (dx, dy) - used while dragging
+// with the Move tool. Returns a new shape rather than mutating, matching
+// how the rest of this component treats shapes as immutable.
+function translateShape(shape: Shape, dx: number, dy: number): Shape {
+  switch (shape.type) {
+    case "pen":
+    case "erase":
+      return { ...shape, points: shape.points.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })) };
+    case "line":
+    case "arrow":
+      return { ...shape, from: { x: shape.from.x + dx, y: shape.from.y + dy }, to: { x: shape.to.x + dx, y: shape.to.y + dy } };
+    case "circle":
+      return { ...shape, center: { x: shape.center.x + dx, y: shape.center.y + dy } };
+    case "angle":
+      return {
+        ...shape,
+        vertex: { x: shape.vertex.x + dx, y: shape.vertex.y + dy },
+        p1: { x: shape.p1.x + dx, y: shape.p1.y + dy },
+        p2: { x: shape.p2.x + dx, y: shape.p2.y + dy },
+      };
+    case "text":
+      return { ...shape, point: { x: shape.point.x + dx, y: shape.point.y + dy } };
+  }
+}
+
 export type SwingCanvasHandle = {
   exportPng: () => Promise<Blob>;
   getShapesJson: () => string;
@@ -75,6 +139,16 @@ export default function SwingCanvas({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+
+  // Fits a photo's real aspect ratio into a reasonable max size, instead
+  // of forcing every photo into one fixed 900x600 box regardless of its
+  // actual shape - that's what was causing camera photos (usually taller
+  // than they are wide) to look visibly squashed.
+  function dimsForImage(width: number, height: number, maxSize = 900) {
+    if (width <= 0 || height <= 0) return { w: 900, h: 600 };
+    const scale = Math.min(maxSize / width, maxSize / height, 1);
+    return { w: Math.round(width * scale), h: Math.round(height * scale) };
+  }
 
   const [dims, setDims] = useState({ w: 900, h: 600 });
   const [tool, setTool] = useState<Tool>("line");
@@ -99,6 +173,7 @@ export default function SwingCanvas({
   const [textDraft, setTextDraft] = useState("");
 
   const drawingRef = useRef(false);
+  const movingRef = useRef<{ index: number; lastPoint: Point } | null>(null);
 
   // Load an existing source photo (re-editing a saved sketch) if provided.
   useEffect(() => {
@@ -107,6 +182,7 @@ export default function SwingCanvas({
     img.crossOrigin = "anonymous";
     img.onload = () => {
       imgRef.current = img;
+      setDims(dimsForImage(img.naturalWidth, img.naturalHeight));
       setHasImage(true);
       redraw();
     };
@@ -229,6 +305,20 @@ export default function SwingCanvas({
 
     function handleStart(clientX: number, clientY: number) {
       const p = getPos(clientX, clientY);
+      if (tool === "move") {
+        // Check shapes topmost-first, since later shapes are drawn over
+        // earlier ones and should take priority when they overlap.
+        setShapes((currentShapes) => {
+          for (let i = currentShapes.length - 1; i >= 0; i--) {
+            if (hitTestShape(currentShapes[i], p)) {
+              movingRef.current = { index: i, lastPoint: p };
+              break;
+            }
+          }
+          return currentShapes;
+        });
+        return;
+      }
       drawingRef.current = true;
       if (tool === "angle") {
         setAngleClicks((prev) => {
@@ -259,8 +349,16 @@ export default function SwingCanvas({
     }
 
     function handleMove(clientX: number, clientY: number) {
-      if (!drawingRef.current) return;
       const p = getPos(clientX, clientY);
+      if (movingRef.current) {
+        const { index, lastPoint } = movingRef.current;
+        const dx = p.x - lastPoint.x;
+        const dy = p.y - lastPoint.y;
+        setShapes((s) => s.map((shape, i) => (i === index ? translateShape(shape, dx, dy) : shape)));
+        movingRef.current = { index, lastPoint: p };
+        return;
+      }
+      if (!drawingRef.current) return;
       setCurrent((prev) => {
         if (!prev) return prev;
         if (prev.type === "pen" || prev.type === "erase") return { ...prev, points: [...prev.points, p] };
@@ -271,6 +369,10 @@ export default function SwingCanvas({
     }
 
     function handleEnd() {
+      if (movingRef.current) {
+        movingRef.current = null;
+        return;
+      }
       if (!drawingRef.current) return;
       drawingRef.current = false;
       setCurrent((prev) => {
@@ -341,6 +443,7 @@ export default function SwingCanvas({
     const img = new Image();
     img.onload = () => {
       imgRef.current = img;
+      setDims(dimsForImage(img.naturalWidth, img.naturalHeight));
       setHasImage(true);
       redraw();
     };
