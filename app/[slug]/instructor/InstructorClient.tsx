@@ -58,6 +58,10 @@ export default function InstructorClient({
   const [viewingInstructorId, setViewingInstructorId] = useState(viewerMembershipId);
   const [noteSlot, setNoteSlot] = useState<Slot | null>(null);
   const [lastMinuteSlot, setLastMinuteSlot] = useState<Slot | null>(null);
+  const [rosterSlot, setRosterSlot] = useState<Slot | null>(null);
+  const [roster, setRoster] = useState<{ bookingId: string; name: string; phone: string | null; email: string }[] | null>(null);
+  const [rosterCapacityInput, setRosterCapacityInput] = useState("");
+  const [savingCapacity, setSavingCapacity] = useState(false);
   const notePanelRef = useRef<HTMLDivElement | null>(null);
   const [noteText, setNoteText] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -359,7 +363,14 @@ export default function InstructorClient({
     // where things stand rather than risking the normal open/close toggle
     // acting on it incorrectly.
     if (slot.isGroup) {
-      alert(`Group lesson: ${slot.groupSpotsTaken ?? 0} of ${slot.groupCapacity} spots taken at $${((slot.groupPriceCents ?? 0) / 100).toFixed(2)} per person.`);
+      setRosterSlot(slot);
+      setRosterCapacityInput(String(slot.groupCapacity ?? ""));
+      setRoster(null);
+      const res = await fetch(`${apiBase}/availability/${slot.id}/roster`);
+      if (res.ok) {
+        const data = await res.json();
+        setRoster(data.roster);
+      }
       return;
     }
     // A same-day/near-term open slot isn't visible to players by default
@@ -400,6 +411,30 @@ export default function InstructorClient({
     });
     setLastMinuteSlot(null);
     loadSlots();
+  }
+
+  async function saveRosterCapacity() {
+    if (!rosterSlot) return;
+    const capacity = parseInt(rosterCapacityInput, 10);
+    if (!Number.isInteger(capacity) || capacity < 1) {
+      alert("Enter a valid number of spots.");
+      return;
+    }
+    setSavingCapacity(true);
+    const res = await fetch(`${apiBase}/availability`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: rosterSlot.id, groupCapacity: capacity }),
+    });
+    setSavingCapacity(false);
+    if (res.ok) {
+      const updated = await res.json();
+      setRosterSlot((s) => (s ? { ...s, groupCapacity: updated.groupCapacity, status: updated.status } : s));
+      loadSlots();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Couldn't update capacity.");
+    }
   }
 
   async function openReviewFor(slot: Slot) {
@@ -1078,6 +1113,58 @@ export default function InstructorClient({
                 style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 13, cursor: "pointer" }}
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {rosterSlot && (
+          <div style={{ background: "#FFF", border: "1px solid #5A4FCF", borderRadius: 12, padding: 16, marginTop: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+              Group lesson - {new Date(rosterSlot.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </div>
+            <p className="mono" style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600, marginBottom: 12 }}>
+              ${((rosterSlot.groupPriceCents ?? 0) / 100).toFixed(2)} per person
+            </p>
+
+            {roster === null ? (
+              <p style={{ fontSize: 13, color: "var(--muted)" }}>Loading roster...</p>
+            ) : roster.length === 0 ? (
+              <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>No one's signed up yet.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+                {roster.map((r, i) => (
+                  <div key={r.bookingId} style={{ display: "flex", justifyContent: "space-between", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{i + 1}. {r.name}</span>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>{r.phone || r.email}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 8, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+              <label style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}>Total spots</div>
+                <input
+                  type="number"
+                  min={1}
+                  value={rosterCapacityInput}
+                  onChange={(e) => setRosterCapacityInput(e.target.value)}
+                  style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontSize: 14 }}
+                />
+              </label>
+              <button
+                onClick={saveRosterCapacity}
+                disabled={savingCapacity}
+                style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                {savingCapacity ? "..." : "Save"}
+              </button>
+              <button
+                onClick={() => setRosterSlot(null)}
+                style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+              >
+                Close
               </button>
             </div>
           </div>
