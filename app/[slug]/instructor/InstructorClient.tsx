@@ -1119,7 +1119,7 @@ export default function InstructorClient({
         )}
 
         {rosterSlot && (
-          <div style={{ background: "#FFF", border: "1px solid #5A4FCF", borderRadius: 12, padding: 16, marginTop: 16 }}>
+          <div id="roster-print-area" style={{ background: "#FFF", border: "1px solid #5A4FCF", borderRadius: 12, padding: 16, marginTop: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
               Group lesson - {new Date(rosterSlot.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
             </div>
@@ -1142,7 +1142,7 @@ export default function InstructorClient({
               </div>
             )}
 
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 8, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+            <div className="no-print" style={{ display: "flex", alignItems: "flex-end", gap: 8, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
               <label style={{ flex: 1 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}>Total spots</div>
                 <input
@@ -1159,6 +1159,13 @@ export default function InstructorClient({
                 style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
               >
                 {savingCapacity ? "..." : "Save"}
+              </button>
+              <button
+                onClick={() => window.print()}
+                disabled={!roster || roster.length === 0}
+                style={{ background: "none", border: "1px solid #5A4FCF", color: "#5A4FCF", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                Print roster
               </button>
               <button
                 onClick={() => setRosterSlot(null)}
