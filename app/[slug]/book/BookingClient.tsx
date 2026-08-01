@@ -8,7 +8,7 @@ import { formatTime12h, wallClockToUTC } from "@/lib/time";
 const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean };
+type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean };
 type Package = { id: string; type: string; lessonsRemaining: number; lessonsTotal: number; paymentStatus?: string; instructorMembershipId?: string | null };
 type Instructor = { id: string; name: string | null; email: string; image: string | null; role: string; [key: string]: any };
 
@@ -762,8 +762,11 @@ export default function BookingClient({
                       const isSelected = selected?.id === slot.id;
                       // Anything less than 24 hours out isn't bookable -
                       // most instructors have their day already planned by
-                      // that point, same as most people.
-                      const isTooSoon = dt.getTime() < Date.now() + 24 * 60 * 60 * 1000;
+                      // that point, same as most people. An instructor can
+                      // explicitly override this for one specific slot
+                      // (allowLastMinute) - e.g. reopening a same-day
+                      // cancellation for any player to grab.
+                      const isTooSoon = !slot.allowLastMinute && dt.getTime() < Date.now() + 24 * 60 * 60 * 1000;
                       const canPick = isOpen && !isTooSoon && (service === "lesson" ? canPickLessonSlot : !!fittingType && !!selectedInstructorId);
                       const bookedBg = slot.bookedServiceType === "fitting"
                         ? "#B8862B"

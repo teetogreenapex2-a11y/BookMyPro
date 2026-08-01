@@ -36,12 +36,13 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     status: s.status,
     bookedServiceType: s.booking?.serviceType || null,
     bookedIsRemote: s.booking?.isRemote || false,
+    allowLastMinute: s.allowLastMinute,
   }));
 
   return NextResponse.json(shaped);
 }
 
-// PATCH /api/{slug}/availability  { id, status }
+// PATCH /api/{slug}/availability  { id, status?, allowLastMinute? }
 // Owner/instructor only. An instructor can only toggle their own slots; the
 // owner can toggle anyone's on the team.
 export async function PATCH(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -54,8 +55,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor"]);
   if (!membership) return NextResponse.json({ error: "Instructor access required for this business" }, { status: 403 });
 
-  const { id, status } = await req.json();
-  if (!["open", "closed"].includes(status)) {
+  const { id, status, allowLastMinute } = await req.json();
+  if (status !== undefined && !["open", "closed"].includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
@@ -70,6 +71,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
     return NextResponse.json({ error: "You can only edit your own availability" }, { status: 403 });
   }
 
-  const updated = await prisma.availability.update({ where: { id }, data: { status } });
+  const data: Record<string, unknown> = {};
+  if (status !== undefined) data.status = status;
+  if (typeof allowLastMinute === "boolean") data.allowLastMinute = allowLastMinute;
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  }
+
+  const updated = await prisma.availability.update({ where: { id }, data });
   return NextResponse.json(updated);
 }

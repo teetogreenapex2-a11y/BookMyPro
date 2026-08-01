@@ -20,7 +20,9 @@ model Business {
   name   String @default("My Golf Business")
   logoUrl String? // uploaded via Settings - shown on this business's own booking/instructor pages instead of the platform's generic branding
   email  String @default("")
-  hours  String @default("Mon–Sat, 8:00 AM – 5:00 PM")
+  hours  String @default("Mon–Sat, 8:00 AM – 5:00 PM") // display-only text, shown on the booking page - not connected to actual calendar generation
+  openHour  Int @default(8)  // 24-hour format - the actual hour the calendar starts generating slots from
+  closeHour Int @default(17) // 24-hour format - the actual hour the calendar stops generating slots at (exclusive - e.g. 17 means the last slot is 4:00 PM, not 5:00 PM)
   lessonRate String @default("$120/hr")
   instructorName String? // shown to players as "with {instructorName}" — separate from the business name
 
@@ -256,6 +258,10 @@ model Availability {
   instructorMembershipId String
   startTime      DateTime
   status         String   @default("open") // open | closed | booked
+  // Lets an instructor override the 24-hour minimum lead time for one
+  // specific slot - e.g. a same-day cancellation they want to reopen for
+  // any player to grab, without turning off the protection everywhere else.
+  allowLastMinute Boolean @default(false)
   closedReason   String?  // "manual" | "calendar"
   blockedEventId String?
   booking        Booking?

@@ -13,7 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // one lesson or one fitting at a time, so there's exactly one timeline, not
 // a separate one per service. `bookedServiceType` (set once something has
 // requested or booked the slot) is what determines its color.
-type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean };
+type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean };
 type SyncLogEntry = {
   id: string;
   ranAt: string;
@@ -57,6 +57,7 @@ export default function InstructorClient({
   // own, since each instructor now has their own independent timeline.
   const [viewingInstructorId, setViewingInstructorId] = useState(viewerMembershipId);
   const [noteSlot, setNoteSlot] = useState<Slot | null>(null);
+  const [lastMinuteSlot, setLastMinuteSlot] = useState<Slot | null>(null);
   const notePanelRef = useRef<HTMLDivElement | null>(null);
   const [noteText, setNoteText] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -328,12 +329,43 @@ export default function InstructorClient({
       await createManualBooking({ ...newBookingForm, slotId: slot.id });
       return;
     }
+    // A same-day/near-term open slot isn't visible to players by default
+    // (see the 24-hour rule on the booking page) - tapping one here asks
+    // what you want to do with it, rather than just closing it outright,
+    // since "let players see this after all" is usually the actual intent.
+    const isNearTerm = slot.status === "open" && new Date(slot.startTime).getTime() < Date.now() + 24 * 60 * 60 * 1000;
+    if (isNearTerm && !slot.allowLastMinute) {
+      setLastMinuteSlot(slot);
+      return;
+    }
     const nextStatus = slot.status === "open" ? "closed" : "open";
     await fetch(`${apiBase}/availability`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: slot.id, status: nextStatus }),
     });
+    loadSlots();
+  }
+
+  async function allowLastMinuteBooking() {
+    if (!lastMinuteSlot) return;
+    await fetch(`${apiBase}/availability`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: lastMinuteSlot.id, allowLastMinute: true }),
+    });
+    setLastMinuteSlot(null);
+    loadSlots();
+  }
+
+  async function closeNearTermSlot() {
+    if (!lastMinuteSlot) return;
+    await fetch(`${apiBase}/availability`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: lastMinuteSlot.id, status: "closed" }),
+    });
+    setLastMinuteSlot(null);
     loadSlots();
   }
 
@@ -873,6 +905,7 @@ export default function InstructorClient({
                       let color = "var(--ink)";
                       let border = "none";
                       let opacity = 1;
+                      const isNearTermSlot = slot.status === "open" && new Date(slot.startTime).getTime() < Date.now() + 24 * 60 * 60 * 1000;
                       if (slot.status === "open") {
                         bg = "var(--open)";
                         // A slot that's already passed and never got booked
@@ -885,6 +918,12 @@ export default function InstructorClient({
                         // makes it obvious at a glance which buttons will
                         // actually complete the booking when tapped.
                         else if (isArmedForBooking) border = "2px solid var(--gold)";
+                        // Near-term slots aren't visible to players by
+                        // default (the 24-hour rule) - a dashed border
+                        // flags that at a glance, and a solid gold one
+                        // marks a slot you've specifically opened up
+                        // despite being last-minute.
+                        else if (isNearTermSlot) border = slot.allowLastMinute ? "2px solid var(--gold)" : "1px dashed var(--muted)";
                       } else if (slot.status === "pending") {
                         bg = "#FBF3DE";
                         border = "1px dashed #B8862B";
@@ -921,6 +960,40 @@ export default function InstructorClient({
           <Legend color="var(--remote)" label="Remote lesson booked" />
           <Legend color="#B8862B" label="Fitting booked" />
         </div>
+        <p style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 6 }}>
+          A dashed border means that slot is within 24 hours and hidden from players by default - tap it to allow last-minute booking. A solid gold border means you've already opened it up.
+        </p>
+
+        {lastMinuteSlot && (
+          <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginTop: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
+              {new Date(lastMinuteSlot.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </div>
+            <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 12 }}>
+              This is less than 24 hours away, so players can't book it themselves by default. What would you like to do?
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={allowLastMinuteBooking}
+                style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                Allow players to book this
+              </button>
+              <button
+                onClick={closeNearTermSlot}
+                style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+              >
+                Close this slot instead
+              </button>
+              <button
+                onClick={() => setLastMinuteSlot(null)}
+                style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 13, cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {reviewingBooking && (
           <div ref={reviewPanelRef} style={{ background: "#FFF", border: "1px solid #B8862B", borderRadius: 12, padding: 16, marginTop: 16 }}>
