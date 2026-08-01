@@ -257,14 +257,24 @@ model Availability {
   instructor     Membership @relation(fields: [instructorMembershipId], references: [id])
   instructorMembershipId String
   startTime      DateTime
-  status         String   @default("open") // open | closed | booked
+  status         String   @default("open") // open | closed | booked | full
   // Lets an instructor override the 24-hour minimum lead time for one
   // specific slot - e.g. a same-day cancellation they want to reopen for
   // any player to grab, without turning off the protection everywhere else.
   allowLastMinute Boolean @default(false)
+  // Group lessons - designated from a normal open slot rather than being a
+  // separate kind of slot from the start. groupPriceCents is set fresh each
+  // time (not a fixed rate from Settings), since group pricing varies a lot
+  // by event - a junior camp vs. an adult clinic vs. a one-off group session.
+  isGroup         Boolean @default(false)
+  groupCapacity   Int?
+  groupPriceCents Int?
   closedReason   String?  // "manual" | "calendar"
   blockedEventId String?
-  booking        Booking?
+  // A list, not a single optional booking, since a group slot can hold
+  // several bookings at once (one per player who's joined) - a private
+  // lesson slot just happens to only ever have one.
+  bookings       Booking[]
 
   @@unique([businessId, instructorMembershipId, startTime])
 }
@@ -301,7 +311,9 @@ model Booking {
   squareOrderId         String?
   googleCalendarEventId String?
   availability          Availability? @relation(fields: [availabilityId], references: [id])
-  availabilityId        String?       @unique
+  // No longer unique - a group lesson slot can have several bookings
+  // pointing at it at once, one per player who's joined that session.
+  availabilityId        String?
   note                  Note?
   swingSketches         SwingSketch[]
   giftCardRedemptions   GiftCardRedemption[]
@@ -530,7 +542,7 @@ model PendingSquarePayment {
   id            String   @id @default(cuid())
   businessId    String
   userId        String
-  kind          String   // "package" | "fitting"
+  kind          String   // "package" | "fitting" | "group"
   packageType   String?
   availabilityId String?
   fittingType   String?

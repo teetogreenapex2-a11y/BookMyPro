@@ -13,7 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // one lesson or one fitting at a time, so there's exactly one timeline, not
 // a separate one per service. `bookedServiceType` (set once something has
 // requested or booked the slot) is what determines its color.
-type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean };
+type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean; isGroup?: boolean; groupCapacity?: number | null; groupPriceCents?: number | null; groupSpotsTaken?: number };
 type SyncLogEntry = {
   id: string;
   ranAt: string;
@@ -76,6 +76,9 @@ export default function InstructorClient({
   const [reviewing, setReviewing] = useState(false);
   const [reviewMessage, setReviewMessage] = useState<string | null>(null);
   const [newBookingOpen, setNewBookingOpen] = useState(false);
+  const [creatingGroupOpen, setCreatingGroupOpen] = useState(false);
+  const [groupCapacityInput, setGroupCapacityInput] = useState("6");
+  const [groupPriceInput, setGroupPriceInput] = useState("");
   const [players, setPlayers] = useState<Player[]>([]);
   const [teamInstructors, setTeamInstructors] = useState<{ id: string; name: string | null; email: string; [key: string]: any }[]>([]);
   const [newBookingForm, setNewBookingForm] = useState({
@@ -327,6 +330,36 @@ export default function InstructorClient({
     if (newBookingOpen && slot.status === "open" && newBookingForm.playerId && newBookingForm.instructorMembershipId) {
       setNewBookingForm((f) => ({ ...f, slotId: slot.id }));
       await createManualBooking({ ...newBookingForm, slotId: slot.id });
+      return;
+    }
+    // Group-creation mode: tapping a genuinely open slot turns it into a
+    // group lesson with the capacity/price entered above, instead of the
+    // normal open/close toggle.
+    if (creatingGroupOpen && slot.status === "open" && !slot.isGroup) {
+      const capacity = parseInt(groupCapacityInput, 10);
+      const priceDollars = parseFloat(groupPriceInput);
+      if (!Number.isInteger(capacity) || capacity < 1) {
+        alert("Enter a valid number of spots.");
+        return;
+      }
+      if (isNaN(priceDollars) || priceDollars < 0) {
+        alert("Enter a valid price per person.");
+        return;
+      }
+      await fetch(`${apiBase}/availability`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: slot.id, isGroup: true, groupCapacity: capacity, groupPriceCents: Math.round(priceDollars * 100) }),
+      });
+      loadSlots();
+      return;
+    }
+    // Full roster viewing and capacity management is a separate piece
+    // still to come - for now, tapping an existing group slot just shows
+    // where things stand rather than risking the normal open/close toggle
+    // acting on it incorrectly.
+    if (slot.isGroup) {
+      alert(`Group lesson: ${slot.groupSpotsTaken ?? 0} of ${slot.groupCapacity} spots taken at $${((slot.groupPriceCents ?? 0) / 100).toFixed(2)} per person.`);
       return;
     }
     // A same-day/near-term open slot isn't visible to players by default
@@ -617,15 +650,60 @@ export default function InstructorClient({
           <img src="/ping-logo.png" alt="PING" style={{ height: 24, width: "auto", flexShrink: 0 }} />
         </div>
 
-        <button
-          onClick={() => { setNewBookingOpen((o) => !o); setNewBookingError(null); }}
-          style={{
-            display: "flex", alignItems: "center", gap: 6, background: "var(--fairway)", color: "var(--chalk)",
-            border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: 20,
-          }}
-        >
-          + New booking
-        </button>
+        <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+          <button
+            onClick={() => { setNewBookingOpen((o) => !o); setNewBookingError(null); }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, background: "var(--fairway)", color: "var(--chalk)",
+              border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700,
+            }}
+          >
+            + New booking
+          </button>
+          <button
+            onClick={() => setCreatingGroupOpen((o) => !o)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, background: creatingGroupOpen ? "var(--gold)" : "none",
+              color: creatingGroupOpen ? "var(--fairway)" : "var(--fairway)", border: "1px solid var(--gold)",
+              borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700,
+            }}
+          >
+            + New group lesson
+          </button>
+        </div>
+
+        {creatingGroupOpen && (
+          <div style={{ background: "#FFF", border: "1px solid var(--gold)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Set up a group lesson</div>
+            <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 12 }}>
+              Set the spots and price below, then tap any open slot on the calendar to turn it into that group session.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <label style={{ flex: 1, minWidth: 120 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}>Spots</div>
+                <input
+                  type="number"
+                  min={1}
+                  value={groupCapacityInput}
+                  onChange={(e) => setGroupCapacityInput(e.target.value)}
+                  style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontSize: 14 }}
+                />
+              </label>
+              <label style={{ flex: 1, minWidth: 120 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}>Price per person</div>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="45.00"
+                  value={groupPriceInput}
+                  onChange={(e) => setGroupPriceInput(e.target.value)}
+                  style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontSize: 14 }}
+                />
+              </label>
+            </div>
+          </div>
+        )}
 
         {newBookingOpen && (() => {
           const selectedPlayer = players.find((p) => p.id === newBookingForm.playerId);
@@ -906,7 +984,15 @@ export default function InstructorClient({
                       let border = "none";
                       let opacity = 1;
                       const isNearTermSlot = slot.status === "open" && new Date(slot.startTime).getTime() < Date.now() + 24 * 60 * 60 * 1000;
-                      if (slot.status === "open") {
+                      if (slot.isGroup) {
+                        // A distinct color from every other state, since a
+                        // group slot behaves differently enough (multiple
+                        // bookings, adjustable capacity) that it shouldn't
+                        // read as just another flavor of "booked."
+                        bg = slot.status === "full" ? "#5A4FCF" : "#E4E1FF";
+                        color = slot.status === "full" ? "var(--chalk)" : "var(--ink)";
+                        if (isPast) opacity = 0.35;
+                      } else if (slot.status === "open") {
                         bg = "var(--open)";
                         // A slot that's already passed and never got booked
                         // isn't "open" in any meaningful sense anymore -
@@ -941,7 +1027,7 @@ export default function InstructorClient({
                           padding: "8px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600, border,
                           background: bg, color, opacity: creatingBooking ? opacity * 0.6 : opacity,
                         }}>
-                          {slot.status === "pending" ? "⏳" : formatTime12h(time)}
+                          {slot.status === "pending" ? "⏳" : slot.isGroup ? `${formatTime12h(time)} · ${slot.groupSpotsTaken ?? 0}/${slot.groupCapacity}` : formatTime12h(time)}
                         </button>
                       );
                     })}
@@ -959,6 +1045,8 @@ export default function InstructorClient({
           <Legend color="var(--fairway)" label="Lesson booked" />
           <Legend color="var(--remote)" label="Remote lesson booked" />
           <Legend color="#B8862B" label="Fitting booked" />
+          <Legend color="#E4E1FF" label="Group lesson (open spots)" />
+          <Legend color="#5A4FCF" label="Group lesson (full)" />
         </div>
         <p style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 6 }}>
           A dashed border means that slot is within 24 hours and hidden from players by default - tap it to allow last-minute booking. A solid gold border means you've already opened it up.

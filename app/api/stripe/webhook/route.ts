@@ -243,6 +243,78 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (meta.kind === "group") {
+      // Re-checked here, not just at checkout start, since two people
+      // could genuinely be checking out for the same session's last spot
+      // at nearly the same moment - whoever's payment webhook lands first
+      // gets it, the other gets refunded automatically below.
+      const slot = await prisma.availability.findFirst({
+        where: { id: meta.availabilityId, businessId },
+        include: { bookings: { where: { status: { not: "cancelled" } } } },
+      });
+
+      if (slot && slot.isGroup && slot.groupCapacity && slot.bookings.length < slot.groupCapacity) {
+        await ensureMembership(meta.userId, businessId, "player");
+
+        const booking = await prisma.$transaction(async (tx) => {
+          const created = await tx.booking.create({
+            data: {
+              businessId,
+              playerId: meta.userId,
+              serviceType: "lesson",
+              startTime: slot.startTime,
+              status: "confirmed",
+              priceCents: session.amount_total ?? 0,
+              stripeSessionId: session.id,
+              availabilityId: slot.id,
+              instructorMembershipId: meta.instructorMembershipId || null,
+              contactName: meta.contactName || null,
+              contactPhone: meta.contactPhone || null,
+              contactEmail: meta.contactEmail || null,
+            },
+          });
+          // Now full? Mark it so - otherwise a group slot just stays
+          // "open" the whole time players are joining, unlike a private
+          // lesson slot which flips to "booked" the moment it has one.
+          const newCount = slot.bookings.length + 1;
+          if (newCount >= slot.groupCapacity!) {
+            await tx.availability.update({ where: { id: slot.id }, data: { status: "full" } });
+          }
+          return created;
+        });
+
+        if (business.notifyOnBooking) {
+          await sendBookingNotification(business.notificationEmail || business.email, {
+            businessName: business.name,
+            serviceLabel: "Group lesson",
+            startTime: slot.startTime,
+            contactName: meta.contactName || null,
+            contactPhone: meta.contactPhone || null,
+            contactEmail: meta.contactEmail || null,
+            priceCents: session.amount_total ?? 0,
+            isPending: false,
+          });
+        }
+        await sendPushToMembership(meta.instructorMembershipId, {
+          title: "New group lesson signup",
+          body: `${meta.contactName || "A player"} joined the group session`,
+          url: businessDestination(business.slug, "/instructor"),
+        });
+      } else if (business.stripeAccountId) {
+        // The session filled up between checkout starting and payment
+        // landing - refund automatically rather than leaving a player
+        // charged for a spot that no longer exists.
+        try {
+          await stripe.refunds.create(
+            { payment_intent: session.payment_intent as string },
+            { stripeAccount: business.stripeAccountId }
+          );
+        } catch (err) {
+          console.error("Group session full - refund failed:", err);
+        }
+      }
+    }
+
     if (meta.kind === "order") {
       // The order and its items already exist (created when checkout
       // started, see POST /orders) — payment succeeding just flips it to

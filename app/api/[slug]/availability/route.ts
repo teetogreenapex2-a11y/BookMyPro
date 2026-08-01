@@ -9,6 +9,12 @@ import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
 // can both be open (or both booked) at the same startTime, since they're
 // two different people. instructorMembershipId is required for this
 // reason: there's no single "the business's" calendar anymore.
+//
+// This route has no auth check, since the player booking page needs to
+// show availability without necessarily being signed in yet - which is
+// exactly why a group slot's response only ever includes a spot COUNT
+// here, never the actual roster of who's joined. Names are instructor-only
+// information, fetched separately.
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
@@ -26,7 +32,13 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       instructorMembershipId,
       ...(start && end ? { startTime: { gte: new Date(start), lte: new Date(end) } } : {}),
     },
-    include: { booking: { select: { serviceType: true, isRemote: true } } },
+    include: {
+      // Cancelled bookings shouldn't count toward a private slot looking
+      // "booked" or a group slot's spot count - excluding them here means
+      // every consumer of this data automatically gets that right, rather
+      // than each place having to remember to filter it out itself.
+      bookings: { where: { status: { not: "cancelled" } }, select: { serviceType: true, isRemote: true } },
+    },
     orderBy: { startTime: "asc" },
   });
 
@@ -34,15 +46,19 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     id: s.id,
     startTime: s.startTime,
     status: s.status,
-    bookedServiceType: s.booking?.serviceType || null,
-    bookedIsRemote: s.booking?.isRemote || false,
+    bookedServiceType: s.bookings[0]?.serviceType || null,
+    bookedIsRemote: s.bookings[0]?.isRemote || false,
     allowLastMinute: s.allowLastMinute,
+    isGroup: s.isGroup,
+    groupCapacity: s.groupCapacity,
+    groupPriceCents: s.groupPriceCents,
+    groupSpotsTaken: s.isGroup ? s.bookings.length : undefined,
   }));
 
   return NextResponse.json(shaped);
 }
 
-// PATCH /api/{slug}/availability  { id, status?, allowLastMinute? }
+// PATCH /api/{slug}/availability  { id, status?, allowLastMinute?, isGroup?, groupCapacity?, groupPriceCents? }
 // Owner/instructor only. An instructor can only toggle their own slots; the
 // owner can toggle anyone's on the team.
 export async function PATCH(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -55,16 +71,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor"]);
   if (!membership) return NextResponse.json({ error: "Instructor access required for this business" }, { status: 403 });
 
-  const { id, status, allowLastMinute } = await req.json();
+  const { id, status, allowLastMinute, isGroup, groupCapacity, groupPriceCents } = await req.json();
   if (status !== undefined && !["open", "closed"].includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
   // Scoping by businessId here (not just id) is what actually enforces the
   // tenant boundary — without it, a valid slot id from any business would work.
-  const slot = await prisma.availability.findFirst({ where: { id, businessId: business.id } });
+  const slot = await prisma.availability.findFirst({
+    where: { id, businessId: business.id },
+    include: { bookings: { where: { status: { not: "cancelled" } } } },
+  });
   if (!slot) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (slot.status === "booked" || slot.status === "pending") {
+
+  const isGroupEdit = isGroup !== undefined || groupCapacity !== undefined || groupPriceCents !== undefined;
+  // A group slot can still have its capacity/price adjusted even once
+  // it's full or has players in it - that's a different kind of edit than
+  // the plain open/closed toggle, which only ever applies to an empty slot.
+  if (!isGroupEdit && (slot.status === "booked" || slot.status === "pending" || slot.status === "full")) {
     return NextResponse.json({ error: "Cannot edit a booked or pending slot directly" }, { status: 400 });
   }
   if (membership.role !== "owner" && slot.instructorMembershipId !== membership.id) {
@@ -74,6 +98,34 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   const data: Record<string, unknown> = {};
   if (status !== undefined) data.status = status;
   if (typeof allowLastMinute === "boolean") data.allowLastMinute = allowLastMinute;
+
+  if (isGroup === true) {
+    // Turning a slot into a group lesson for the first time - only makes
+    // sense starting from a genuinely open, empty slot.
+    if (slot.status !== "open" || slot.isGroup) {
+      return NextResponse.json({ error: "Only a normal open slot can be turned into a group lesson" }, { status: 400 });
+    }
+    if (!Number.isInteger(groupCapacity) || groupCapacity < 1) {
+      return NextResponse.json({ error: "Enter a valid number of spots" }, { status: 400 });
+    }
+    if (!Number.isInteger(groupPriceCents) || groupPriceCents < 0) {
+      return NextResponse.json({ error: "Enter a valid price" }, { status: 400 });
+    }
+    data.isGroup = true;
+    data.groupCapacity = groupCapacity;
+    data.groupPriceCents = groupPriceCents;
+  } else if (slot.isGroup && groupCapacity !== undefined) {
+    // Adjusting an existing group's capacity - can't shrink below however
+    // many players have already joined.
+    if (!Number.isInteger(groupCapacity) || groupCapacity < slot.bookings.length) {
+      return NextResponse.json({ error: `Capacity can't be less than the ${slot.bookings.length} player(s) already in this group` }, { status: 400 });
+    }
+    data.groupCapacity = groupCapacity;
+    // Reopen if raising capacity above a full group; the fuller-check
+    // below decides the final status either way.
+    if (slot.status === "full" && groupCapacity > slot.bookings.length) data.status = "open";
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }

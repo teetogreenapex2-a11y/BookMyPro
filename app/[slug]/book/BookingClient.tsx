@@ -8,7 +8,7 @@ import { formatTime12h, wallClockToUTC } from "@/lib/time";
 const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean };
+type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean; isGroup?: boolean; groupCapacity?: number | null; groupPriceCents?: number | null; groupSpotsTaken?: number };
 type Package = { id: string; type: string; lessonsRemaining: number; lessonsTotal: number; paymentStatus?: string; instructorMembershipId?: string | null };
 type Instructor = { id: string; name: string | null; email: string; image: string | null; role: string; [key: string]: any };
 
@@ -307,6 +307,26 @@ export default function BookingClient({
         contactPhone: contact.phone,
         contactEmail: contact.email,
         isRemote,
+      }),
+    });
+    setConfirming(false);
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+    else setMessage(data.error || "Something went wrong.");
+  }
+
+  async function joinGroupSession() {
+    if (!selected || !contactValid()) return;
+    saveProfileFieldsIfProvided();
+    setConfirming(true);
+    const res = await fetch(`${apiBase}/groups/checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        availabilityId: selected.id,
+        contactName: contact.name,
+        contactPhone: contact.phone,
+        contactEmail: contact.email,
       }),
     });
     setConfirming(false);
@@ -767,7 +787,10 @@ export default function BookingClient({
                       // (allowLastMinute) - e.g. reopening a same-day
                       // cancellation for any player to grab.
                       const isTooSoon = !slot.allowLastMinute && dt.getTime() < Date.now() + 24 * 60 * 60 * 1000;
-                      const canPick = isOpen && !isTooSoon && (service === "lesson" ? canPickLessonSlot : !!fittingType && !!selectedInstructorId);
+                      const isGroupJoinable = !!slot.isGroup && (slot.groupSpotsTaken ?? 0) < (slot.groupCapacity ?? 0);
+                      const canPick = slot.isGroup
+                        ? isGroupJoinable
+                        : isOpen && !isTooSoon && (service === "lesson" ? canPickLessonSlot : !!fittingType && !!selectedInstructorId);
                       const bookedBg = slot.bookedServiceType === "fitting"
                         ? "#B8862B"
                         : slot.bookedIsRemote
@@ -781,12 +804,16 @@ export default function BookingClient({
                           style={{
                             padding: "8px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                             border: isPending ? "1px dashed #B8862B" : "none",
-                            background: isSelected ? "var(--gold)" : canPick ? "var(--open)" : isBooked ? bookedBg : isPending ? "#FBF3DE" : "var(--closed)",
-                            color: isSelected ? "#FFF" : isBooked ? "var(--chalk)" : "var(--ink)",
+                            background: isSelected
+                              ? "var(--gold)"
+                              : slot.isGroup
+                              ? (isGroupJoinable ? "#E4E1FF" : "#5A4FCF")
+                              : canPick ? "var(--open)" : isBooked ? bookedBg : isPending ? "#FBF3DE" : "var(--closed)",
+                            color: isSelected ? "#FFF" : (isBooked || (slot.isGroup && !isGroupJoinable)) ? "var(--chalk)" : "var(--ink)",
                             cursor: canPick ? "pointer" : "default",
                           }}
                         >
-                          {isPending ? "(pending)" : formatTime12h(time)}
+                          {isPending ? "(pending)" : slot.isGroup ? `${formatTime12h(time)} · ${slot.groupSpotsTaken ?? 0}/${slot.groupCapacity}` : formatTime12h(time)}
                         </button>
                       );
                     })}
@@ -797,7 +824,66 @@ export default function BookingClient({
           </div>
         )}
 
-        {selected && (
+        {selected && selected.isGroup && (
+          <div
+            ref={confirmCardRef}
+            style={{
+              marginTop: 20, background: "var(--fairway)", borderRadius: 12, padding: "18px 18px 16px",
+              border: "2px solid var(--gold)", boxShadow: "0 4px 20px rgba(184,134,43,0.35)",
+            }}
+          >
+            <div className="mono" style={{ fontSize: 11, color: "var(--gold)", fontWeight: 700, letterSpacing: "0.04em", marginBottom: 8 }}>
+              JOIN THIS GROUP LESSON
+            </div>
+            <div style={{ color: "var(--chalk)", marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                {new Date(selected.startTime).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} at{" "}
+                {new Date(selected.startTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+              </div>
+              <div className="mono" style={{ fontSize: 11, color: "#9DB8A9" }}>
+                {centsToDollars(selected.groupPriceCents ?? 0)} - {selected.groupSpotsTaken ?? 0} of {selected.groupCapacity} spots taken
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+              <input
+                value={contact.name}
+                onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
+                placeholder="Full name"
+                className="contact-input"
+                style={contactInputStyle}
+              />
+              <input
+                value={contact.phone}
+                onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
+                placeholder="Phone number"
+                type="tel"
+                className="contact-input"
+                style={contactInputStyle}
+              />
+              <input
+                value={contact.email}
+                onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+                placeholder="Email address"
+                type="email"
+                className="contact-input"
+                style={contactInputStyle}
+              />
+            </div>
+            <button
+              onClick={joinGroupSession}
+              disabled={confirming || !contactValid()}
+              style={{
+                width: "100%", background: "var(--gold)", color: "var(--fairway)", border: "none", borderRadius: 8,
+                padding: "10px 18px", fontWeight: 700, fontSize: 14,
+                opacity: confirming || !contactValid() ? 0.6 : 1,
+              }}
+            >
+              {confirming ? "..." : "Pay & Join"}
+            </button>
+          </div>
+        )}
+
+        {selected && !selected.isGroup && (
           <div
             ref={confirmCardRef}
             style={{

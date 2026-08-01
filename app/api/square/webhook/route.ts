@@ -243,6 +243,67 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (pending.kind === "group" && pending.availabilityId) {
+    // Re-checked here, not just at checkout start, since two people could
+    // genuinely be checking out for the same session's last spot at
+    // nearly the same moment.
+    const slot = await prisma.availability.findFirst({
+      where: { id: pending.availabilityId, businessId },
+      include: { bookings: { where: { status: { not: "cancelled" } } } },
+    });
+
+    if (slot && slot.isGroup && slot.groupCapacity && slot.bookings.length < slot.groupCapacity) {
+      await ensureMembership(pending.userId, businessId, "player");
+
+      await prisma.$transaction(async (tx) => {
+        await tx.booking.create({
+          data: {
+            businessId,
+            playerId: pending.userId,
+            serviceType: "lesson",
+            startTime: slot.startTime,
+            status: "confirmed",
+            priceCents: payment.amount_money?.amount ?? 0,
+            squareOrderId: orderId,
+            availabilityId: slot.id,
+            instructorMembershipId: pending.instructorMembershipId,
+            contactName: pending.contactName,
+            contactPhone: pending.contactPhone,
+            contactEmail: pending.contactEmail,
+          },
+        });
+        const newCount = slot.bookings.length + 1;
+        if (newCount >= slot.groupCapacity!) {
+          await tx.availability.update({ where: { id: slot.id }, data: { status: "full" } });
+        }
+      });
+
+      if (business.notifyOnBooking) {
+        await sendBookingNotification(business.notificationEmail || business.email, {
+          businessName: business.name,
+          serviceLabel: "Group lesson",
+          startTime: slot.startTime,
+          contactName: pending.contactName,
+          contactPhone: pending.contactPhone,
+          contactEmail: pending.contactEmail,
+          priceCents: payment.amount_money?.amount ?? 0,
+          isPending: false,
+        });
+      }
+      await sendPushToMembership(pending.instructorMembershipId, {
+        title: "New group lesson signup",
+        body: `${pending.contactName || "A player"} joined the group session`,
+        url: businessDestination(business.slug, "/instructor"),
+      });
+    } else {
+      // The session filled up between checkout starting and payment
+      // landing. Unlike the Stripe side, there's no automatic refund path
+      // wired up for Square yet - this needs the business to manually
+      // refund from their own Square dashboard.
+      console.error(`Group session full - manual Square refund needed for order ${orderId}, business ${businessId}`);
+    }
+  }
+
   // Consumed — remove so a duplicate webhook delivery (Square retries) can't double-process it.
   await prisma.pendingSquarePayment.delete({ where: { id: pending.id } }).catch(() => {});
 
