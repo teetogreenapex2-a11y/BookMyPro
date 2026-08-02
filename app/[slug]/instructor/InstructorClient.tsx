@@ -453,6 +453,27 @@ export default function InstructorClient({
     }
   }
 
+  const [cancellingGroup, setCancellingGroup] = useState(false);
+
+  async function cancelGroupLesson() {
+    if (!rosterSlot) return;
+    const count = roster?.length ?? 0;
+    const warning = count > 0
+      ? `Cancel this group lesson? ${count} player(s) who already joined will be notified, but nothing is refunded automatically - reach out directly if a refund or reschedule is needed. This can't be undone.`
+      : "Cancel this group lesson? This can't be undone.";
+    if (!window.confirm(warning)) return;
+    setCancellingGroup(true);
+    const res = await fetch(`${apiBase}/availability/${rosterSlot.id}/cancel-group`, { method: "POST" });
+    setCancellingGroup(false);
+    if (res.ok) {
+      setRosterSlot(null);
+      loadSlots();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Couldn't cancel this group lesson.");
+    }
+  }
+
   async function openReviewFor(slot: Slot) {
     const res = await fetch(`${apiBase}/bookings`);
     const bookings: Booking[] = await res.json();
@@ -1216,6 +1237,16 @@ export default function InstructorClient({
                 style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
               >
                 Close
+              </button>
+            </div>
+
+            <div className="no-print" style={{ borderTop: "1px solid var(--border)", marginTop: 14, paddingTop: 14 }}>
+              <button
+                onClick={cancelGroupLesson}
+                disabled={cancellingGroup}
+                style={{ fontSize: 12.5, fontWeight: 700, color: "#B23A3A", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+              >
+                {cancellingGroup ? "Cancelling..." : "Cancel this group lesson"}
               </button>
             </div>
           </div>
