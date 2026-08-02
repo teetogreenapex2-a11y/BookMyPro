@@ -53,6 +53,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     groupCapacity: s.groupCapacity,
     groupPriceCents: s.groupPriceCents,
     groupSpotsTaken: s.isGroup ? s.bookings.length : undefined,
+    groupCategory: s.groupCategory,
+    groupAgeRange: s.groupAgeRange,
   }));
 
   return NextResponse.json(shaped);
@@ -71,7 +73,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor"]);
   if (!membership) return NextResponse.json({ error: "Instructor access required for this business" }, { status: 403 });
 
-  const { id, status, allowLastMinute, isGroup, groupCapacity, groupPriceCents } = await req.json();
+  const { id, status, allowLastMinute, isGroup, groupCapacity, groupPriceCents, groupCategory, groupAgeRange } = await req.json();
+  const VALID_CATEGORIES = ["men", "ladies", "junior_younger", "junior_older"];
+  if (groupCategory !== undefined && groupCategory !== null && !VALID_CATEGORIES.includes(groupCategory)) {
+    return NextResponse.json({ error: "Invalid group category" }, { status: 400 });
+  }
   if (status !== undefined && !["open", "closed"].includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
@@ -114,6 +120,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
     data.isGroup = true;
     data.groupCapacity = groupCapacity;
     data.groupPriceCents = groupPriceCents;
+    data.groupCategory = groupCategory || null;
+    data.groupAgeRange = groupAgeRange?.trim() || null;
   } else if (slot.isGroup && groupCapacity !== undefined) {
     // Adjusting an existing group's capacity - can't shrink below however
     // many players have already joined.

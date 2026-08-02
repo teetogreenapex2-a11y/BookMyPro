@@ -13,7 +13,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // one lesson or one fitting at a time, so there's exactly one timeline, not
 // a separate one per service. `bookedServiceType` (set once something has
 // requested or booked the slot) is what determines its color.
-type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean; isGroup?: boolean; groupCapacity?: number | null; groupPriceCents?: number | null; groupSpotsTaken?: number };
+type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean; isGroup?: boolean; groupCapacity?: number | null; groupPriceCents?: number | null; groupSpotsTaken?: number; groupCategory?: string | null; groupAgeRange?: string | null };
+
+function formatGroupCategory(category?: string | null, ageRange?: string | null) {
+  const labels: Record<string, string> = { men: "Men", ladies: "Ladies", junior_younger: "Junior (Younger)", junior_older: "Junior (Older)" };
+  if (!category) return null;
+  const label = labels[category] || category;
+  return ageRange ? `${label} - ${ageRange}` : label;
+}
 type SyncLogEntry = {
   id: string;
   ranAt: string;
@@ -83,6 +90,8 @@ export default function InstructorClient({
   const [creatingGroupOpen, setCreatingGroupOpen] = useState(false);
   const [groupCapacityInput, setGroupCapacityInput] = useState("6");
   const [groupPriceInput, setGroupPriceInput] = useState("");
+  const [groupCategoryInput, setGroupCategoryInput] = useState("");
+  const [groupAgeRangeInput, setGroupAgeRangeInput] = useState("");
   const [players, setPlayers] = useState<Player[]>([]);
   const [teamInstructors, setTeamInstructors] = useState<{ id: string; name: string | null; email: string; [key: string]: any }[]>([]);
   const [newBookingForm, setNewBookingForm] = useState({
@@ -353,7 +362,14 @@ export default function InstructorClient({
       await fetch(`${apiBase}/availability`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: slot.id, isGroup: true, groupCapacity: capacity, groupPriceCents: Math.round(priceDollars * 100) }),
+        body: JSON.stringify({
+          id: slot.id,
+          isGroup: true,
+          groupCapacity: capacity,
+          groupPriceCents: Math.round(priceDollars * 100),
+          groupCategory: groupCategoryInput || null,
+          groupAgeRange: groupAgeRangeInput || null,
+        }),
       });
       loadSlots();
       return;
@@ -736,6 +752,33 @@ export default function InstructorClient({
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontSize: 14 }}
                 />
               </label>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+              <label style={{ flex: 1, minWidth: 160 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}>Category (optional)</div>
+                <select
+                  value={groupCategoryInput}
+                  onChange={(e) => { setGroupCategoryInput(e.target.value); if (!e.target.value.startsWith("junior")) setGroupAgeRangeInput(""); }}
+                  style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontSize: 14, background: "#FFF" }}
+                >
+                  <option value="">None</option>
+                  <option value="men">Men</option>
+                  <option value="ladies">Ladies</option>
+                  <option value="junior_younger">Junior - Younger</option>
+                  <option value="junior_older">Junior - Older</option>
+                </select>
+              </label>
+              {groupCategoryInput.startsWith("junior") && (
+                <label style={{ flex: 1, minWidth: 160 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}>Age range</div>
+                  <input
+                    value={groupAgeRangeInput}
+                    onChange={(e) => setGroupAgeRangeInput(e.target.value)}
+                    placeholder="Ages 6-9"
+                    style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontSize: 14 }}
+                  />
+                </label>
+              )}
             </div>
           </div>
         )}
@@ -1121,7 +1164,8 @@ export default function InstructorClient({
         {rosterSlot && (
           <div id="roster-print-area" style={{ background: "#FFF", border: "1px solid #5A4FCF", borderRadius: 12, padding: 16, marginTop: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
-              Group lesson - {new Date(rosterSlot.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              {formatGroupCategory(rosterSlot.groupCategory, rosterSlot.groupAgeRange) ? `${formatGroupCategory(rosterSlot.groupCategory, rosterSlot.groupAgeRange)} - ` : ""}
+              {new Date(rosterSlot.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
             </div>
             <p className="mono" style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600, marginBottom: 12 }}>
               ${((rosterSlot.groupPriceCents ?? 0) / 100).toFixed(2)} per person

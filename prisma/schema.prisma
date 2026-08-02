@@ -269,6 +269,13 @@ model Availability {
   isGroup         Boolean @default(false)
   groupCapacity   Int?
   groupPriceCents Int?
+  // "men" | "ladies" | "junior_younger" | "junior_older" - a fixed set
+  // rather than free text, so the booking page can offer real filtering.
+  groupCategory   String?
+  // Free text, only meaningful when groupCategory is one of the junior
+  // types - exact age brackets vary by program, so this stays flexible
+  // rather than being baked into the category itself.
+  groupAgeRange   String?
   closedReason   String?  // "manual" | "calendar"
   blockedEventId String?
   // A list, not a single optional booking, since a group slot can hold

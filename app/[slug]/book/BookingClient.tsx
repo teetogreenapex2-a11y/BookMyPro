@@ -8,7 +8,14 @@ import { formatTime12h, wallClockToUTC } from "@/lib/time";
 const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean; isGroup?: boolean; groupCapacity?: number | null; groupPriceCents?: number | null; groupSpotsTaken?: number };
+type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean; isGroup?: boolean; groupCapacity?: number | null; groupPriceCents?: number | null; groupSpotsTaken?: number; groupCategory?: string | null; groupAgeRange?: string | null };
+
+function formatGroupCategory(category?: string | null, ageRange?: string | null) {
+  const labels: Record<string, string> = { men: "Men", ladies: "Ladies", junior_younger: "Junior (Younger)", junior_older: "Junior (Older)" };
+  if (!category) return null;
+  const label = labels[category] || category;
+  return ageRange ? `${label} - ${ageRange}` : label;
+}
 type Package = { id: string; type: string; lessonsRemaining: number; lessonsTotal: number; paymentStatus?: string; instructorMembershipId?: string | null };
 type Instructor = { id: string; name: string | null; email: string; image: string | null; role: string; [key: string]: any };
 
@@ -81,6 +88,10 @@ export default function BookingClient({
   const [contact, setContact] = useState({ name: "", phone: "", email: "", handedness: "", scoreOrHandicap: "", commonIssues: "" });
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
+  const [upcomingGroups, setUpcomingGroups] = useState<
+    { id: string; startTime: string; instructorMembershipId: string; instructorName: string; groupCapacity: number; groupPriceCents: number; groupSpotsTaken: number; groupCategory: string | null; groupAgeRange: string | null }[]
+  >([]);
+  const [groupFilter, setGroupFilter] = useState<"all" | "men" | "ladies" | "junior">("all");
   const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "off" | "on" | "enabling">("unknown");
 
   useEffect(() => {
@@ -138,6 +149,14 @@ export default function BookingClient({
 
   useEffect(() => {
     loadMyBookings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    fetch(`${apiBase}/groups`)
+      .then((r) => r.json())
+      .then((list) => setUpcomingGroups(Array.isArray(list) ? list : []))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -626,6 +645,93 @@ export default function BookingClient({
           </div>
         )}
 
+        {upcomingGroups.length > 0 && (() => {
+          const filteredGroups = upcomingGroups.filter((g) => {
+            if (groupFilter === "all") return true;
+            if (groupFilter === "junior") return g.groupCategory === "junior_younger" || g.groupCategory === "junior_older";
+            return g.groupCategory === groupFilter;
+          });
+          const hasCategories = upcomingGroups.some((g) => g.groupCategory);
+          return (
+            <div style={{ background: "#2A2470", border: "1px solid #5A4FCF", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+              <div className="mono" style={{ fontSize: 11, color: "#C9C4FF", fontWeight: 700, letterSpacing: "0.04em", marginBottom: 10 }}>
+                UPCOMING GROUP LESSONS
+              </div>
+
+              {hasCategories && (
+                <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                  {(["all", "men", "ladies", "junior"] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setGroupFilter(f)}
+                      style={{
+                        fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 20, cursor: "pointer",
+                        background: groupFilter === f ? "#FFF" : "rgba(255,255,255,0.1)",
+                        color: groupFilter === f ? "#2A2470" : "#C9C4FF",
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {filteredGroups.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#C9C4FF" }}>No sessions in this category right now.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {filteredGroups.map((g) => (
+                    <button
+                      key={g.id}
+                      onClick={() => {
+                        setSelectedInstructorId(g.instructorMembershipId);
+                        setSelected({
+                          id: g.id,
+                          startTime: g.startTime,
+                          status: "open",
+                          bookedServiceType: null,
+                          isGroup: true,
+                          groupCapacity: g.groupCapacity,
+                          groupPriceCents: g.groupPriceCents,
+                          groupSpotsTaken: g.groupSpotsTaken,
+                          groupCategory: g.groupCategory,
+                          groupAgeRange: g.groupAgeRange,
+                        });
+                      }}
+                      style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%",
+                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8,
+                        padding: "10px 12px", cursor: "pointer", textAlign: "left",
+                      }}
+                    >
+                      <div>
+                        {formatGroupCategory(g.groupCategory, g.groupAgeRange) && (
+                          <div className="mono" style={{ fontSize: 10.5, color: "#B8862B", fontWeight: 700, letterSpacing: "0.03em", marginBottom: 2 }}>
+                            {formatGroupCategory(g.groupCategory, g.groupAgeRange)!.toUpperCase()}
+                          </div>
+                        )}
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: "#FFF" }}>
+                          {new Date(g.startTime).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} at{" "}
+                          {new Date(g.startTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#C9C4FF" }}>with {g.instructorName}</div>
+                      </div>
+                      <div className="mono" style={{ fontSize: 12, color: "#FFF", fontWeight: 600, textAlign: "right" }}>
+                        {centsToDollars(g.groupPriceCents)}
+                        <div style={{ fontSize: 11, color: "#C9C4FF", fontWeight: 500 }}>
+                          {g.groupSpotsTaken} of {g.groupCapacity} spots
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {(pushStatus === "off" || pushStatus === "enabling") && (
           <button
             onClick={enablePushNotifications}
@@ -833,7 +939,9 @@ export default function BookingClient({
             }}
           >
             <div className="mono" style={{ fontSize: 11, color: "var(--gold)", fontWeight: 700, letterSpacing: "0.04em", marginBottom: 8 }}>
-              JOIN THIS GROUP LESSON
+              {formatGroupCategory(selected.groupCategory, selected.groupAgeRange)
+                ? `JOIN - ${formatGroupCategory(selected.groupCategory, selected.groupAgeRange)!.toUpperCase()}`
+                : "JOIN THIS GROUP LESSON"}
             </div>
             <div style={{ color: "var(--chalk)", marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>

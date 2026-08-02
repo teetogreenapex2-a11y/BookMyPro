@@ -34,6 +34,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       groupCapacity: s.groupCapacity,
       groupPriceCents: s.groupPriceCents,
       groupSpotsTaken: s.bookings.length,
+      groupCategory: s.groupCategory,
+      groupAgeRange: s.groupAgeRange,
     }))
   );
 }
