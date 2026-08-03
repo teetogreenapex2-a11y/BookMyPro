@@ -3,6 +3,8 @@
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
 
 export default function LoginPage() {
   return (
@@ -19,6 +21,8 @@ function LoginPageInner() {
   const [email, setEmail] = useState("");
   const [sendingLink, setSendingLink] = useState(false);
   const [linkSent, setLinkSent] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+  const [signingInWithGoogle, setSigningInWithGoogle] = useState(false);
 
   async function sendMagicLink() {
     if (!email.trim()) return;
@@ -26,6 +30,42 @@ function LoginPageInner() {
     await signIn("email", { email, callbackUrl, redirect: false });
     setSendingLink(false);
     setLinkSent(true);
+  }
+
+  // Google itself blocks its normal web sign-in flow from working inside
+  // an embedded native app view, for security reasons - it requires a
+  // real, full browser. Inside the native app, this uses Capacitor's own
+  // native Google Sign-In plugin instead, which hands back a real ID
+  // token directly rather than doing a browser redirect - that token
+  // then gets verified server-side at /api/auth/google-native, which
+  // signs the person in exactly as the normal web flow would.
+  async function handleGoogleSignIn() {
+    if (!Capacitor.isNativePlatform()) {
+      signIn("google", { callbackUrl });
+      return;
+    }
+
+    setGoogleError(null);
+    setSigningInWithGoogle(true);
+    try {
+      await GoogleSignIn.initialize({ clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID! });
+      const result = await GoogleSignIn.signIn();
+      if (!result.idToken) throw new Error("Google didn't return a token");
+
+      const res = await fetch("/api/auth/google-native", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: result.idToken }),
+      });
+      if (!res.ok) throw new Error("Sign-in failed - try again");
+
+      window.location.href = callbackUrl;
+    } catch (err) {
+      console.error("Native Google sign-in failed:", err);
+      setGoogleError("Couldn't sign in with Google. Try again, or use email instead.");
+    } finally {
+      setSigningInWithGoogle(false);
+    }
   }
 
   return (
@@ -57,7 +97,8 @@ function LoginPageInner() {
           Sign in to book
         </h1>
         <button
-          onClick={() => signIn("google", { callbackUrl })}
+          onClick={handleGoogleSignIn}
+          disabled={signingInWithGoogle}
           style={{
             width: "100%",
             background: "var(--fairway)",
@@ -67,10 +108,14 @@ function LoginPageInner() {
             padding: "12px 20px",
             fontWeight: 700,
             fontSize: 14,
+            opacity: signingInWithGoogle ? 0.6 : 1,
           }}
         >
-          Continue with Google
+          {signingInWithGoogle ? "Signing in..." : "Continue with Google"}
         </button>
+        {googleError && (
+          <p style={{ fontSize: 12, color: "#B23A3A", marginTop: 8 }}>{googleError}</p>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0" }}>
           <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
