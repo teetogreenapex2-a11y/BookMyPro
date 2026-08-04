@@ -1,35 +1,38 @@
 package com.bookmypro.app;
 
 import android.os.Bundle;
+import android.view.View;
+import android.view.ViewGroup;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
+import android.widget.LinearLayout;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends BridgeActivity {
+    private BottomNavigationView tabBar;
+    private String currentSlug = "";
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        WebView webView = this.bridge.getWebView();
 
         // The app loads the real, live website directly rather than a
         // locally bundled copy, which means if the device has no
         // connection, the WebView's own attempt to load bookmypro.app
         // fails before any of the website's own JavaScript ever gets a
-        // chance to run - a fix built inside the website itself can't
-        // catch that moment. This extends Capacitor's own WebViewClient
+        // chance to run. This extends Capacitor's own WebViewClient
         // (rather than replacing it outright, which would break plugin
         // communication) to catch exactly that failure and swap in a
-        // real, branded offline page bundled locally inside the app
-        // itself, instead of Android's own generic "can't load this
-        // page" browser error screen.
-        this.bridge.getWebView().setWebViewClient(new BridgeWebViewClient(this.bridge) {
+        // real, branded offline page bundled locally inside the app.
+        webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                // isForMainFrame matters here - without it, a failed
-                // sub-resource (an image, a tracking script, anything
-                // secondary) would trigger this same callback and wipe out
-                // an already-working page for no real reason.
                 if (request.isForMainFrame()) {
                     view.loadUrl("file:///android_asset/public/offline.html");
                 } else {
@@ -37,5 +40,85 @@ public class MainActivity extends BridgeActivity {
                 }
             }
         });
+
+        // A real native bottom tab bar, sitting outside the WebView
+        // rather than being part of the website itself - genuinely native
+        // navigation, not a web page pretending to be one. The native
+        // side has no inherent way to know who's signed in or which
+        // business is active, since that only exists in the website's own
+        // session - so this exposes a small bridge the website's own
+        // JavaScript calls once it knows that, telling the native layer
+        // which role's tab set to show and which business slug to
+        // navigate within.
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void setRole(final String role, final String slug) {
+                runOnUiThread(() -> updateTabBar(role, slug));
+            }
+
+            @JavascriptInterface
+            public void hide() {
+                runOnUiThread(() -> tabBar.setVisibility(View.GONE));
+            }
+        }, "AndroidTabBar");
+
+        // Re-parent the existing WebView into a new vertical layout with
+        // the tab bar below it, rather than trying to replace Capacitor's
+        // own content view outright, which risks breaking things the
+        // Bridge itself depends on.
+        ViewGroup originalParent = (ViewGroup) webView.getParent();
+        if (originalParent != null) {
+            originalParent.removeView(webView);
+        }
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.addView(webView, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        tabBar = new BottomNavigationView(this);
+        tabBar.setVisibility(View.GONE); // hidden until the website tells us who's signed in
+        root.addView(tabBar, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        setContentView(root);
+
+        tabBar.setOnItemReselectedListener(item -> {
+            // Tapping the already-selected tab again is a no-op, rather
+            // than reloading the same page and losing whatever the person
+            // was doing on it.
+        });
+
+        tabBar.setOnItemSelectedListener(item -> {
+            String path;
+            int id = item.getItemId();
+            if (id == R.id.tab_calendar) path = "/instructor";
+            else if (id == R.id.tab_customers) path = "/customers";
+            else if (id == R.id.tab_videos) path = "/videos";
+            else if (id == R.id.tab_swingsketch) path = "/swing-sketches";
+            else if (id == R.id.tab_settings) path = "/settings";
+            else if (id == R.id.tab_book) path = "/book";
+            else path = "/";
+            webView.loadUrl("https://bookmypro.app/" + currentSlug + path);
+            return true;
+        });
+    }
+
+    private void updateTabBar(String role, String slug) {
+        currentSlug = slug;
+        tabBar.getMenu().clear();
+        if ("player".equals(role)) {
+            tabBar.inflateMenu(R.menu.player_tabs);
+        } else if ("instructor".equals(role) || "owner".equals(role)) {
+            tabBar.inflateMenu(R.menu.instructor_tabs);
+        } else {
+            // An unrecognized or missing role (e.g. someone still on the
+            // sign-in page, before any membership exists yet) - stay
+            // hidden rather than show tabs that might not make sense yet.
+            tabBar.setVisibility(View.GONE);
+            return;
+        }
+        tabBar.setVisibility(View.VISIBLE);
     }
 }

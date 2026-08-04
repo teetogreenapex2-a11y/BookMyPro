@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/tab_calendar" android:icon="@drawable/tab_calendar" android:title="Calendar" />
+    <item android:id="@+id/tab_customers" android:icon="@drawable/tab_customers" android:title="Customers" />
+    <item android:id="@+id/tab_videos" android:icon="@drawable/tab_videos" android:title="Videos" />
+    <item android:id="@+id/tab_swingsketch" android:icon="@drawable/tab_swingsketch" android:title="Sketch" />
+    <item android:id="@+id/tab_settings" android:icon="@drawable/tab_settings" android:title="Settings" />
+</menu>
