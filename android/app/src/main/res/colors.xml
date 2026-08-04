@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- These three match Capacitor's own default template values - kept
+         here in case colors.xml didn't already exist elsewhere, so
+         nothing that already referenced them breaks. -->
+    <color name="colorPrimary">#2196F3</color>
+    <color name="colorPrimaryDark">#1976D2</color>
+    <color name="colorAccent">#FF4081</color>
+
+    <!-- The app's real brand green, used for the native launch splash
+         screen background on Android 12+ (see styles.xml). -->
+    <color name="splash_background">#1B3A2F</color>
+</resources>
