@@ -1,6 +1,7 @@
 package com.bookmypro.app;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
@@ -55,6 +56,7 @@ public class MainActivity extends BridgeActivity {
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface
             public void setRole(final String role, final String slug) {
+                Log.d("TabBarDebug", "setRole called with role=" + role + " slug=" + slug);
                 runOnUiThread(() -> updateTabBar(role, slug));
             }
 
@@ -107,6 +109,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void updateTabBar(String role, String slug) {
+        Log.d("TabBarDebug", "updateTabBar running with role=" + role + " slug=" + slug + " currentRole=" + currentRole + " currentSlug=" + currentSlug);
         // The website can genuinely call setRole several times in quick
         // succession while a page is first loading (its own session state
         // typically moves through a "loading" phase before settling) -
@@ -116,6 +119,7 @@ public class MainActivity extends BridgeActivity {
         // Skipping the rebuild entirely when nothing has actually changed
         // makes repeated calls harmless instead of risky.
         if (role.equals(currentRole) && slug.equals(currentSlug)) {
+            Log.d("TabBarDebug", "Skipped - nothing changed");
             return;
         }
         currentRole = role;
@@ -129,9 +133,11 @@ public class MainActivity extends BridgeActivity {
             // An unrecognized or missing role (e.g. someone still on the
             // sign-in page, before any membership exists yet) - stay
             // hidden rather than show tabs that might not make sense yet.
+            Log.d("TabBarDebug", "Unrecognized role, hiding");
             tabBar.setVisibility(View.GONE);
             return;
         }
+        Log.d("TabBarDebug", "Menu now has " + tabBar.getMenu().size() + " items");
         tabBar.setVisibility(View.VISIBLE);
     }
 }
