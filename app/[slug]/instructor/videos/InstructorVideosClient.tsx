@@ -131,6 +131,12 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
     el.currentTime = Math.max(0, Math.min(next, el.duration || next));
   }
 
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  function changeSpeed(speed: number) {
+    setPlaybackSpeed(speed);
+    if (videoRef.current) videoRef.current.playbackRate = speed;
+  }
+
   async function addComment() {
     if (!selected || !commentDraft.trim() || !videoRef.current) return;
     setPosting(true);
@@ -296,6 +302,22 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   >
                     Frame {">"}
                   </button>
+                </div>
+                <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                  {[0.25, 0.5, 1, 1.5, 2].map((speed) => (
+                    <button
+                      key={speed}
+                      onClick={() => changeSpeed(speed)}
+                      style={{
+                        flex: 1, fontSize: 12.5, fontWeight: 700, borderRadius: 8, padding: "8px 6px", cursor: "pointer",
+                        border: playbackSpeed === speed ? "1px solid var(--fairway)" : "1px solid var(--border)",
+                        background: playbackSpeed === speed ? "var(--fairway)" : "var(--card)",
+                        color: playbackSpeed === speed ? "var(--chalk)" : "var(--fairway)",
+                      }}
+                    >
+                      {speed}x
+                    </button>
+                  ))}
                 </div>
                 <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
                   <button

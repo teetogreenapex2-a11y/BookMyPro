@@ -115,6 +115,13 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
     el.currentTime = Math.max(0, Math.min(next, el.duration || next));
   }
 
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  function changeSpeed(submissionId: string, speed: number) {
+    setPlaybackSpeed(speed);
+    const el = videoRefs.current[submissionId];
+    if (el) el.playbackRate = speed;
+  }
+
   return (
     <div style={{ minHeight: "100vh" }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
@@ -238,6 +245,22 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
                       >
                         Frame {">"}
                       </button>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                      {[0.25, 0.5, 1, 1.5, 2].map((speed) => (
+                        <button
+                          key={speed}
+                          onClick={() => changeSpeed(s.id, speed)}
+                          style={{
+                            flex: 1, fontSize: 12.5, fontWeight: 700, borderRadius: 8, padding: "8px 6px", cursor: "pointer",
+                            border: playbackSpeed === speed ? "1px solid var(--fairway)" : "1px solid var(--border)",
+                            background: playbackSpeed === speed ? "var(--fairway)" : "var(--card)",
+                            color: playbackSpeed === speed ? "var(--chalk)" : "var(--fairway)",
+                          }}
+                        >
+                          {speed}x
+                        </button>
+                      ))}
                     </div>
                     <button
                       onClick={() => downloadVideo(s.videoUrl, `${s.title || "swing-video"}.mp4`)}
