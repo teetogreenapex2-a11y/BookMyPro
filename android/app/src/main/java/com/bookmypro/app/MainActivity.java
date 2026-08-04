@@ -139,5 +139,15 @@ public class MainActivity extends BridgeActivity {
         }
         Log.d("TabBarDebug", "Menu now has " + tabBar.getMenu().size() + " items");
         tabBar.setVisibility(View.VISIBLE);
+        // The view sat hidden (View.GONE) before this point, which means
+        // Android never gave it a real measure/layout pass while it had
+        // items - switching straight to visible can leave it working off
+        // a stale internal width calculation from when it was empty,
+        // which is exactly the "some tabs quietly missing" symptom this
+        // was causing despite the menu itself genuinely holding all 5
+        // items (confirmed by the log line right above this). Forcing a
+        // fresh measure and layout pass here fixes that directly.
+        tabBar.requestLayout();
+        tabBar.invalidate();
     }
 }
