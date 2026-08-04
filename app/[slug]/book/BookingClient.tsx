@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
+import { Capacitor } from "@capacitor/core";
 import { FITTING_TYPES, centsToDollars, enabledPackages, enabledFittings, getFittingPriceCents } from "@/lib/pricing";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 
@@ -95,6 +96,19 @@ export default function BookingClient({
   const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "off" | "on" | "enabling">("unknown");
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      // Inside the wrapped app, "enabled" means Firebase's own native
+      // permission has already been granted - this doesn't guarantee a
+      // token was actually saved to the backend (e.g. a network hiccup
+      // during a past attempt), but it's the same kind of best-effort,
+      // browser/OS-level check the web version below does too.
+      import("@capacitor-firebase/messaging").then(({ FirebaseMessaging }) => {
+        FirebaseMessaging.checkPermissions()
+          .then((r) => setPushStatus(r.receive === "granted" ? "on" : "off"))
+          .catch(() => setPushStatus("off"));
+      });
+      return;
+    }
     if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
       setPushStatus("unsupported");
       return;
@@ -111,6 +125,28 @@ export default function BookingClient({
   async function enablePushNotifications() {
     setPushStatus("enabling");
     try {
+      // Native push (inside the wrapped app) uses Firebase Cloud
+      // Messaging instead of the browser's own web push APIs below - a
+      // completely different mechanism under the hood, but the same
+      // end result for the person using it: a real device token gets
+      // registered with the backend.
+      if (Capacitor.isNativePlatform()) {
+        const { FirebaseMessaging } = await import("@capacitor-firebase/messaging");
+        const { receive } = await FirebaseMessaging.requestPermissions();
+        if (receive !== "granted") {
+          setPushStatus("off");
+          return;
+        }
+        const { token } = await FirebaseMessaging.getToken();
+        await fetch(`${apiBase}/push/fcm-subscribe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+        setPushStatus("on");
+        return;
+      }
+
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setPushStatus("off");

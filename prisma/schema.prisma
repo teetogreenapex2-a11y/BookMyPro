@@ -153,6 +153,7 @@ model Membership {
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
   pushSubscriptions PushSubscription[]
+  fcmTokens         FcmToken[]
 
   // Per-instructor pricing — each instructor on staff sets their own rates,
   // rather than one shared business-wide price. Mirrors the exact same
@@ -499,6 +500,23 @@ model PushSubscription {
   endpoint     String     @unique
   p256dh       String
   auth         String
+  createdAt    DateTime   @default(now())
+
+  @@index([membershipId])
+}
+
+// A device token for native push notifications (via Firebase Cloud
+// Messaging), used only inside the wrapped Android/iOS app - kept as its
+// own model rather than reusing PushSubscription, since FCM's shape (one
+// simple token) is structurally different from a web push subscription
+// (endpoint + two separate keys). sendPushToMembership sends to both
+// kinds together, so the rest of the app never needs to know which one
+// a given person is using.
+model FcmToken {
+  id           String     @id @default(cuid())
+  membership   Membership @relation(fields: [membershipId], references: [id])
+  membershipId String
+  token        String     @unique
   createdAt    DateTime   @default(now())
 
   @@index([membershipId])

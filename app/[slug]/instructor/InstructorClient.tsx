@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
+import { Capacitor } from "@capacitor/core";
 import { User } from "lucide-react";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 import { enabledPackages, getPackagePriceCents, centsToDollars } from "@/lib/pricing";
@@ -108,6 +109,14 @@ export default function InstructorClient({
   const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "off" | "on" | "enabling">("unknown");
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      import("@capacitor-firebase/messaging").then(({ FirebaseMessaging }) => {
+        FirebaseMessaging.checkPermissions()
+          .then((r) => setPushStatus(r.receive === "granted" ? "on" : "off"))
+          .catch(() => setPushStatus("off"));
+      });
+      return;
+    }
     if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
       setPushStatus("unsupported");
       return;
@@ -124,6 +133,23 @@ export default function InstructorClient({
   async function enablePushNotifications() {
     setPushStatus("enabling");
     try {
+      if (Capacitor.isNativePlatform()) {
+        const { FirebaseMessaging } = await import("@capacitor-firebase/messaging");
+        const { receive } = await FirebaseMessaging.requestPermissions();
+        if (receive !== "granted") {
+          setPushStatus("off");
+          return;
+        }
+        const { token } = await FirebaseMessaging.getToken();
+        await fetch(`${apiBase}/push/fcm-subscribe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+        setPushStatus("on");
+        return;
+      }
+
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setPushStatus("off");
