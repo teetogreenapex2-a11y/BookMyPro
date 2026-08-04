@@ -12,6 +12,9 @@ import android.widget.LinearLayout;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.navigation.NavigationBarView;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 
 public class MainActivity extends BridgeActivity {
     private BottomNavigationView tabBar;
@@ -82,6 +85,30 @@ public class MainActivity extends BridgeActivity {
 
         tabBar = new BottomNavigationView(this);
         tabBar.setVisibility(View.GONE); // hidden until the website tells us who's signed in
+
+        // The default colors for a programmatically-created tab bar can
+        // sometimes default to black-on-black for unselected items
+        // depending on the system theme, which makes them look missing.
+        // Explicitly setting the brand green background and white/gray
+        // tints ensures they're always visible.
+        tabBar.setBackgroundColor(Color.parseColor("#1B3A2F"));
+        int[][] states = new int[][] {
+            new int[] { android.R.attr.state_selected },
+            new int[] { -android.R.attr.state_selected }
+        };
+        int[] colors = new int[] {
+            Color.WHITE,
+            Color.parseColor("#80FFFFFF")
+        };
+        ColorStateList colorStateList = new ColorStateList(states, colors);
+        tabBar.setItemIconTintList(colorStateList);
+        tabBar.setItemTextColor(colorStateList);
+
+        // Force all labels to show, which prevents the "shifting"
+        // behavior that can sometimes make the layout feel jumpy or
+        // hide icons if space is tight.
+        tabBar.setLabelVisibilityMode(NavigationBarView.LABEL_VISIBILITY_LABELED);
+
         root.addView(tabBar, new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
@@ -149,5 +176,10 @@ public class MainActivity extends BridgeActivity {
         // fresh measure and layout pass here fixes that directly.
         tabBar.requestLayout();
         tabBar.invalidate();
+        // Also request layout on the root to ensure the WebView resizes
+        // properly now that the tab bar is visible.
+        if (tabBar.getParent() != null) {
+            tabBar.getParent().requestLayout();
+        }
     }
 }
