@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
 
 type Comment = { id: string; timestampSeconds: number; text: string };
@@ -45,9 +46,27 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
 
   function loadPlayers() {
     fetch(`${apiBase}/players`).then((r) => r.json()).then((list) => setPlayers(Array.isArray(list) ? list : [])).catch(() => {});
+  }
+
+  async function recordVideo() {
+    setUploadError(null);
+    setRecording(true);
+    try {
+      const { Camera } = await import("@capacitor/camera");
+      const result = await Camera.recordVideo({ saveToGallery: false });
+      const res = await fetch(result.webPath!);
+      const blob = await res.blob();
+      const recordedFile = new File([blob], `swing-${Date.now()}.mp4`, { type: blob.type || "video/mp4" });
+      await uploadVideo(recordedFile);
+    } catch (err) {
+      console.error("Failed to record video:", err);
+    } finally {
+      setRecording(false);
+    }
   }
 
   async function uploadVideo(file: File) {
@@ -201,6 +220,19 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }}
                 />
                 {uploadError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{uploadError}</p>}
+                {Capacitor.isNativePlatform() && (
+                  <button
+                    onClick={recordVideo}
+                    disabled={recording || uploading}
+                    style={{
+                      width: "100%", background: "var(--card)", color: "var(--fairway)", border: "1px solid var(--fairway)",
+                      borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 700,
+                      opacity: recording || uploading ? 0.7 : 1,
+                    }}
+                  >
+                    {recording ? "Opening camera..." : "🎥 Record a new video"}
+                  </button>
+                )}
                 <label style={{ display: "inline-block", textAlign: "center", background: "var(--gold)", color: "var(--fairway)", borderRadius: 8, padding: "10px 16px", fontWeight: 700, fontSize: 13, cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}>
                   {uploading ? "Uploading..." : "Choose video file"}
                   <input
