@@ -804,7 +804,17 @@ export default function BookingClient({
                         PENDING
                       </span>
                     )}
+                    {b.status === "denied" && (
+                      <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: "#B23A3A", background: "#FBE9E9", borderRadius: 4, padding: "3px 6px" }}>
+                        DECLINED
+                      </span>
+                    )}
                   </div>
+                  {b.status === "denied" && (
+                    <p style={{ fontSize: 11.5, color: "#B23A3A", margin: "6px 0 0" }}>
+                      The day and time you selected has a conflict. Please choose another time.
+                    </p>
+                  )}
                   {b.isRemote && (
                     b.videoCallUrl ? (
                       <a
@@ -942,7 +952,7 @@ export default function BookingClient({
                         <button
                           key={time}
                           disabled={!canPick}
-                          onClick={() => setSelected(slot)}
+                          onClick={() => setSelected(isSelected ? null : slot)}
                           style={{
                             padding: "8px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                             border: isPending ? "1px dashed #B8862B" : "none",
@@ -1023,6 +1033,15 @@ export default function BookingClient({
               }}
             >
               {confirming ? "..." : "Pay & Join"}
+            </button>
+            <button
+              onClick={() => setSelected(null)}
+              style={{
+                width: "100%", background: "none", color: "#C9C4FF", border: "none",
+                padding: "10px 18px", fontWeight: 600, fontSize: 13, marginTop: 4,
+              }}
+            >
+              Cancel
             </button>
           </div>
         )}
@@ -1148,6 +1167,16 @@ export default function BookingClient({
                 Reserve - pay at first lesson instead
               </button>
             )}
+
+            <button
+              onClick={() => setSelected(null)}
+              style={{
+                width: "100%", background: "none", color: "#D7DED9", border: "none",
+                padding: "10px 18px", fontWeight: 600, fontSize: 13, marginTop: 4,
+              }}
+            >
+              Cancel
+            </button>
           </div>
         )}
 

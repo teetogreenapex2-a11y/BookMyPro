@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
+import { getBusinessBySlug, requireMembership, getMembership } from "@/lib/tenant";
+import { sendPushToMembership } from "@/lib/pushNotifications";
+import { businessDestination } from "@/lib/businessUrl";
 
 // POST /api/{slug}/bookings/{id}/deny — owner/instructor only.
 // Denies a pending booking: releases the slot, refunds a package credit
@@ -37,8 +39,21 @@ export async function POST(
     }
   });
 
+  // Without this, a denied request just silently vanishes for the player -
+  // they'd have no way to know it didn't go through unless they happened
+  // to notice the time was open again.
+  const playerMembership = await getMembership(booking.playerId, business.id);
+  if (playerMembership) {
+    await sendPushToMembership(playerMembership.id, {
+      title: "Booking request declined",
+      body: "The day and time you selected has a conflict. Please choose another time.",
+      url: businessDestination(business.slug, "/book"),
+    });
+  }
+
   return NextResponse.json({
     ok: true,
     refundNeeded: booking.priceCents > 0, // a real payment was involved — instructor handles this manually
   });
 }
+

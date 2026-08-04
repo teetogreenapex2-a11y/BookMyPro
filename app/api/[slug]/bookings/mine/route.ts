@@ -21,7 +21,7 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
     where: {
       businessId: business.id,
       playerId: userId,
-      status: { in: ["confirmed", "pending"] },
+      status: { in: ["confirmed", "pending", "denied"] },
       startTime: { gte: new Date() },
     },
     include: { instructor: { include: { user: { select: { name: true } } } } },
