@@ -19,6 +19,8 @@ type Business = {
   logoUrl: string | null;
   email: string;
   hours: string;
+  openHour: number;
+  closeHour: number;
   lessonRate: string;
   instructorName: string | null;
   packageSingleEnabled: boolean;
@@ -557,7 +559,36 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               placeholder="Rick Stitzer"
             />
             <Field label="Business email" value={biz.email} onChange={(v) => setBiz((b) => ({ ...b, email: v }))} />
-            <Field label="Business hours" value={biz.hours} onChange={(v) => setBiz((b) => ({ ...b, hours: v }))} />
+            <div style={{ display: "flex", gap: 12 }}>
+              <label style={{ display: "block", flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Calendar opens at</div>
+                <select
+                  value={biz.openHour}
+                  onChange={(e) => setBiz((b) => ({ ...b, openHour: Number(e.target.value) }))}
+                  style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, background: "#FFF" }}
+                >
+                  {HOUR_OPTIONS.map((h) => (
+                    <option key={h} value={h}>{formatHourLabel(h)}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "block", flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Calendar closes at</div>
+                <select
+                  value={biz.closeHour}
+                  onChange={(e) => setBiz((b) => ({ ...b, closeHour: Number(e.target.value) }))}
+                  style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, background: "#FFF" }}
+                >
+                  {HOUR_OPTIONS.map((h) => (
+                    <option key={h} value={h}>{formatHourLabel(h)}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p style={{ fontSize: 12, color: "var(--faint)", margin: "-8px 0 0" }}>
+              This controls which time slots actually appear on your calendar. Changing it adds any newly-included hours right away - it never removes an existing slot, even one outside the new hours, so nothing already booked is ever affected.
+            </p>
+            <Field label="Business hours (shown to players)" value={biz.hours} onChange={(v) => setBiz((b) => ({ ...b, hours: v }))} placeholder="Mon-Sat, 8:00 AM - 5:00 PM" />
             <Field label="Lesson rate" value={biz.lessonRate} onChange={(v) => setBiz((b) => ({ ...b, lessonRate: v }))} />
 
             <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
@@ -911,6 +942,14 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       </main>
     </div>
   );
+}
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
+
+function formatHourLabel(hour: number) {
+  const period = hour < 12 || hour === 24 ? "AM" : "PM";
+  const display = hour % 12 === 0 ? 12 : hour % 12;
+  return `${display}:00 ${period}`;
 }
 
 function Field({ label, value, onChange, disabled, placeholder }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean; placeholder?: string }) {
