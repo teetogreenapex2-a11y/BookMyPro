@@ -89,12 +89,30 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
       setUploadOpen(false);
       setUploadPlayerId("");
       setUploadTitle("");
-      load();
+      loadVideosWithRetry(submissions.length);
     } catch (err: any) {
       setUploadError(err?.message || "Something went wrong.");
     } finally {
       setUploading(false);
     }
+  }
+
+  // Vercel Blob's client upload finishes in two separate steps - the
+  // browser's own upload() call resolves once the file bytes have
+  // landed, but the actual database record only gets created moments
+  // later by a separate background callback from Vercel itself. Calling
+  // load() immediately after upload() can genuinely run before that
+  // record exists yet - this retries a few times with short, increasing
+  // delays instead of checking exactly once too early.
+  async function loadVideosWithRetry(previousCount: number, attempt = 0) {
+    const res = await fetch(`${apiBase}/videos`);
+    const list = await res.json();
+    const fresh = Array.isArray(list) ? list : [];
+    setSubmissions(fresh);
+    setLoading(false);
+    if (fresh.length > previousCount || attempt >= 4) return;
+    await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    await loadVideosWithRetry(previousCount, attempt + 1);
   }
 
   function load() {

@@ -88,6 +88,26 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
     }).catch(() => setLoading(false));
   }
 
+  // Vercel Blob's client upload finishes in two separate steps: the
+  // browser's own upload() call resolves as soon as the file bytes
+  // themselves have landed, but the actual database record only gets
+  // created moments later by a separate, background callback from Vercel
+  // itself - calling load() immediately after upload() can genuinely run
+  // before that record exists yet, which is exactly why the new video
+  // wasn't showing up without navigating away and back (a later,
+  // unrelated page load happened to catch it after the fact). This
+  // retries a few times with short, increasing delays instead of trying
+  // exactly once too early.
+  async function loadVideosWithRetry(previousCount: number, attempt = 0) {
+    const res = await fetch(`${apiBase}/videos`);
+    const list = await res.json();
+    const fresh = Array.isArray(list) ? list : [];
+    setSubmissions(fresh);
+    if (fresh.length > previousCount || attempt >= 4) return;
+    await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    await loadVideosWithRetry(previousCount, attempt + 1);
+  }
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,7 +137,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
       setTitle("");
       setPlayerNote("");
       setFile(null);
-      load();
+      loadVideosWithRetry(submissions.length);
     } catch (err: any) {
       setError(err?.message || "Something went wrong uploading that.");
     } finally {
