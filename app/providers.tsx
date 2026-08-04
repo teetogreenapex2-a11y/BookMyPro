@@ -39,7 +39,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 // which role's tab set to show and which business to navigate within.
 function TabBarSync() {
   const pathname = usePathname();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -62,7 +62,7 @@ function TabBarSync() {
         else bridge.hide?.();
       })
       .catch(() => bridge.hide?.());
-  }, [pathname, status, session]);
+  }, [pathname, status]);
 
   return null;
 }

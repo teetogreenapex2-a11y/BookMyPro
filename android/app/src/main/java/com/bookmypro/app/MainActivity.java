@@ -15,6 +15,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 public class MainActivity extends BridgeActivity {
     private BottomNavigationView tabBar;
     private String currentSlug = "";
+    private String currentRole = "";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -106,6 +107,18 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void updateTabBar(String role, String slug) {
+        // The website can genuinely call setRole several times in quick
+        // succession while a page is first loading (its own session state
+        // typically moves through a "loading" phase before settling) -
+        // without this guard, several back-to-back menu rebuilds on the
+        // same tab bar view can leave it in an inconsistent state, which
+        // is exactly the "some tabs missing" symptom this was causing.
+        // Skipping the rebuild entirely when nothing has actually changed
+        // makes repeated calls harmless instead of risky.
+        if (role.equals(currentRole) && slug.equals(currentSlug)) {
+            return;
+        }
+        currentRole = role;
         currentSlug = slug;
         tabBar.getMenu().clear();
         if ("player".equals(role)) {
