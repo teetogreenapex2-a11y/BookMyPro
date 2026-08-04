@@ -28,6 +28,27 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'automatic',
   },
+
+  // A real native splash screen using the app's actual brand green,
+  // instead of the plain white/blank flash Android shows by default
+  // before anything loads. launchAutoHide is intentionally false here -
+  // the app itself calls SplashScreen.hide() once the real page has
+  // actually finished loading, rather than hiding on a fixed timer that
+  // might reveal a still-loading blank page underneath on a slow
+  // connection.
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 0,
+      launchAutoHide: false,
+      backgroundColor: '#1B3A2F',
+      androidScaleType: 'CENTER_CROP',
+      showSpinner: true,
+      androidSpinnerStyle: 'large',
+      spinnerColor: '#B8862B',
+      splashFullScreen: true,
+      splashImmersive: true,
+    },
+  },
 };
 
 export default config;
