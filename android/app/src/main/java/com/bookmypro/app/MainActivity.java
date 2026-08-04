@@ -65,7 +65,18 @@ public class MainActivity extends BridgeActivity {
 
             @JavascriptInterface
             public void hide() {
-                runOnUiThread(() -> tabBar.setVisibility(View.GONE));
+                runOnUiThread(() -> {
+                    tabBar.setVisibility(View.GONE);
+                    // Without resetting these, a later setRole() call with
+                    // the exact same role/slug as before this hide() (e.g.
+                    // navigating back to the same dashboard after briefly
+                    // passing through a page with no valid business
+                    // context) gets incorrectly treated as "nothing
+                    // changed" and skipped entirely - leaving the tab bar
+                    // stuck hidden even on a page where it should show.
+                    currentRole = "";
+                    currentSlug = "";
+                });
             }
         }, "AndroidTabBar");
 
