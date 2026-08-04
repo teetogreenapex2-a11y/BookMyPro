@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
+import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
 
 type Instructor = { id: string; name: string | null; email: string };
@@ -48,7 +49,33 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
+
+  // Inside the wrapped app, this opens the phone's own real camera app to
+  // record a fresh swing video directly, rather than only being able to
+  // pick an already-recorded file off the device - genuinely faster for
+  // the common case of "record my swing right now and send it over."
+  // The recorded video comes back as a native file reference (not
+  // directly usable for upload), so this fetches it into a real Blob and
+  // wraps that as a File - from that point on it's handled by the exact
+  // same upload code the regular file picker already uses.
+  async function recordVideo() {
+    setError(null);
+    setRecording(true);
+    try {
+      const { Camera } = await import("@capacitor/camera");
+      const result = await Camera.recordVideo({ saveToGallery: true });
+      const res = await fetch(result.webPath!);
+      const blob = await res.blob();
+      const recordedFile = new File([blob], `swing-${Date.now()}.mp4`, { type: blob.type || "video/mp4" });
+      setFile(recordedFile);
+    } catch (err) {
+      console.error("Failed to record video:", err);
+    } finally {
+      setRecording(false);
+    }
+  }
 
   function load() {
     fetch(`${apiBase}/instructors`).then((r) => r.json()).then((list) => {
@@ -172,12 +199,30 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
             rows={2}
             style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8, resize: "vertical" }}
           />
+          {Capacitor.isNativePlatform() && (
+            <button
+              onClick={recordVideo}
+              disabled={recording}
+              style={{
+                width: "100%", background: "var(--card)", color: "var(--fairway)", border: "1px solid var(--fairway)",
+                borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 700, marginBottom: 8,
+                opacity: recording ? 0.7 : 1,
+              }}
+            >
+              {recording ? "Opening camera..." : "🎥 Record a new video"}
+            </button>
+          )}
           <input
             type="file"
             accept="video/mp4,video/quicktime,video/webm,video/x-m4v"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
-            style={{ width: "100%", fontSize: 13, marginBottom: 10 }}
+            style={{ width: "100%", fontSize: 13, marginBottom: 6 }}
           />
+          {file && (
+            <p style={{ fontSize: 12, color: "var(--fairway)", fontWeight: 600, margin: "0 0 10px" }}>
+              Ready to upload: {file.name}
+            </p>
+          )}
 
           {error && <p style={{ fontSize: 12, color: "#B23A3A", margin: "0 0 10px" }}>{error}</p>}
 
