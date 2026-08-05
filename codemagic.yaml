@@ -40,6 +40,15 @@ workflows:
           # properly generated.
           rm -rf ios
           npx cap add ios
+      - name: Generate iOS app icon
+        script: |
+          # The ios folder never persists between builds (it's rebuilt
+          # from scratch every time above), so this step - unlike the
+          # matching one already run once, locally, for Android - has
+          # never actually had a chance to run before now. Uses the same
+          # source icon.png as Android for a consistent, real app icon
+          # instead of Capacitor's generic default.
+          npx @capacitor/assets generate --ios
       - name: Sync Capacitor
         script: |
           npx cap sync ios
