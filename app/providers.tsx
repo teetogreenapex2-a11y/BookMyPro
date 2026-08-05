@@ -55,10 +55,27 @@ function TabBarSync() {
       return;
     }
 
+    // Which tab should be shown as highlighted for the current page -
+    // without this, the tab bar's selection only ever updated when
+    // someone actually tapped a tab directly, so navigating some other
+    // way (a "\u2190 Back" link, the system back button) left it showing
+    // whichever tab was tapped last, rather than the page actually on
+    // screen.
+    const page = pathname?.replace(`/${slug}`, "") || "/";
+    const pageKey = page.startsWith("/instructor/videos") ? "videos"
+      : page.startsWith("/instructor/swing-sketch") ? "swingsketch"
+      : page.startsWith("/instructor") ? "calendar"
+      : page.startsWith("/customers") ? "customers"
+      : page.startsWith("/videos") ? "videos"
+      : page.startsWith("/swing-sketches") ? "swingsketch"
+      : page.startsWith("/settings") ? "settings"
+      : page.startsWith("/book") ? "book"
+      : "";
+
     fetch(`/api/${slug}/my-role`)
       .then((r) => r.json())
       .then(({ role }) => {
-        if (role) bridge.setRole?.(role, slug);
+        if (role) bridge.setRole?.(role, slug, pageKey);
         else bridge.hide?.();
       })
       .catch(() => bridge.hide?.());
