@@ -27,17 +27,25 @@ workflows:
       # would have - the only thing that actually needs to sync into the
       # native project is the small set of local assets (the offline
       # fallback page, the app icon, etc.) plus the installed plugins.
-      - name: Add iOS platform if it isn't already in the repo
+      - name: Add iOS platform
         script: |
-          if [ ! -d "ios" ]; then
-            npx cap add ios
-          fi
+          # Always start fresh rather than checking if the folder merely
+          # exists - a leftover, partial ios folder from an earlier failed
+          # build attempt could otherwise cause this to be skipped even
+          # though the actual native project (Podfile and all) was never
+          # properly generated.
+          rm -rf ios
+          npx cap add ios
       - name: Sync Capacitor
         script: |
           npx cap sync ios
-      - name: Install CocoaPods dependencies
-        script: |
-          cd ios/App && pod install
+      # No CocoaPods step here - this version of Capacitor generates a
+      # Package.swift instead of a Podfile (confirmed by the "Add iOS
+      # platform" step's own log output: "Writing Package.swift"),
+      # meaning it uses Apple's own Swift Package Manager for plugin
+      # dependencies. Xcode resolves those automatically as part of the
+      # actual build itself, so there's nothing separate to install here
+      # the way CocoaPods would have needed.
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
