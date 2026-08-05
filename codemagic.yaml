@@ -55,7 +55,6 @@ workflows:
           xcode-project use-profiles
       - name: Build ipa for distribution
         script: |
-          cd ios/App
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
