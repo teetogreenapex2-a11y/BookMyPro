@@ -65,18 +65,7 @@ public class MainActivity extends BridgeActivity {
 
             @JavascriptInterface
             public void hide() {
-                runOnUiThread(() -> {
-                    tabBar.setVisibility(View.GONE);
-                    // Without resetting these, a later setRole() call with
-                    // the exact same role/slug as before this hide() (e.g.
-                    // navigating back to the same dashboard after briefly
-                    // passing through a page with no valid business
-                    // context) gets incorrectly treated as "nothing
-                    // changed" and skipped entirely - leaving the tab bar
-                    // stuck hidden even on a page where it should show.
-                    currentRole = "";
-                    currentSlug = "";
-                });
+                runOnUiThread(() -> tabBar.setVisibility(View.GONE));
             }
         }, "AndroidTabBar");
 
@@ -148,47 +137,43 @@ public class MainActivity extends BridgeActivity {
 
     private void updateTabBar(String role, String slug) {
         Log.d("TabBarDebug", "updateTabBar running with role=" + role + " slug=" + slug + " currentRole=" + currentRole + " currentSlug=" + currentSlug);
-        // The website can genuinely call setRole several times in quick
-        // succession while a page is first loading (its own session state
-        // typically moves through a "loading" phase before settling) -
-        // without this guard, several back-to-back menu rebuilds on the
-        // same tab bar view can leave it in an inconsistent state, which
-        // is exactly the "some tabs missing" symptom this was causing.
-        // Skipping the rebuild entirely when nothing has actually changed
-        // makes repeated calls harmless instead of risky.
-        if (role.equals(currentRole) && slug.equals(currentSlug)) {
-            Log.d("TabBarDebug", "Skipped - nothing changed");
-            return;
-        }
-        currentRole = role;
-        currentSlug = slug;
-        tabBar.getMenu().clear();
-        if ("player".equals(role)) {
-            tabBar.inflateMenu(R.menu.player_tabs);
-        } else if ("instructor".equals(role) || "owner".equals(role)) {
-            tabBar.inflateMenu(R.menu.instructor_tabs);
-        } else {
-            // An unrecognized or missing role (e.g. someone still on the
-            // sign-in page, before any membership exists yet) - stay
-            // hidden rather than show tabs that might not make sense yet.
-            Log.d("TabBarDebug", "Unrecognized role, hiding");
+
+        // The website often calls setRole() several times in quick
+        // succession while a page is loading, or on every page load even
+        // if the role haven't changed.
+        
+        boolean isValidRole = "player".equals(role) || "instructor".equals(role) || "owner".equals(role);
+        
+        if (!isValidRole) {
+            Log.d("TabBarDebug", "Unrecognized or empty role, hiding");
             tabBar.setVisibility(View.GONE);
+            // We still update these so that if the user somehow gets back
+            // to a valid state, it triggers a rebuild.
+            currentRole = role;
+            currentSlug = slug;
             return;
         }
-        Log.d("TabBarDebug", "Menu now has " + tabBar.getMenu().size() + " items");
+
+        // Only rebuild the menu if something actually changed, to avoid
+        // flickering or inconsistent states during rapid-fire JS calls.
+        if (!role.equals(currentRole) || !slug.equals(currentSlug)) {
+            currentRole = role;
+            currentSlug = slug;
+            tabBar.getMenu().clear();
+            if ("player".equals(role)) {
+                tabBar.inflateMenu(R.menu.player_tabs);
+            } else {
+                tabBar.inflateMenu(R.menu.instructor_tabs);
+            }
+            Log.d("TabBarDebug", "Menu rebuilt, now has " + tabBar.getMenu().size() + " items");
+        }
+
+        // Even if we skipped the menu rebuild, we MUST ensure the tab bar
+        // is visible and has a fresh layout pass - this handles cases
+        // where it might have been briefly hidden during a transition.
         tabBar.setVisibility(View.VISIBLE);
-        // The view sat hidden (View.GONE) before this point, which means
-        // Android never gave it a real measure/layout pass while it had
-        // items - switching straight to visible can leave it working off
-        // a stale internal width calculation from when it was empty,
-        // which is exactly the "some tabs quietly missing" symptom this
-        // was causing despite the menu itself genuinely holding all 5
-        // items (confirmed by the log line right above this). Forcing a
-        // fresh measure and layout pass here fixes that directly.
         tabBar.requestLayout();
         tabBar.invalidate();
-        // Also request layout on the root to ensure the WebView resizes
-        // properly now that the tab bar is visible.
         if (tabBar.getParent() != null) {
             tabBar.getParent().requestLayout();
         }

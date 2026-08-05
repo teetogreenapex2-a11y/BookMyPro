@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { signOut } from "next-auth/react";
 
 type User = {
   name: string | null;
@@ -167,6 +168,38 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
     }
   }
 
+  const [savingHours, setSavingHours] = useState(false);
+  const [hoursSaved, setHoursSaved] = useState(false);
+  const [hoursError, setHoursError] = useState<string | null>(null);
+
+  // A dedicated save just for the calendar hours, separate from the main
+  // "Save changes" button at the very bottom - since this is the one
+  // setting that actually changes what a player can book, saving it in
+  // isolation (rather than needing to scroll all the way down and submit
+  // the entire form) is worth the extra button on its own.
+  async function saveHours() {
+    setSavingHours(true);
+    setHoursError(null);
+    try {
+      const res = await fetch(`${apiBase}/business`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ openHour: biz.openHour, closeHour: biz.closeHour }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setHoursError(data.error || "Something went wrong saving your hours.");
+        return;
+      }
+      setHoursSaved(true);
+      setTimeout(() => setHoursSaved(false), 1800);
+    } catch (err) {
+      setHoursError("Something went wrong saving your hours.");
+    } finally {
+      setSavingHours(false);
+    }
+  }
+
   async function saveSpecialty(instructorId: string, specialty: string) {
     await fetch(`${apiBase}/instructors/${instructorId}`, {
       method: "PATCH",
@@ -224,6 +257,20 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
+  }
+
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  async function deleteAccount() {
+    setDeletingAccount(true);
+    const res = await fetch("/api/user/delete", { method: "POST" });
+    if (res.ok) {
+      await signOut({ callbackUrl: "/login" });
+    } else {
+      setDeletingAccount(false);
+    }
   }
 
   const tabs = isInstructor
@@ -303,6 +350,57 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14 }}
                 />
               </label>
+            </div>
+
+            <div style={{ background: "#FBEBEB", border: "1px solid #E8B4B4", borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: "#8A2E2E" }}>Delete account</div>
+              {isOwner ? (
+                <p style={{ fontSize: 12, color: "#8A2E2E", margin: 0 }}>
+                  As the owner of this business, deleting your own account here isn't available, since it would leave the business without an owner. Contact support if you need to close out your account.
+                </p>
+              ) : deleteConfirmOpen ? (
+                <div>
+                  <p style={{ fontSize: 12, color: "#8A2E2E", margin: "0 0 10px" }}>
+                    This removes your personal information permanently and signs you out everywhere. It can't be undone. Type DELETE below to confirm.
+                  </p>
+                  <input
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="Type DELETE"
+                    style={{ width: "100%", border: "1px solid #E8B4B4", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 10 }}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => { setDeleteConfirmOpen(false); setDeleteConfirmText(""); }}
+                      style={{ background: "none", border: "1px solid #E8B4B4", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#8A2E2E" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={deleteAccount}
+                      disabled={deleteConfirmText !== "DELETE" || deletingAccount}
+                      style={{
+                        background: "#B23A3A", color: "#FFF", border: "none", borderRadius: 8, padding: "8px 14px",
+                        fontSize: 13, fontWeight: 700, opacity: deleteConfirmText !== "DELETE" || deletingAccount ? 0.5 : 1,
+                      }}
+                    >
+                      {deletingAccount ? "Deleting..." : "Permanently delete my account"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p style={{ fontSize: 12, color: "#8A2E2E", margin: "0 0 10px" }}>
+                    Permanently remove your personal information from BookMyPro.
+                  </p>
+                  <button
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    style={{ background: "none", border: "1px solid #E8B4B4", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, color: "#8A2E2E" }}
+                  >
+                    Delete my account
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -588,6 +686,19 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
             <p style={{ fontSize: 12, color: "var(--faint)", margin: "-8px 0 0" }}>
               This controls which time slots actually appear on your calendar. Changing it adds any newly-included hours right away - it never removes an existing slot, even one outside the new hours, so nothing already booked is ever affected.
             </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "-4px 0 4px" }}>
+              <button
+                onClick={saveHours}
+                disabled={savingHours}
+                style={{
+                  background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8,
+                  padding: "9px 16px", fontSize: 13, fontWeight: 700, opacity: savingHours ? 0.6 : 1,
+                }}
+              >
+                {savingHours ? "Saving..." : hoursSaved ? "Saved" : "Save calendar hours"}
+              </button>
+              {hoursError && <span style={{ fontSize: 12, color: "#B23A3A" }}>{hoursError}</span>}
+            </div>
             <Field label="Business hours (shown to players)" value={biz.hours} onChange={(v) => setBiz((b) => ({ ...b, hours: v }))} placeholder="Mon-Sat, 8:00 AM - 5:00 PM" />
             <Field label="Lesson rate" value={biz.lessonRate} onChange={(v) => setBiz((b) => ({ ...b, lessonRate: v }))} />
 
