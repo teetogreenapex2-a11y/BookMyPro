@@ -59,7 +59,12 @@ workflows:
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
     artifacts:
-      - ios/App/build/ios/ipa/*.ipa
+      # Matches wherever the build actually places the .ipa, whether
+      # that ends up being repo-root-relative or under ios/App - since
+      # this genuinely shifted once already after removing the earlier
+      # "cd ios/App" step, matching broadly here is safer than guessing
+      # the exact single path again.
+      - "**/*.ipa"
       - /tmp/xcodebuild_logs/*.log
     publishing:
       email:
