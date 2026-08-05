@@ -18,6 +18,16 @@
   box-sizing: border-box;
 }
 
+html, body {
+  /* Prevents the whole page from becoming horizontally scrollable if any
+     one element on it ever ends up slightly wider than the screen (a
+     stray fixed width, an unwrapped row of items, etc.) - without this,
+     a single overflowing element anywhere on a page can drag the entire
+     page sideways instead of just being clipped in place. */
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', sans-serif;

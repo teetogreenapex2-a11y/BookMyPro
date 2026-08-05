@@ -6,7 +6,6 @@ import { Capacitor } from "@capacitor/core";
 import { FITTING_TYPES, centsToDollars, enabledPackages, enabledFittings, getFittingPriceCents } from "@/lib/pricing";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 
-const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean; isGroup?: boolean; groupCapacity?: number | null; groupPriceCents?: number | null; groupSpotsTaken?: number; groupCategory?: string | null; groupAgeRange?: string | null };
@@ -35,6 +34,19 @@ export default function BookingClient({
   basePath: string;
   apiBase: string;
 }) {
+  // Built from the business's real, current hours instead of a fixed
+  // list - without this, a business widening its hours in Settings would
+  // never actually show any of those newly-added times to a player,
+  // since this would still only ever be looking for its own fixed,
+  // unrelated set of times regardless of what's actually available.
+  const TIMES = useMemo(() => {
+    const openHour = business.openHour ?? 8;
+    const closeHour = business.closeHour ?? 17;
+    const times: string[] = [];
+    for (let h = openHour; h < closeHour; h++) times.push(`${String(h).padStart(2, "0")}:00`);
+    return times;
+  }, [business.openHour, business.closeHour]);
+
   const [service, setService] = useState<"lesson" | "fitting">("lesson");
   const [isRemote, setIsRemote] = useState(false);
   const [packages, setPackages] = useState<Package[]>(initialPackages);
