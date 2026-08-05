@@ -47,6 +47,15 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  // Checking Capacitor.isNativePlatform() directly during render caused a
+  // hydration mismatch (the server always renders as if it's not native,
+  // since it has no way to know) - starting this state at false to match
+  // the server, and only updating it after mounting on the client, avoids
+  // that entirely.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
 
   function loadPlayers() {
     fetch(`${apiBase}/players`).then((r) => r.json()).then((list) => setPlayers(Array.isArray(list) ? list : [])).catch(() => {});
@@ -238,7 +247,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }}
                 />
                 {uploadError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{uploadError}</p>}
-                {Capacitor.isNativePlatform() && (
+                {isNative && (
                   <button
                     onClick={recordVideo}
                     disabled={recording || uploading}

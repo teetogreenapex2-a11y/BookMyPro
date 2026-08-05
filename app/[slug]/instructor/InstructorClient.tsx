@@ -107,6 +107,19 @@ export default function InstructorClient({
   const [newPlayerError, setNewPlayerError] = useState<string | null>(null);
   const [creatingPlayer, setCreatingPlayer] = useState(false);
   const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "off" | "on" | "enabling">("unknown");
+  // Capacitor.isNativePlatform() gives a different answer on the server
+  // (always false, since the server has no way to know it's rendering
+  // for the native app) than on the actual device - checking it directly
+  // during render caused exactly that mismatch between what the server
+  // sent and what the client expected, which breaks React's hydration
+  // and can silently stop things like button clicks from working
+  // correctly afterward. Starting this at false (matching the server)
+  // and only flipping it true after the component has actually mounted
+  // on the client avoids that mismatch entirely.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -613,7 +626,7 @@ export default function InstructorClient({
               </span>
             </span>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              {!Capacitor.isNativePlatform() && (
+              {!isNative && (
                 <>
                   <a href={`${basePath}/customers`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Customers</a>
                   <a href={`${basePath}/instructor/videos`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Swing videos</a>
@@ -621,7 +634,7 @@ export default function InstructorClient({
                 </>
               )}
               <a href={`${basePath}/instructor/shop`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Shop</a>
-              {!Capacitor.isNativePlatform() && (
+              {!isNative && (
                 <a href={`${basePath}/settings`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Settings</a>
               )}
               <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>

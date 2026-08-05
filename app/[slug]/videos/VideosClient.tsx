@@ -50,6 +50,15 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  // Checking Capacitor.isNativePlatform() directly during render caused a
+  // hydration mismatch (the server always renders as if it's not native,
+  // since it has no way to know) - starting this state at false to match
+  // the server, and only updating it after mounting on the client, avoids
+  // that entirely.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
 
   // Inside the wrapped app, this opens the phone's own real camera app to
@@ -219,7 +228,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
             rows={2}
             style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8, resize: "vertical" }}
           />
-          {Capacitor.isNativePlatform() && (
+          {isNative && (
             <button
               onClick={recordVideo}
               disabled={recording}
