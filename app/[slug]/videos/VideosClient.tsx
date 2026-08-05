@@ -185,7 +185,9 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span className="display" style={{ fontSize: 18, fontWeight: 700 }}>Swing videos</span>
             <div style={{ display: "flex", gap: 10 }}>
-              <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
+              {!isNative && (
+                <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
+              )}
               <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>
                 Sign out
               </button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { Capacitor } from "@capacitor/core";
 
 type Sketch = {
   id: string;
@@ -14,6 +15,15 @@ export default function SwingSketchesClient({ slug, basePath, apiBase }: { slug:
   const [sketches, setSketches] = useState<Sketch[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Sketch | null>(null);
+  // Checking Capacitor.isNativePlatform() directly during render caused a
+  // hydration mismatch elsewhere tonight (the server always renders as if
+  // it's not native, since it has no way to know) - starting this state
+  // at false to match the server, and only updating it after mounting on
+  // the client, avoids that entirely.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
 
   useEffect(() => {
     fetch(`${apiBase}/swing-sketches`)
@@ -32,7 +42,9 @@ export default function SwingSketchesClient({ slug, basePath, apiBase }: { slug:
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span className="display" style={{ fontSize: 18, fontWeight: 700 }}>Swing Sketches</span>
             <div style={{ display: "flex", gap: 10 }}>
-              <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
+              {!isNative && (
+                <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
+              )}
               <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>
                 Sign out
               </button>
