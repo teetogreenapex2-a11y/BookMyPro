@@ -14,7 +14,11 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.bookmypro.app
       vars:
-        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        # No .xcworkspace exists here - that file is specifically what
+        # CocoaPods creates to wrap the project together with its Pods
+        # dependency; since this uses Swift Package Manager instead,
+        # there's only a regular .xcodeproj to point at.
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
       node: latest
     scripts:
@@ -53,7 +57,7 @@ workflows:
         script: |
           cd ios/App
           xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
+            --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
