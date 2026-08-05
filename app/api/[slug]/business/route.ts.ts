@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
 
   const body = await req.json();
   const allowed = [
-    "name", "email", "hours", "lessonRate", "instructorName", "paymentProvider",
+    "name", "email", "hours", "openHour", "closeHour", "lessonRate", "instructorName", "paymentProvider",
     "packageSingleEnabled", "packagePlayingEnabled", "packageVideoEnabled", "packageThreeEnabled", "packageFiveEnabled", "packageTenEnabled",
     "packageSinglePriceCents", "packagePlayingPriceCents", "packageVideoPriceCents", "packageThreePriceCents", "packageFivePriceCents", "packageTenPriceCents",
     "fittingDriverEnabled", "fittingIronEnabled", "fittingFullEnabled",
@@ -63,6 +63,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   if (typeof data.bookingWindowDays === "number" && data.bookingWindowDays > business.bookingWindowDays) {
     const instructors = await getBusinessInstructors(business.id);
     await Promise.all(instructors.map((inst) => seedInstructorAvailability(business.id, inst.id, data.bookingWindowDays as number)));
+  }
+
+  // Hours changed - re-seed so the calendar picks up any newly-included
+  // hours right away (e.g. staying open later now creates those new
+  // slots). This is additive only: if hours got narrower, any existing
+  // slot outside the new range - especially a booked one - is left
+  // exactly as it is rather than being touched or removed automatically.
+  if ("openHour" in data || "closeHour" in data) {
+    const instructors = await getBusinessInstructors(business.id);
+    await Promise.all(instructors.map((inst) => seedInstructorAvailability(business.id, inst.id, business.bookingWindowDays)));
   }
 
   return NextResponse.json(updated);
