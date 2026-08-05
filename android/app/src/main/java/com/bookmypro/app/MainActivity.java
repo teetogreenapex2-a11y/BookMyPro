@@ -7,6 +7,8 @@ import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.CookieManager;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.LinearLayout;
 import com.getcapacitor.BridgeActivity;
@@ -46,21 +48,28 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // A real native bottom tab bar, sitting outside the WebView
-        // rather than being part of the website itself - genuinely native
-        // navigation, not a web page pretending to be one. The native
-        // side has no inherent way to know who's signed in or which
-        // business is active, since that only exists in the website's own
-        // session - so this exposes a small bridge the website's own
-        // JavaScript calls once it knows that, telling the native layer
-        // which role's tab set to show and which business slug to
-        // navigate within.
-        webView.getSettings().setJavaScriptEnabled(true);
+        // Configure WebView settings to support modern app data syncing,
+        // window management, and fresh content loading.
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true); // Critical for saving state locally
+        settings.setDatabaseEnabled(true);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE); // Force fresh load to see settings changes
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+        settings.setSupportMultipleWindows(true);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface
-            public void setRole(final String role, final String slug) {
-                Log.d("TabBarDebug", "setRole called with role=" + role + " slug=" + slug);
-                runOnUiThread(() -> updateTabBar(role, slug));
+            public void setRole(final String role, final String slug, final String pageKey) {
+                Log.d("TabBarDebug", "setRole called with role=" + role + " slug=" + slug + " pageKey=" + pageKey);
+                runOnUiThread(() -> updateTabBar(role, slug, pageKey));
             }
 
             @JavascriptInterface
@@ -86,11 +95,7 @@ public class MainActivity extends BridgeActivity {
         tabBar = new BottomNavigationView(this);
         tabBar.setVisibility(View.GONE); // hidden until the website tells us who's signed in
 
-        // The default colors for a programmatically-created tab bar can
-        // sometimes default to black-on-black for unselected items
-        // depending on the system theme, which makes them look missing.
-        // Explicitly setting the brand green background and white/gray
-        // tints ensures they're always visible.
+        // Styling the Nav Bar (Ensures icons/text are always visible)
         tabBar.setBackgroundColor(Color.parseColor("#1B3A2F"));
         int[][] states = new int[][] {
             new int[] { android.R.attr.state_selected },
@@ -104,9 +109,7 @@ public class MainActivity extends BridgeActivity {
         tabBar.setItemIconTintList(colorStateList);
         tabBar.setItemTextColor(colorStateList);
 
-        // Force all labels to show, which prevents the "shifting"
-        // behavior that can sometimes make the layout feel jumpy or
-        // hide icons if space is tight.
+        // Force all labels to show to prevent shifting/measurement bugs
         tabBar.setLabelVisibilityMode(NavigationBarView.LABEL_VISIBILITY_LABELED);
 
         root.addView(tabBar, new LinearLayout.LayoutParams(
@@ -115,47 +118,42 @@ public class MainActivity extends BridgeActivity {
         setContentView(root);
 
         tabBar.setOnItemReselectedListener(item -> {
-            // Tapping the already-selected tab again is a no-op, rather
-            // than reloading the same page and losing whatever the person
-            // was doing on it.
+            // Tapping the already-selected tab again is a no-op
         });
 
-        tabBar.setOnItemSelectedListener(item -> {
+        tabClickListener = item -> {
             String path;
             int id = item.getItemId();
+            boolean isInstructorRole = "instructor".equals(currentRole) || "owner".equals(currentRole);
             if (id == R.id.tab_calendar) path = "/instructor";
             else if (id == R.id.tab_customers) path = "/customers";
-            else if (id == R.id.tab_videos) path = "/videos";
-            else if (id == R.id.tab_swingsketch) path = "/swing-sketches";
+            else if (id == R.id.tab_videos) path = isInstructorRole ? "/instructor/videos" : "/videos";
+            else if (id == R.id.tab_swingsketch) path = isInstructorRole ? "/instructor/swing-sketch" : "/swing-sketches";
             else if (id == R.id.tab_settings) path = "/settings";
             else if (id == R.id.tab_book) path = "/book";
             else path = "/";
             webView.loadUrl("https://bookmypro.app/" + currentSlug + path);
             return true;
-        });
+        };
+        tabBar.setOnItemSelectedListener(tabClickListener);
     }
 
-    private void updateTabBar(String role, String slug) {
-        Log.d("TabBarDebug", "updateTabBar running with role=" + role + " slug=" + slug + " currentRole=" + currentRole + " currentSlug=" + currentSlug);
+    private BottomNavigationView.OnItemSelectedListener tabClickListener;
 
-        // The website often calls setRole() several times in quick
-        // succession while a page is loading, or on every page load even
-        // if the role haven't changed.
-        
+    private void updateTabBar(String role, String slug, String pageKey) {
+        Log.d("TabBarDebug", "updateTabBar running with role=" + role + " slug=" + slug + " pageKey=" + pageKey + " currentRole=" + currentRole + " currentSlug=" + currentSlug);
+
         boolean isValidRole = "player".equals(role) || "instructor".equals(role) || "owner".equals(role);
-        
+
         if (!isValidRole) {
             Log.d("TabBarDebug", "Unrecognized or empty role, hiding");
             tabBar.setVisibility(View.GONE);
-            // We still update these so that if the user somehow gets back
-            // to a valid state, it triggers a rebuild.
             currentRole = role;
             currentSlug = slug;
             return;
         }
 
-        // Only rebuild the menu if something actually changed, to avoid
-        // flickering or inconsistent states during rapid-fire JS calls.
+        // Only rebuild the menu items if the role/slug actually changed
         if (!role.equals(currentRole) || !slug.equals(currentSlug)) {
             currentRole = role;
             currentSlug = slug;
@@ -168,14 +166,40 @@ public class MainActivity extends BridgeActivity {
             Log.d("TabBarDebug", "Menu rebuilt, now has " + tabBar.getMenu().size() + " items");
         }
 
-        // Even if we skipped the menu rebuild, we MUST ensure the tab bar
-        // is visible and has a fresh layout pass - this handles cases
-        // where it might have been briefly hidden during a transition.
+        // Keeps the highlighted tab matching whichever page is actually on
+        // screen, even when someone got there some other way than tapping
+        // a tab directly (a "\u2190 Back" link, the system back button).
+        // Detaching the listener first is what stops this from re-firing
+        // a page load of its own - setSelectedItemId() normally triggers
+        // the same click handler a real tap would, which would otherwise
+        // send the WebView back to whatever page it's already showing,
+        // over and over.
+        int targetId = getTabIdForPageKey(pageKey);
+        if (targetId != 0 && tabBar.getSelectedItemId() != targetId) {
+            tabBar.setOnItemSelectedListener(null);
+            tabBar.setSelectedItemId(targetId);
+            tabBar.setOnItemSelectedListener(tabClickListener);
+        }
+
+        // ALWAYS ensure visibility and layout pass (Fixes disappearing bar on nav back)
         tabBar.setVisibility(View.VISIBLE);
         tabBar.requestLayout();
         tabBar.invalidate();
         if (tabBar.getParent() != null) {
             tabBar.getParent().requestLayout();
+        }
+    }
+
+    private int getTabIdForPageKey(String pageKey) {
+        if (pageKey == null) return 0;
+        switch (pageKey) {
+            case "calendar": return R.id.tab_calendar;
+            case "customers": return R.id.tab_customers;
+            case "videos": return R.id.tab_videos;
+            case "swingsketch": return R.id.tab_swingsketch;
+            case "settings": return R.id.tab_settings;
+            case "book": return R.id.tab_book;
+            default: return 0;
         }
     }
 }

@@ -1,0 +1,67 @@
+workflows:
+  ios-workflow:
+    name: BookMyPro iOS
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      # "codemagic" here has to exactly match whatever name you give the
+      # App Store Connect API key when you add it in Codemagic's own
+      # Team settings - if you name it something else there, change this
+      # line to match.
+      app_store_connect: codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.bookmypro.app
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: latest
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          npm install
+      # The app loads the real, live website directly (see server.url in
+      # capacitor.config.ts) rather than a locally bundled copy, so there's
+      # no "npm run build" step here the way a typical Capacitor project
+      # would have - the only thing that actually needs to sync into the
+      # native project is the small set of local assets (the offline
+      # fallback page, the app icon, etc.) plus the installed plugins.
+      - name: Add iOS platform if it isn't already in the repo
+        script: |
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+      - name: Sync Capacitor
+        script: |
+          npx cap sync ios
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios/App && pod install
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles
+      - name: Build ipa for distribution
+        script: |
+          cd ios/App
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - ios/App/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      email:
+        recipients:
+          - teetogreenapex2@gmail.com
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        auth: integration
+        # This lets it go straight to TestFlight for your own testing,
+        # without also submitting to Apple's full App Store review -
+        # that's a deliberate, separate step for later, once you're
+        # actually ready to publish for real.
+        submit_to_testflight: true
+        submit_to_app_store: false
