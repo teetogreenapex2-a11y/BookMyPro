@@ -7,7 +7,6 @@ import { User } from "lucide-react";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 import { enabledPackages, getPackagePriceCents, centsToDollars } from "@/lib/pricing";
 
-const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // A slot is a single shared moment in the day - an instructor can only run
@@ -56,8 +55,18 @@ type Player = {
 };
 
 export default function InstructorClient({
-  calendarConnected, calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, slug, basePath, apiBase, businessName, businessLogoUrl,
-}: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null }) {
+  calendarConnected, calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, slug, basePath, apiBase, businessName, businessLogoUrl, openHour, closeHour,
+}: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null; openHour: number; closeHour: number }) {
+  // Built from the business's real, current hours instead of a fixed
+  // list - without this, changing hours in Settings would update the
+  // underlying data correctly, but the calendar itself would never
+  // actually show any of the newly-added time slots, since it would
+  // still only ever be looking for its own fixed, unrelated set of times.
+  const TIMES = useMemo(() => {
+    const times: string[] = [];
+    for (let h = openHour; h < closeHour; h++) times.push(`${String(h).padStart(2, "0")}:00`);
+    return times;
+  }, [openHour, closeHour]);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);

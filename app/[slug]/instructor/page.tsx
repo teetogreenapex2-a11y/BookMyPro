@@ -29,6 +29,8 @@ export default async function InstructorPage({ params }: { params: { slug: strin
       viewerRole={membership.role}
       basePath={basePath}
       apiBase={apiBase}
+      openHour={business.openHour}
+      closeHour={business.closeHour}
     />
   );
 }
