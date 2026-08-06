@@ -72,7 +72,26 @@ workflows:
           # ios-specific equivalent of the google-services.json already
           # in place for Android; both come from the same Firebase
           # project, just registered as two separate "apps" within it.
+          #
+          # Just placing the file on disk here isn't actually enough on
+          # its own, though - that was the real reason this kept
+          # crashing even after adding it. Xcode only bundles files it's
+          # explicitly told about in the project's own internal file
+          # list; a file merely sitting in the folder is invisible to
+          # the compiled app unless it's properly registered, which is
+          # what the script below actually does.
           cp ios-config/GoogleService-Info.plist ios/App/App/GoogleService-Info.plist
+          ruby -e '
+            require "xcodeproj"
+            project_path = "ios/App/App.xcodeproj"
+            project = Xcodeproj::Project.open(project_path)
+            target = project.targets.first
+            group = project.main_group.find_subpath("App", true)
+            file_ref = group.new_reference("GoogleService-Info.plist")
+            target.resources_build_phase.add_file_reference(file_ref)
+            project.save
+            puts "Registered GoogleService-Info.plist with Xcode project"
+          '
       - name: Add required privacy purpose strings to Info.plist
         script: |
           # Apple's own automated review rejected the last build
