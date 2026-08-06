@@ -64,6 +64,29 @@ workflows:
           # source icon.png as Android for a consistent, real app icon
           # instead of Capacitor's generic default.
           npx @capacitor/assets generate --ios
+      - name: Add native tab bar
+        script: |
+          # Same real, native bottom tab bar built for Android tonight,
+          # now on iOS too - this copies in the Swift file, registers it
+          # with the Xcode project so it's actually compiled in (the
+          # same real gap that caused the Firebase crash earlier tonight
+          # applies here too), and points the storyboard at this class
+          # instead of Capacitor's own default one.
+          cp ios-config/MainViewController.swift ios/App/App/MainViewController.swift
+          ruby -e '
+            require "xcodeproj"
+            project_path = "ios/App/App.xcodeproj"
+            project = Xcodeproj::Project.open(project_path)
+            target = project.targets.first
+            group = project.main_group.find_subpath("App", true)
+            file_ref = group.new_reference("MainViewController.swift")
+            target.source_build_phase.add_file_reference(file_ref)
+            project.save
+            puts "Registered MainViewController.swift with Xcode project"
+          '
+          # Point the storyboard's root view controller at the new
+          # class instead of Capacitor'\''s own default one.
+          sed -i '' 's/customClass="CAPBridgeViewController"/customClass="MainViewController"/' ios/App/App/Base.lproj/Main.storyboard
       - name: Add Firebase iOS config
         script: |
           # Without this, Firebase's own initialization fails outright
