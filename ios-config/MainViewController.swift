@@ -19,34 +19,29 @@ class MainViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMes
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        guard let webView = self.bridge?.webView else { return }
-
-        // Re-parent the existing WebView into a vertical stack with the
-        // tab bar below it, rather than trying to replace Capacitor's
-        // own view hierarchy outright.
-        webView.removeFromSuperview()
-
-        let stack = UIStackView()
-        stack.axis = .vertical
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-
-        webView.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(webView)
-
+        // Rather than trying to move the existing webview into a new
+        // container (which crashed - the real, actual cause turned out
+        // to be a circular view hierarchy, since Capacitor's own webview
+        // may already effectively be this view controller's own root
+        // view, not a separate child inside it), the tab bar is instead
+        // added as its own independent layer on top of the existing
+        // screen, pinned to the bottom. Simpler and safer, since it
+        // doesn't touch or reshape anything Capacitor itself already set
+        // up.
         tabBar.delegate = self
         tabBar.isHidden = true // hidden until the website tells us who's signed in
         tabBar.barTintColor = UIColor(red: 0x1B/255, green: 0x3A/255, blue: 0x2F/255, alpha: 1)
         tabBar.tintColor = .white
         tabBar.unselectedItemTintColor = UIColor.white.withAlphaComponent(0.6)
         tabBar.isTranslucent = false
-        stack.addArrangedSubview(tabBar)
+        tabBar.translatesAutoresizingMaskIntoConstraints = false
+
+        view.addSubview(tabBar)
+        NSLayoutConstraint.activate([
+            tabBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tabBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tabBar.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
     }
 
     // Capacitor calls this specifically before the webview's first page
