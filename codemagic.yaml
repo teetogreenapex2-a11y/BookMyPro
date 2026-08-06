@@ -64,6 +64,15 @@ workflows:
           # source icon.png as Android for a consistent, real app icon
           # instead of Capacitor's generic default.
           npx @capacitor/assets generate --ios
+      - name: Add Firebase iOS config
+        script: |
+          # Without this, Firebase's own initialization fails outright
+          # the moment the app launches, before anything else - even the
+          # splash screen - ever gets a chance to render. This is the
+          # ios-specific equivalent of the google-services.json already
+          # in place for Android; both come from the same Firebase
+          # project, just registered as two separate "apps" within it.
+          cp ios-config/GoogleService-Info.plist ios/App/App/GoogleService-Info.plist
       - name: Add required privacy purpose strings to Info.plist
         script: |
           # Apple's own automated review rejected the last build
@@ -90,6 +99,19 @@ workflows:
       # dependencies. Xcode resolves those automatically as part of the
       # actual build itself, so there's nothing separate to install here
       # the way CocoaPods would have needed.
+      - name: Set build number
+        script: |
+          # Apple requires every single upload to have a strictly higher
+          # build number than anything ever uploaded before for this app
+          # - every attempt tonight has been stuck at the same hardcoded
+          # "1", which is exactly why this kept getting rejected once the
+          # actual build itself finally started succeeding. Codemagic's
+          # own $BUILD_NUMBER counts up automatically with every build
+          # it runs, so using that directly guarantees this is always
+          # genuinely new.
+          cd ios/App
+          agvtool new-version -all $BUILD_NUMBER
+          cd ../..
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
