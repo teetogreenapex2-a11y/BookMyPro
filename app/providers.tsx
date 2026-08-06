@@ -89,8 +89,8 @@ function TabBarSync() {
 
   if (!Capacitor.isNativePlatform()) return null;
   return (
-    <div style={{ position: "fixed", top: 4, left: 4, zIndex: 99999, background: "black", color: "lime", fontSize: 10, padding: "2px 6px", borderRadius: 4, fontFamily: "monospace" }}>
-      {bridgeStatus}
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 999999, background: "red", color: "white", fontSize: 18, fontWeight: 900, padding: "12px", textAlign: "center" }}>
+      DEBUG: {bridgeStatus}
     </div>
   );
 }
