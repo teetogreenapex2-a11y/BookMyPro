@@ -102,12 +102,17 @@ workflows:
           else
             echo "WARNING: storyboard replacement did not fully take effect"
           fi
-          # Checking whether SceneDelegate might be setting up the root
-          # screen programmatically instead - if it is, the storyboard
-          # change above would be entirely bypassed regardless of
-          # whether it succeeded.
-          echo "--- SceneDelegate.swift contents ---"
-          cat ios/App/App/SceneDelegate.swift || echo "No SceneDelegate.swift found"
+          # The real, actual place the root screen gets set turned out to
+          # be SceneDelegate.swift directly, not the storyboard at all -
+          # it explicitly instantiates CAPBridgeViewController() in code,
+          # completely bypassing whatever the storyboard says. The
+          # storyboard change above was correct in principle, just aimed
+          # at a file this particular app doesn't actually use for this.
+          echo "--- SceneDelegate.swift BEFORE change ---"
+          grep 'rootViewController' ios/App/App/SceneDelegate.swift || echo "No rootViewController line found"
+          sed -i '' 's/CAPBridgeViewController()/MainViewController()/' ios/App/App/SceneDelegate.swift
+          echo "--- SceneDelegate.swift AFTER change ---"
+          grep 'rootViewController' ios/App/App/SceneDelegate.swift || echo "No rootViewController line found"
       - name: Add Firebase iOS config
         script: |
           # Without this, Firebase's own initialization fails outright
