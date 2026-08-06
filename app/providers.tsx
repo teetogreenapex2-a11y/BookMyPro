@@ -40,10 +40,16 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 function TabBarSync() {
   const pathname = usePathname();
   const { status } = useSession();
+  // Temporary, visible debug indicator - shows directly on the page
+  // whether the native iOS bridge actually got injected at all, since
+  // there's no easy way to check Xcode's own console without a Mac.
+  // Safe to remove once this is sorted out.
+  const [bridgeStatus, setBridgeStatus] = useState("checking...");
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     const bridge = (window as any).AndroidTabBar;
+    setBridgeStatus(bridge ? "bridge FOUND" : "bridge MISSING");
     if (!bridge) return;
 
     // Every business page follows /{slug}/whatever - pages outside that
@@ -81,5 +87,10 @@ function TabBarSync() {
       .catch(() => bridge.hide?.());
   }, [pathname, status]);
 
-  return null;
+  if (!Capacitor.isNativePlatform()) return null;
+  return (
+    <div style={{ position: "fixed", top: 4, left: 4, zIndex: 99999, background: "black", color: "lime", fontSize: 10, padding: "2px 6px", borderRadius: 4, fontFamily: "monospace" }}>
+      {bridgeStatus}
+    </div>
+  );
 }
