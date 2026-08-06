@@ -96,6 +96,12 @@ workflows:
           else
             echo "WARNING: storyboard replacement did not take effect - the app will still be running Capacitor's own default view controller, not the new tab bar code"
           fi
+          # Checking whether SceneDelegate might be setting up the root
+          # screen programmatically instead - if it is, the storyboard
+          # change above would be entirely bypassed regardless of
+          # whether it succeeded.
+          echo "--- SceneDelegate.swift contents ---"
+          cat ios/App/App/SceneDelegate.swift || echo "No SceneDelegate.swift found"
       - name: Add Firebase iOS config
         script: |
           # Without this, Firebase's own initialization fails outright

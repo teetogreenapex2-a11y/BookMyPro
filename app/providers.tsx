@@ -49,7 +49,12 @@ function TabBarSync() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     const bridge = (window as any).AndroidTabBar;
-    setBridgeStatus(bridge ? "bridge FOUND" : "bridge MISSING");
+    const nativeHandlerExists = !!(window as any).webkit?.messageHandlers?.iosTabBar;
+    setBridgeStatus(
+      bridge ? "bridge FOUND"
+      : nativeHandlerExists ? "handler exists, script missing"
+      : "neither exists"
+    );
     if (!bridge) return;
 
     // Every business page follows /{slug}/whatever - pages outside that
