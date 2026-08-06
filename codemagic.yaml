@@ -85,16 +85,22 @@ workflows:
             puts "Registered MainViewController.swift with Xcode project"
           '
           # Point the storyboard's root view controller at the new
-          # class instead of Capacitor'\''s own default one.
+          # class instead of Capacitor'\''s own default one. A storyboard
+          # tracks the class name and which module it lives in as two
+          # separate attributes - changing only the class name earlier
+          # left the module reference still pointed at Capacitor'\''s own
+          # framework, where a class called MainViewController doesn'\''t
+          # exist at all, which is the likely real reason none of this
+          # code ever actually ran.
           echo "--- Main.storyboard BEFORE change ---"
-          grep -o 'customClass="[^"]*"' ios/App/App/Base.lproj/Main.storyboard || echo "No customClass attribute found at all"
-          sed -i '' 's/customClass="CAPBridgeViewController"/customClass="MainViewController"/' ios/App/App/Base.lproj/Main.storyboard
+          grep -o 'customClass="[^"]*"\|customModule="[^"]*"' ios/App/App/Base.lproj/Main.storyboard || echo "Neither attribute found at all"
+          sed -i '' 's/customClass="CAPBridgeViewController"/customClass="MainViewController"/; s/customModule="Capacitor"/customModule="App"/' ios/App/App/Base.lproj/Main.storyboard
           echo "--- Main.storyboard AFTER change ---"
-          grep -o 'customClass="[^"]*"' ios/App/App/Base.lproj/Main.storyboard || echo "No customClass attribute found at all"
-          if grep -q 'customClass="MainViewController"' ios/App/App/Base.lproj/Main.storyboard; then
-            echo "SUCCESS: storyboard now points at MainViewController"
+          grep -o 'customClass="[^"]*"\|customModule="[^"]*"' ios/App/App/Base.lproj/Main.storyboard || echo "Neither attribute found at all"
+          if grep -q 'customClass="MainViewController"' ios/App/App/Base.lproj/Main.storyboard && grep -q 'customModule="App"' ios/App/App/Base.lproj/Main.storyboard; then
+            echo "SUCCESS: storyboard now points at MainViewController in the App module"
           else
-            echo "WARNING: storyboard replacement did not take effect - the app will still be running Capacitor's own default view controller, not the new tab bar code"
+            echo "WARNING: storyboard replacement did not fully take effect"
           fi
           # Checking whether SceneDelegate might be setting up the root
           # screen programmatically instead - if it is, the storyboard
