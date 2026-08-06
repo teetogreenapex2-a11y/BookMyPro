@@ -86,7 +86,16 @@ workflows:
           '
           # Point the storyboard's root view controller at the new
           # class instead of Capacitor'\''s own default one.
+          echo "--- Main.storyboard BEFORE change ---"
+          grep -o 'customClass="[^"]*"' ios/App/App/Base.lproj/Main.storyboard || echo "No customClass attribute found at all"
           sed -i '' 's/customClass="CAPBridgeViewController"/customClass="MainViewController"/' ios/App/App/Base.lproj/Main.storyboard
+          echo "--- Main.storyboard AFTER change ---"
+          grep -o 'customClass="[^"]*"' ios/App/App/Base.lproj/Main.storyboard || echo "No customClass attribute found at all"
+          if grep -q 'customClass="MainViewController"' ios/App/App/Base.lproj/Main.storyboard; then
+            echo "SUCCESS: storyboard now points at MainViewController"
+          else
+            echo "WARNING: storyboard replacement did not take effect - the app will still be running Capacitor's own default view controller, not the new tab bar code"
+          fi
       - name: Add Firebase iOS config
         script: |
           # Without this, Firebase's own initialization fails outright
