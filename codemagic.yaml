@@ -40,6 +40,21 @@ workflows:
           # properly generated.
           rm -rf ios
           npx cap add ios
+      - name: Add required permission descriptions to Info.plist
+        script: |
+          # Apple rejects a build outright if it references a sensitive
+          # API (camera, photo library, microphone) without a matching,
+          # user-facing explanation string for why the app needs it -
+          # this is exactly what the first TestFlight submission was
+          # rejected for. Since the ios folder never persists between
+          # builds, this has to be injected fresh here rather than as a
+          # one-time edit to a file that would otherwise get wiped out
+          # and regenerated from scratch on every single build.
+          PLIST="ios/App/App/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Used to record your golf swing for review with your instructor.'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Used to save and access swing videos you record.'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Used to save recorded swing videos to your photo library.'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Used to record audio during swing videos and remote video lessons.'" "$PLIST" || true
       - name: Generate iOS app icon
         script: |
           # The ios folder never persists between builds (it's rebuilt
@@ -49,6 +64,22 @@ workflows:
           # source icon.png as Android for a consistent, real app icon
           # instead of Capacitor's generic default.
           npx @capacitor/assets generate --ios
+      - name: Add required privacy purpose strings to Info.plist
+        script: |
+          # Apple's own automated review rejected the last build
+          # specifically for this - iOS requires a human-readable
+          # explanation for any API that could touch a person's photos,
+          # camera, or microphone, shown to them the first time the app
+          # actually asks for that access. The camera plugin (used for
+          # recording and saving swing videos) references all three of
+          # these, so all three need a real string here, not just the
+          # one Apple's rejection email specifically named - otherwise
+          # the next submission would likely just get rejected again for
+          # the other two in turn.
+          PLIST="ios/App/App/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'BookMyPro saves your recorded swing videos to your photo library so you can review them later.'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'BookMyPro uses your camera to record your golf swing for review.'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'BookMyPro records audio along with your swing video.'" "$PLIST" || true
       - name: Sync Capacitor
         script: |
           npx cap sync ios
