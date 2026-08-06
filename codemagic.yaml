@@ -122,6 +122,12 @@ workflows:
           # from the Android and web client IDs already in use
           # elsewhere).
           PLIST="ios/App/App/Info.plist"
+          # The underlying native Google Sign-In SDK needs its own client
+          # ID key directly in Info.plist, separate from the URL scheme
+          # below - confirmed as the real, exact cause after temporarily
+          # exposing the actual error message on screen, which named this
+          # specific missing key directly.
+          /usr/libexec/PlistBuddy -c "Add :GIDClientID string 748505012241-0ri4odsjmdmbcv9usac2ka67pgbqf9ao.apps.googleusercontent.com" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$PLIST" || true
