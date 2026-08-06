@@ -128,6 +128,12 @@ workflows:
           # the next submission would likely just get rejected again for
           # the other two in turn.
           PLIST="ios/App/App/Info.plist"
+          # Answers Apple's export compliance question permanently,
+          # right in the app's own config, rather than needing to
+          # manually answer it by hand for every single future build -
+          # correct here since the app only ever uses standard HTTPS,
+          # nothing exotic enough to need the fuller declaration.
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'BookMyPro saves your recorded swing videos to your photo library so you can review them later.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'BookMyPro uses your camera to record your golf swing for review.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'BookMyPro records audio along with your swing video.'" "$PLIST" || true
