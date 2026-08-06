@@ -108,6 +108,24 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'BookMyPro saves your recorded swing videos to your photo library so you can review them later.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'BookMyPro uses your camera to record your golf swing for review.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'BookMyPro records audio along with your swing video.'" "$PLIST" || true
+      - name: Add Google Sign-In URL scheme
+        script: |
+          # Google Sign-In on iOS specifically needs a "URL scheme"
+          # registered so the system knows to hand control back to this
+          # app once someone finishes signing in through Google's own
+          # screen - without it, the native sign-in flow fails outright
+          # ("Couldn't sign in with Google") even though the exact same
+          # setup already works correctly on Android, since Android
+          # doesn't have this particular requirement. This is the
+          # reversed form of the dedicated iOS OAuth client created
+          # specifically for this app in Google Cloud Console (separate
+          # from the Android and web client IDs already in use
+          # elsewhere).
+          PLIST="ios/App/App/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string com.googleusercontent.apps.748505012241-0ri4odsjmdmbcv9usac2ka67pgbqf9ao" "$PLIST" || true
       - name: Sync Capacitor
         script: |
           npx cap sync ios
