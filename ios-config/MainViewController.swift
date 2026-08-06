@@ -21,28 +21,6 @@ class MainViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMes
 
         guard let webView = self.bridge?.webView else { return }
 
-        // Bridges the gap between Android's addJavascriptInterface
-        // (which lets JavaScript call native methods directly with real
-        // arguments) and how WKWebView actually works on iOS (JavaScript
-        // can only ever post a single message object to a named
-        // handler). This small injected script recreates the exact same
-        // window.AndroidTabBar.setRole(role, slug, pageKey) / .hide()
-        // interface the website already calls, translating each call
-        // into the message format this handler expects below.
-        let bridgeScript = """
-        window.AndroidTabBar = {
-          setRole: function(role, slug, pageKey) {
-            window.webkit.messageHandlers.iosTabBar.postMessage({action: 'setRole', role: role, slug: slug, pageKey: pageKey});
-          },
-          hide: function() {
-            window.webkit.messageHandlers.iosTabBar.postMessage({action: 'hide'});
-          }
-        };
-        """
-        let userScript = WKUserScript(source: bridgeScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
-        webView.configuration.userContentController.addUserScript(userScript)
-        webView.configuration.userContentController.add(self, name: "iosTabBar")
-
         // Re-parent the existing WebView into a vertical stack with the
         // tab bar below it, rather than trying to replace Capacitor's
         // own view hierarchy outright.
@@ -69,6 +47,33 @@ class MainViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMes
         tabBar.unselectedItemTintColor = UIColor.white.withAlphaComponent(0.6)
         tabBar.isTranslucent = false
         stack.addArrangedSubview(tabBar)
+    }
+
+    // Capacitor calls this specifically before the webview's first page
+    // load ever begins and before it's even added to the screen - the
+    // real reason the tab bar never showed up at all the first time
+    // around was that this same setup was happening inside viewDidLoad()
+    // instead, which can run too late: the very first page load may
+    // already be underway by the time that code executes, meaning the
+    // website's own JavaScript never had this bridge available on that
+    // first load, and never actually managed to tell the native side who
+    // was signed in.
+    override func capacitorDidLoad() {
+        guard let webView = self.bridge?.webView else { return }
+
+        let bridgeScript = """
+        window.AndroidTabBar = {
+          setRole: function(role, slug, pageKey) {
+            window.webkit.messageHandlers.iosTabBar.postMessage({action: 'setRole', role: role, slug: slug, pageKey: pageKey});
+          },
+          hide: function() {
+            window.webkit.messageHandlers.iosTabBar.postMessage({action: 'hide'});
+          }
+        };
+        """
+        let userScript = WKUserScript(source: bridgeScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        webView.configuration.userContentController.addUserScript(userScript)
+        webView.configuration.userContentController.add(self, name: "iosTabBar")
     }
 
     // MARK: - Receiving messages from the website's own JavaScript
