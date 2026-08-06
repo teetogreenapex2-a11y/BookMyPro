@@ -60,9 +60,15 @@ function LoginPageInner() {
       if (!res.ok) throw new Error("Sign-in failed - try again");
 
       window.location.href = callbackUrl;
-    } catch (err) {
+    } catch (err: any) {
       console.error("Native Google sign-in failed:", err);
-      setGoogleError("Couldn't sign in with Google. Try again, or use email instead.");
+      // Temporarily showing the real, specific error instead of a
+      // generic message - there's no easy way to inspect the JavaScript
+      // console on an iPad without a Mac, so this is the most direct
+      // way to actually see what's failing. Safe to revert to the
+      // generic message once this is sorted out.
+      const detail = err?.message || err?.code || JSON.stringify(err) || "unknown error";
+      setGoogleError(`Couldn't sign in with Google: ${detail}`);
     } finally {
       setSigningInWithGoogle(false);
     }
