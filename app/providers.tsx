@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { SessionProvider } from "next-auth/react";
@@ -40,21 +40,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 function TabBarSync() {
   const pathname = usePathname();
   const { status } = useSession();
-  // Temporary, visible debug indicator - shows directly on the page
-  // whether the native iOS bridge actually got injected at all, since
-  // there's no easy way to check Xcode's own console without a Mac.
-  // Safe to remove once this is sorted out.
-  const [bridgeStatus, setBridgeStatus] = useState("checking...");
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     const bridge = (window as any).AndroidTabBar;
-    const nativeHandlerExists = !!(window as any).webkit?.messageHandlers?.iosTabBar;
-    setBridgeStatus(
-      bridge ? "bridge FOUND"
-      : nativeHandlerExists ? "handler exists, script missing"
-      : "neither exists"
-    );
     if (!bridge) return;
 
     // Every business page follows /{slug}/whatever - pages outside that
@@ -92,10 +81,5 @@ function TabBarSync() {
       .catch(() => bridge.hide?.());
   }, [pathname, status]);
 
-  if (!Capacitor.isNativePlatform()) return null;
-  return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 999999, background: "red", color: "white", fontSize: 18, fontWeight: 900, padding: "12px", textAlign: "center" }}>
-      DEBUG: {bridgeStatus}
-    </div>
-  );
+  return null;
 }
