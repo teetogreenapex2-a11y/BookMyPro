@@ -210,6 +210,13 @@ workflows:
           cd ios/App
           agvtool new-version -all $BUILD_NUMBER
           cd ../..
+      - name: Diagnose project file directly
+        script: |
+          # The wrapper tool's own error message ("Failed to show build
+          # settings") gave no actual detail about what's really wrong -
+          # calling xcodebuild directly here shows Xcode's own, real
+          # error text instead, which should tell us the genuine reason.
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -showBuildSettings || true
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
