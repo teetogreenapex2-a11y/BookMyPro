@@ -48,6 +48,15 @@ export default function BookingClient({
   }, [business.openHour, business.closeHour]);
 
   const [service, setService] = useState<"lesson" | "fitting">("lesson");
+  // Checking Capacitor.isNativePlatform() directly during render caused a
+  // hydration mismatch elsewhere tonight (the server always renders as if
+  // it's not native, since it has no way to know) - starting this state
+  // at false to match the server, and only updating it after mounting on
+  // the client, avoids that entirely.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
   const [isRemote, setIsRemote] = useState(false);
   const [packages, setPackages] = useState<Package[]>(initialPackages);
   // Which package is auto/selected depends on which instructor is chosen
@@ -481,21 +490,27 @@ export default function BookingClient({
               </span>
             </span>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <a href={`${basePath}/videos`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
-                Swing videos
-              </a>
-              <a href={`${basePath}/swing-sketches`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
-                Swing Sketches
-              </a>
+              {!isNative && (
+                <>
+                  <a href={`${basePath}/videos`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
+                    Swing videos
+                  </a>
+                  <a href={`${basePath}/swing-sketches`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
+                    Swing Sketches
+                  </a>
+                </>
+              )}
               <a href={`${basePath}/shop`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
                 Shop
               </a>
               <a href={`${basePath}/gift-cards`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
                 Gift Cards
               </a>
-              <a href={`${basePath}/settings`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
-                Settings
-              </a>
+              {!isNative && (
+                <a href={`${basePath}/settings`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
+                  Settings
+                </a>
+              )}
               <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>
                 Sign out
               </button>
@@ -1021,8 +1036,9 @@ export default function BookingClient({
               <input
                 value={contact.phone}
                 onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
-                placeholder="Phone number"
+                placeholder="Phone number *"
                 type="tel"
+                required
                 className="contact-input"
                 style={contactInputStyle}
               />
@@ -1094,8 +1110,9 @@ export default function BookingClient({
               <input
                 value={contact.phone}
                 onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
-                placeholder="Phone number"
+                placeholder="Phone number *"
                 type="tel"
+                required
                 className="contact-input"
                 style={contactInputStyle}
               />

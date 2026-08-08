@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { Capacitor } from "@capacitor/core";
 
 type OwnGiftCard = { id: string; code: string; initialValueCents: number; remainingValueCents: number; status: string; recipientName: string | null };
 
@@ -13,6 +14,15 @@ function dollars(cents: number) {
 
 export default function GiftCardsClient({ slug, basePath, apiBase, businessName }: { slug: string; basePath: string; apiBase: string; businessName: string }) {
   const [amountCents, setAmountCents] = useState(5000);
+  // Checking Capacitor.isNativePlatform() directly during render caused a
+  // hydration mismatch elsewhere tonight (the server always renders as if
+  // it's not native, since it has no way to know) - starting this state
+  // at false to match the server, and only updating it after mounting on
+  // the client, avoids that entirely.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
   const [customAmount, setCustomAmount] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
@@ -47,7 +57,9 @@ export default function GiftCardsClient({ slug, basePath, apiBase, businessName 
             <span className="display" style={{ fontSize: 18, fontWeight: 700 }}>{businessName}</span>
             <div style={{ display: "flex", gap: 10 }}>
               <a href={`${basePath}/shop`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Shop</a>
-              <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
+              {!isNative && (
+                <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
+              )}
               <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>Sign out</button>
             </div>
           </div>
