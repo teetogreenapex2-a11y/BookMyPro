@@ -16,11 +16,28 @@ export default async function HomePage() {
 
   if (memberships.length === 1) {
     const m = memberships[0];
+    // A pending instructor request isn't real access yet - redirecting
+    // them to the instructor dashboard here would be misleading even if
+    // the dashboard itself still correctly blocks them once they arrive,
+    // since requireMembership() elsewhere already requires an active
+    // status. Route them to a clear "still waiting" page instead.
+    if (m.status === "pending") {
+      redirect(businessDestination(m.business.slug, "/join-as-instructor"));
+    }
     const destination = m.role === "owner" || m.role === "instructor" ? "instructor" : "book";
     redirect(businessDestination(m.business.slug, `/${destination}`));
   }
 
   if (memberships.length === 0) {
+    // Hardcoded to Tee to Green Golf specifically, rather than the
+    // generic multi-business "Find a Pro" directory or the "create your
+    // own separate business" onboarding flow - this app is currently
+    // built and branded for this one business alone, so someone showing
+    // up here with no membership anywhere is almost certainly a real
+    // player or instructor for this specific business, not someone
+    // shopping around the wider platform. Worth revisiting if/when other
+    // businesses start using bookmypro.app directly through a browser
+    // rather than this app.
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "sans-serif", background: "#1B3A2F" }}>
         <div style={{ background: "#F6F4EE", borderRadius: 16, padding: "36px 32px", maxWidth: 380, width: "100%", textAlign: "center" }}>
@@ -28,14 +45,14 @@ export default async function HomePage() {
           <h1 style={{ fontSize: 22, marginBottom: 24, color: "#1B3A2F" }}>What brings you here?</h1>
 <a
           
-            href="/find-a-pro"
+            href="/tee-to-green-golf/book"
             style={{ display: "block", background: "#1B3A2F", color: "#F6F4EE", borderRadius: 8, padding: "13px 20px", fontWeight: 700, fontSize: 14, textDecoration: "none", marginBottom: 10 }}
           >
             I'm looking to book a lesson
           </a>
 <a
           
-            href="/onboarding"
+            href="/tee-to-green-golf/join-as-instructor"
             style={{ display: "block", background: "none", color: "#1B3A2F", border: "1px solid #E3D9C9", borderRadius: 8, padding: "13px 20px", fontWeight: 600, fontSize: 14, textDecoration: "none" }}
           >
             I'm a coach or instructor
