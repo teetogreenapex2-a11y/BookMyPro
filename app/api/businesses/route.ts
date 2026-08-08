@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { generateUniqueSlug, slugify } from "@/lib/slug";
 import { seedInstructorAvailability } from "@/lib/seedAvailability";
 import { businessDestination } from "@/lib/businessUrl";
+import { sendNewBusinessNotification } from "@/lib/email";
 
 // POST /api/businesses  { name, email?, hours?, lessonRate?, slug? }
 // Creates a new Business, makes the current user its "owner", and seeds
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
     data: {
       slug,
       name,
+      approved: false,
       email: (body.email || "").trim(),
       hours: body.hours?.trim() || undefined,
       lessonRate: body.lessonRate?.trim() || undefined,
@@ -40,6 +42,19 @@ export async function POST(req: NextRequest) {
   });
 
   await seedInstructorAvailability(business.id, ownerMembership.id, business.bookingWindowDays);
+
+  // The platform admin has no dedicated login/role of their own yet -
+  // this app is still genuinely a single-admin operation right now, so
+  // notifications for anything platform-wide go to whoever owns the
+  // one real, known business, same as everything else tonight that
+  // needed an actual person to review something.
+  const admin = await prisma.business.findUnique({ where: { slug: "tee-to-green-golf" } });
+  await sendNewBusinessNotification(admin?.notificationEmail || admin?.email, {
+    businessName: business.name,
+    ownerName: session.user?.name || "",
+    ownerEmail: session.user?.email || "",
+    reviewUrl: `${process.env.NEXTAUTH_URL}/admin/pending-businesses`,
+  });
 
   return NextResponse.json({
     slug: business.slug,

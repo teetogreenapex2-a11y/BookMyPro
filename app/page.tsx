@@ -24,6 +24,23 @@ export default async function HomePage() {
     if (m.status === "pending") {
       redirect(businessDestination(m.business.slug, "/join-as-instructor"));
     }
+    // Same idea for a business the owner just self-onboarded through
+    // /onboarding - it isn't approved for real bookings yet, so show a
+    // clear waiting message instead of sending them to a dashboard for
+    // a business that can't actually do anything real yet.
+    if (m.role === "owner" && !m.business.approved) {
+      return (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "sans-serif", background: "#1B3A2F" }}>
+          <div style={{ background: "#F6F4EE", borderRadius: 16, padding: "36px 32px", maxWidth: 380, width: "100%", textAlign: "center" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#B8862B", marginBottom: 14 }}>BOOKMYPRO</div>
+            <h1 style={{ fontSize: 22, marginBottom: 12, color: "#1B3A2F" }}>Almost there</h1>
+            <p style={{ fontSize: 14, color: "#5C6459", lineHeight: 1.6 }}>
+              {m.business.name} has been created and is waiting for approval before it can start accepting real bookings. You'll be notified once it's live.
+            </p>
+          </div>
+        </div>
+      );
+    }
     const destination = m.role === "owner" || m.role === "instructor" ? "instructor" : "book";
     redirect(businessDestination(m.business.slug, `/${destination}`));
   }

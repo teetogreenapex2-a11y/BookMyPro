@@ -11,6 +11,12 @@ export default async function BookPage({ params }: { params: { slug: string } })
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) notFound();
+  // A self-onboarded business that hasn't been approved yet shouldn't be
+  // able to accept real bookings just because someone has the direct
+  // link - notFound() here rather than a special message, since telling
+  // an outsider "this business exists but isn't approved yet" reveals
+  // more than they need to know.
+  if (!business.approved) notFound();
 
   const userId = (session.user as any).id;
 

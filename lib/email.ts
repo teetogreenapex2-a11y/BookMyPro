@@ -103,6 +103,28 @@ export async function sendInstructorRequestNotification(to: string | null | unde
 
   await sendEmail(to, `New instructor request: ${details.applicantName}`, html);
 }
+
+// Sent when someone finishes onboarding their own new business through
+// /onboarding - it doesn't go live for real bookings until the platform
+// admin reviews and approves it.
+export async function sendNewBusinessNotification(to: string | null | undefined, details: { businessName: string; ownerName: string; ownerEmail: string; reviewUrl: string }) {
+  if (!to) return;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">New business awaiting approval</h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        <tr><td style="padding: 4px 0; color: #8A8571;">Business</td><td style="padding: 4px 0; font-weight: 600;">${details.businessName}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Owner</td><td style="padding: 4px 0; font-weight: 600;">${details.ownerName}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Email</td><td style="padding: 4px 0;">${details.ownerEmail}</td></tr>
+      </table>
+      <p>It won't accept real bookings until you approve it.</p>
+      <a href="${details.reviewUrl}" style="display:inline-block;background:#1B3A2F;color:#F6F4EE;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">Review business</a>
+    </div>
+  `;
+
+  await sendEmail(to, `New business awaiting approval: ${details.businessName}`, html);
+}
 export async function sendVideoReviewedNotification(to: string, details: { businessName: string; title: string | null }) {
   const subject = `Your swing video has feedback — ${details.businessName}`;
   const html = `
