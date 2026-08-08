@@ -86,3 +86,16 @@ export async function ensureMembership(userId: string, businessId: string, role:
     create: { userId, businessId, role },
   });
 }
+
+// There's no dedicated platform-admin role yet - this app is genuinely a
+// single-admin operation right now, so admin access is gated the same
+// practical way as everything else that needed a real person to review
+// something: whoever owns the one real, known business on the platform.
+export async function isPlatformAdmin(userId: string) {
+  const adminBusiness = await prisma.business.findUnique({ where: { slug: "tee-to-green-golf" } });
+  if (!adminBusiness) return false;
+  const membership = await prisma.membership.findUnique({
+    where: { userId_businessId: { userId, businessId: adminBusiness.id } },
+  });
+  return membership?.role === "owner" && membership.status === "active";
+}
