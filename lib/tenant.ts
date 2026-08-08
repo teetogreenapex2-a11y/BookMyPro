@@ -39,7 +39,7 @@ export async function requireMembership(
   allowedRoles: Array<"owner" | "instructor" | "player">
 ) {
   const membership = await getMembership(userId, businessId);
-  if (!membership || !allowedRoles.includes(membership.role as any)) return null;
+  if (!membership || membership.status !== "active" || !allowedRoles.includes(membership.role as any)) return null;
   return membership;
 }
 
@@ -59,7 +59,7 @@ export async function getBusinessInstructor(businessId: string) {
 // with — a business with multiple instructors on staff shows all of them.
 export async function getBusinessInstructors(businessId: string) {
   return prisma.membership.findMany({
-    where: { businessId, role: { in: ["owner", "instructor"] } },
+    where: { businessId, role: { in: ["owner", "instructor"] }, status: "active" },
     include: { user: { select: { id: true, name: true, email: true, image: true } } },
     orderBy: { createdAt: "asc" },
   });

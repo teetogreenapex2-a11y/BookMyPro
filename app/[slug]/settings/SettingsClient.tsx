@@ -123,6 +123,27 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   const [googleCalStatus, setGoogleCalStatus] = useState<{ connected: boolean } | null>(null);
   const [outlookStatus, setOutlookStatus] = useState<{ connected: boolean } | null>(null);
   const [team, setTeam] = useState<{ id: string; name: string | null; email: string; role: string; [key: string]: any }[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<{ id: string; name: string | null; email: string; requestedAt: string }[]>([]);
+  const [respondingToRequest, setRespondingToRequest] = useState<string | null>(null);
+
+  async function loadPendingRequests() {
+    const res = await fetch(`${apiBase}/instructor-requests`);
+    if (res.ok) setPendingRequests(await res.json());
+  }
+
+  async function respondToRequest(id: string, action: "approve" | "deny") {
+    setRespondingToRequest(id);
+    const res = await fetch(`${apiBase}/instructor-requests/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    setRespondingToRequest(null);
+    if (res.ok) {
+      setPendingRequests((prev) => prev.filter((r) => r.id !== id));
+      if (action === "approve") loadTeam();
+    }
+  }
   const [addInstructorOpen, setAddInstructorOpen] = useState(false);
   const [addInstructorForm, setAddInstructorForm] = useState({ name: "", email: "", specialty: "" });
   const [addingInstructor, setAddingInstructor] = useState(false);
@@ -238,6 +259,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       fetch(`${apiBase}/calendar/status`).then((r) => r.json()).then(setGoogleCalStatus).catch(() => {});
       fetch(`${apiBase}/calendar/outlook/status`).then((r) => r.json()).then(setOutlookStatus).catch(() => {});
       loadTeam();
+      if (isOwner) loadPendingRequests();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInstructor, tab, apiBase]);
@@ -701,6 +723,44 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
             </div>
             <Field label="Business hours (shown to players)" value={biz.hours} onChange={(v) => setBiz((b) => ({ ...b, hours: v }))} placeholder="Mon-Sat, 8:00 AM - 5:00 PM" />
             <Field label="Lesson rate" value={biz.lessonRate} onChange={(v) => setBiz((b) => ({ ...b, lessonRate: v }))} />
+
+            {isOwner && pendingRequests.length > 0 && (
+              <div style={{ background: "#FBF3DE", border: "1px solid #B8862B", borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Instructor requests</div>
+                <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 12px" }}>
+                  These people asked to join as an instructor. They won't have any access until you approve them.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {pendingRequests.map((r) => (
+                    <div key={r.id} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+                      background: "#FFF", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px",
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{r.name || r.email}</div>
+                        <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{r.email}</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button
+                          onClick={() => respondToRequest(r.id, "deny")}
+                          disabled={respondingToRequest === r.id}
+                          style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 10px", fontSize: 12, fontWeight: 600, color: "var(--muted)" }}
+                        >
+                          Deny
+                        </button>
+                        <button
+                          onClick={() => respondToRequest(r.id, "approve")}
+                          disabled={respondingToRequest === r.id}
+                          style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 12, fontWeight: 700 }}
+                        >
+                          {respondingToRequest === r.id ? "..." : "Approve"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Team</div>

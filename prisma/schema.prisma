@@ -132,6 +132,13 @@ model Membership {
   business   Business @relation(fields: [businessId], references: [id])
   businessId String
   role       String   // "owner" | "instructor" | "player"
+  // "active" for every normal membership (the default, matching every
+  // existing row). "pending" is specifically for someone who requested to
+  // join as an instructor and hasn't been approved yet - requireMembership()
+  // below treats a pending membership as if it doesn't exist for any
+  // access check, so a pending request never grants real instructor
+  // access on its own, only the actual approval does.
+  status     String   @default("active")
   specialty  String?  // short tagline shown to players, e.g. "Short game, junior coaching" — only meaningful for owner/instructor roles
 
   // Google Calendar sync token — set when this member (as an instructor)

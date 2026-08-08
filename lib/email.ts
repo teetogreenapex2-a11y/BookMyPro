@@ -79,8 +79,30 @@ export async function sendBookingNotification(to: string | null | undefined, det
   await sendEmail(to, subject, html);
 }
 
-// Sent to the player once an instructor leaves the first comment on their
-// swing video submission — the equivalent of "you have feedback waiting."
+// Sent to the business owner when someone requests to join as an
+// instructor - a real person, not automatically granted access, since
+// unlike a player booking a lesson, becoming an instructor at someone
+// else's business is a real trust decision that needs a human okay.
+export async function sendInstructorRequestNotification(to: string | null | undefined, details: { businessName: string; applicantName: string; applicantEmail: string; applicantPhone: string; message: string; reviewUrl: string }) {
+  if (!to) return;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">New instructor request</h2>
+      <p style="color: #5C6459; margin-top: 0;">${details.businessName}</p>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        <tr><td style="padding: 4px 0; color: #8A8571;">Name</td><td style="padding: 4px 0; font-weight: 600;">${details.applicantName}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Email</td><td style="padding: 4px 0;">${details.applicantEmail}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Phone</td><td style="padding: 4px 0;">${details.applicantPhone || "—"}</td></tr>
+      </table>
+      ${details.message ? `<p style="color: #5C6459;">"${details.message}"</p>` : ""}
+      <p>They won't have any instructor access until you approve them.</p>
+      <a href="${details.reviewUrl}" style="display:inline-block;background:#1B3A2F;color:#F6F4EE;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">Review request</a>
+    </div>
+  `;
+
+  await sendEmail(to, `New instructor request: ${details.applicantName}`, html);
+}
 export async function sendVideoReviewedNotification(to: string, details: { businessName: string; title: string | null }) {
   const subject = `Your swing video has feedback — ${details.businessName}`;
   const html = `
