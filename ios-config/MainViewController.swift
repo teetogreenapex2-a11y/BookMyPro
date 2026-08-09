@@ -106,6 +106,12 @@ class MainViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMes
         }
 
         tabBar.isHidden = false
+        // The webview underneath can get reordered during normal page
+        // navigation, which would silently cover the tab bar even
+        // though it's technically still there and correctly set to
+        // visible - forcing it back to the front here, every time a
+        // page changes, is a real, direct guard against exactly that.
+        view.bringSubviewToFront(tabBar)
 
         // Keeps the highlighted tab matching whichever page is actually
         // on screen, even when someone got there some other way than
