@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { isPlatformAdmin } from "@/app/api/admin/pending-businesses/route";
+import { isPlatformAdmin } from "@/lib/tenant";
 import PendingBusinessesClient from "./PendingBusinessesClient";
 
 export default async function PendingBusinessesPage() {
