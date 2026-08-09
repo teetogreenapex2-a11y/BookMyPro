@@ -86,10 +86,14 @@ function TabBarSync() {
     fetch(`/api/${slug}/my-role`)
       .then((r) => r.json())
       .then(({ role }) => {
+        setDebugInfo(`native, bridge=found, role="${role}", slug=${slug}, pageKey=${pageKey}`);
         if (role) bridge.setRole?.(role, slug, pageKey);
         else bridge.hide?.();
       })
-      .catch(() => bridge.hide?.());
+      .catch((err) => {
+        setDebugInfo(`native, bridge=found, my-role FETCH FAILED: ${err}`);
+        bridge.hide?.();
+      });
   }, [pathname, status]);
 
   if (!Capacitor.isNativePlatform()) return null;
