@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { SessionProvider } from "next-auth/react";
@@ -40,21 +40,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 function TabBarSync() {
   const pathname = usePathname();
   const { status } = useSession();
-  // Temporary, visible debug indicator - a specific tester's tab bar
-  // still isn't showing even after a fresh install on the newest build,
-  // and there's no way to check her device's console directly, so this
-  // gives us real, direct evidence instead of more guessing. Safe to
-  // remove once this is sorted out.
-  const [debugInfo, setDebugInfo] = useState("checking...");
 
   useEffect(() => {
-    const isNative = Capacitor.isNativePlatform();
-    if (!isNative) {
-      setDebugInfo(`NOT NATIVE (platform: ${Capacitor.getPlatform()})`);
-      return;
-    }
+    if (!Capacitor.isNativePlatform()) return;
     const bridge = (window as any).AndroidTabBar;
-    setDebugInfo(`native, platform=${Capacitor.getPlatform()}, bridge=${bridge ? "found" : "MISSING"}`);
     if (!bridge) return;
 
     // Every business page follows /{slug}/whatever - pages outside that
@@ -86,20 +75,11 @@ function TabBarSync() {
     fetch(`/api/${slug}/my-role`)
       .then((r) => r.json())
       .then(({ role }) => {
-        setDebugInfo(`native, bridge=found, role="${role}", slug=${slug}, pageKey=${pageKey}`);
         if (role) bridge.setRole?.(role, slug, pageKey);
         else bridge.hide?.();
       })
-      .catch((err) => {
-        setDebugInfo(`native, bridge=found, my-role FETCH FAILED: ${err}`);
-        bridge.hide?.();
-      });
+      .catch(() => bridge.hide?.());
   }, [pathname, status]);
 
-  if (!Capacitor.isNativePlatform()) return null;
-  return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 999999, background: "red", color: "white", fontSize: 14, fontWeight: 900, padding: "10px", textAlign: "center" }}>
-      DEBUG: {debugInfo}
-    </div>
-  );
+  return null;
 }
