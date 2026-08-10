@@ -163,11 +163,16 @@ export default function InstructorClient({
           return;
         }
         const { token } = await FirebaseMessaging.getToken();
-        await fetch(`${apiBase}/push/fcm-subscribe`, {
+        const saveRes = await fetch(`${apiBase}/push/fcm-subscribe`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
         });
+        if (!saveRes.ok) {
+          console.error("Failed to save push token:", saveRes.status, await saveRes.text());
+          setPushStatus("off");
+          return;
+        }
         setPushStatus("on");
         return;
       }
@@ -184,11 +189,16 @@ export default function InstructorClient({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
       });
-      await fetch(`${apiBase}/push/subscribe`, {
+      const saveRes = await fetch(`${apiBase}/push/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(subscription.toJSON()),
       });
+      if (!saveRes.ok) {
+        console.error("Failed to save push subscription:", saveRes.status, await saveRes.text());
+        setPushStatus("off");
+        return;
+      }
       setPushStatus("on");
     } catch (err) {
       console.error("Failed to enable push notifications:", err);
