@@ -74,7 +74,8 @@ export default function CustomersClient({
       const { id } = await res.json();
       window.location.href = `${basePath}/instructor/messages/${id}`;
     } else {
-      alert("Couldn't start the conversation.");
+      const text = await res.text();
+      alert(`Couldn't start the conversation (${res.status}): ${text.slice(0, 300)}`);
     }
   }
 
