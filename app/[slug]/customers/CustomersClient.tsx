@@ -61,6 +61,23 @@ export default function CustomersClient({
     }
   }
 
+  const [startingConversationId, setStartingConversationId] = useState<string | null>(null);
+  async function messageCustomer(playerMembershipId: string) {
+    setStartingConversationId(playerMembershipId);
+    const res = await fetch(`${apiBase}/conversations/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerMembershipId }),
+    });
+    setStartingConversationId(null);
+    if (res.ok) {
+      const { id } = await res.json();
+      window.location.href = `${basePath}/instructor/messages/${id}`;
+    } else {
+      alert("Couldn't start the conversation.");
+    }
+  }
+
   async function addCustomer() {
     if (!addForm.name.trim() || !addForm.email.trim()) {
       setAddError("Name and email are required.");
@@ -325,17 +342,26 @@ export default function CustomersClient({
                 )}
                 <div style={{ fontSize: 12, color: "var(--muted)" }}>{c.email}</div>
                 <div style={{ fontSize: 12, color: "var(--faint)" }}>{c.phone}</div>
-                <button
-                  onClick={() => {
-                    if (window.confirm(`Delete ${c.name || c.email} from your customer list? Their booking and payment history stays on record, but they'll no longer show up here.`)) {
-                      deleteCustomer(c.id);
-                    }
-                  }}
-                  disabled={deletingId === c.id}
-                  style={{ fontSize: 11, color: "#B23A3A", background: "none", border: "none", padding: 0, marginTop: 4, cursor: "pointer" }}
-                >
-                  {deletingId === c.id ? "Deleting…" : "Delete"}
-                </button>
+                <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                  <button
+                    onClick={() => messageCustomer(c.id)}
+                    disabled={startingConversationId === c.id}
+                    style={{ fontSize: 11, color: "var(--fairway)", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                  >
+                    {startingConversationId === c.id ? "..." : "Message"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Delete ${c.name || c.email} from your customer list? Their booking and payment history stays on record, but they'll no longer show up here.`)) {
+                        deleteCustomer(c.id);
+                      }
+                    }}
+                    disabled={deletingId === c.id}
+                    style={{ fontSize: 11, color: "#B23A3A", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                  >
+                    {deletingId === c.id ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
               </div>
               <div style={bodyCell}>
                 {c.packages.length === 0 ? (
