@@ -132,10 +132,26 @@ export default function InstructorClient({
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
-      import("@capacitor-firebase/messaging").then(({ FirebaseMessaging }) => {
-        FirebaseMessaging.checkPermissions()
-          .then((r) => setPushStatus(r.receive === "granted" ? "on" : "off"))
-          .catch(() => setPushStatus("off"));
+      import("@capacitor-firebase/messaging").then(async ({ FirebaseMessaging }) => {
+        const { receive } = await FirebaseMessaging.checkPermissions();
+        if (receive !== "granted") {
+          setPushStatus("off");
+          return;
+        }
+        try {
+          const { token } = await FirebaseMessaging.getToken();
+          if (token) {
+            await fetch(`${apiBase}/push/fcm-subscribe`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token }),
+            });
+          }
+        } catch {
+          // Fine either way - the button below still lets someone
+          // retry by hand.
+        }
+        setPushStatus("on");
       });
       return;
     }
