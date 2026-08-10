@@ -54,6 +54,20 @@ type Player = {
   packages: { id: string; label: string; lessonsRemaining: number; lessonsTotal: number }[];
 };
 
+// Same well-known iOS timing fix as the player page - retrying a few
+// times with a short wait, since Apple's own push token can take a
+// moment to arrive before Firebase's own token is ready to fetch.
+async function getFcmTokenWithRetry(FirebaseMessaging: any, attempts = 5, delayMs = 1200) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await FirebaseMessaging.getToken();
+    } catch (err) {
+      if (i === attempts - 1) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 export default function InstructorClient({
   calendarConnected, calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, slug, basePath, apiBase, businessName, businessLogoUrl, openHour, closeHour,
 }: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null; openHour: number; closeHour: number }) {
@@ -139,7 +153,7 @@ export default function InstructorClient({
           return;
         }
         try {
-          const { token } = await FirebaseMessaging.getToken();
+          const tokenResult = await getFcmTokenWithRetry(FirebaseMessaging); const token = tokenResult?.token;
           if (!token) {
             setPushStatus("off");
             return;
@@ -179,7 +193,7 @@ export default function InstructorClient({
           setPushStatus("off");
           return;
         }
-        const { token } = await FirebaseMessaging.getToken();
+        const tokenResult = await getFcmTokenWithRetry(FirebaseMessaging); const token = tokenResult?.token;
         const saveRes = await fetch(`${apiBase}/push/fcm-subscribe`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

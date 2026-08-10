@@ -19,6 +19,22 @@ function formatGroupCategory(category?: string | null, ageRange?: string | null)
 type Package = { id: string; type: string; lessonsRemaining: number; lessonsTotal: number; paymentStatus?: string; instructorMembershipId?: string | null };
 type Instructor = { id: string; name: string | null; email: string; image: string | null; role: string; [key: string]: any };
 
+// A real, well-known iOS timing issue: Apple's own push token takes a
+// moment to arrive asynchronously after permission is granted, and
+// asking Firebase for its own token before that arrives fails with "No
+// APNS token specified" - retrying a few times with a short wait, rather
+// than asking once and giving up, is the standard, documented fix.
+async function getFcmTokenWithRetry(FirebaseMessaging: any, attempts = 5, delayMs = 1200) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await FirebaseMessaging.getToken();
+    } catch (err) {
+      if (i === attempts - 1) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 export default function BookingClient({
   initialPackages,
   business,
@@ -134,7 +150,7 @@ export default function BookingClient({
           return;
         }
         try {
-          const { token } = await FirebaseMessaging.getToken();
+          const tokenResult = await getFcmTokenWithRetry(FirebaseMessaging); const token = tokenResult?.token;
           if (!token) {
             setPushStatus("off");
             return;
@@ -185,7 +201,7 @@ export default function BookingClient({
           setPushError(`Permission not granted (${receive})`);
           return;
         }
-        const { token } = await FirebaseMessaging.getToken();
+        const tokenResult = await getFcmTokenWithRetry(FirebaseMessaging); const token = tokenResult?.token;
         if (!token) {
           setPushStatus("off");
           setPushError("No device token was generated");
