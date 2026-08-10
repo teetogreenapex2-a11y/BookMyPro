@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 
 type Message = { id: string; body: string; createdAt: string; isMine: boolean; senderName: string };
 
@@ -8,6 +9,15 @@ export default function ChatThread({
   apiBase, conversationId, title, backHref,
 }: { apiBase: string; conversationId: string; title: string; backHref: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
+  // The native tab bar sits on top of the page rather than shrinking the
+  // space available to it (a deliberate tradeoff made when fixing a real
+  // crash earlier), so anything reaching the very bottom of the screen -
+  // like this input bar - needs its own extra clearance to avoid getting
+  // covered.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -94,7 +104,7 @@ export default function ChatThread({
       <div style={{ padding: "0 16px" }}>
         {error && <p style={{ fontSize: 12, color: "#B23A3A", margin: "6px 0 0" }}>{error}</p>}
       </div>
-      <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: "1px solid #E3D9C9", background: "#FFF" }}>
+      <div style={{ display: "flex", gap: 8, padding: `12px 16px ${isNative ? 84 : 12}px`, borderTop: "1px solid #E3D9C9", background: "#FFF" }}>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
