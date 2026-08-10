@@ -94,6 +94,7 @@ model Business {
   availability Availability[]
   bookings     Booking[]
   packages     Package[]
+  conversations Conversation[]
   syncLogs     SyncLog[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
@@ -166,6 +167,8 @@ model Membership {
   swingSketches SwingSketch[]
   pushSubscriptions PushSubscription[]
   fcmTokens         FcmToken[]
+  conversationsAsPlayer Conversation[]
+  sentMessages          Message[]
 
   // Per-instructor pricing — each instructor on staff sets their own rates,
   // rather than one shared business-wide price. Mirrors the exact same
@@ -625,4 +628,33 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// One thread per player per business, visible to every instructor/owner
+// at that business - not a separate thread per instructor, since a
+// small business's players naturally think of themselves as messaging
+// "the business," not a specific person, and this keeps things simple
+// for the common case of one or two instructors sharing the same inbox.
+model Conversation {
+  id                 String   @id @default(cuid())
+  business           Business @relation(fields: [businessId], references: [id])
+  businessId         String
+  playerMembership   Membership @relation(fields: [playerMembershipId], references: [id])
+  playerMembershipId String
+  messages           Message[]
+  lastMessageAt      DateTime @default(now()) // drives sort order in the conversation list - updated every time a new message comes in, so the most recently active thread always sorts first
+  createdAt          DateTime @default(now())
+
+  @@unique([businessId, playerMembershipId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  conversationId String
+  sender         Membership   @relation(fields: [senderMembershipId], references: [id])
+  senderMembershipId String
+  body           String
+  readAt         DateTime? // null until the recipient actually opens the thread - drives the unread indicator
+  createdAt      DateTime     @default(now())
 }

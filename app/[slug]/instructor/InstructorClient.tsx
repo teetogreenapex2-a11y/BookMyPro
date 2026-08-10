@@ -643,6 +643,7 @@ export default function InstructorClient({
                 </>
               )}
               <a href={`${basePath}/instructor/shop`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Shop</a>
+              <a href={`${basePath}/instructor/messages`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Messages</a>
               {!isNative && (
                 <a href={`${basePath}/settings`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Settings</a>
               )}

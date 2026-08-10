@@ -506,6 +506,9 @@ export default function BookingClient({
               <a href={`${basePath}/gift-cards`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
                 Gift Cards
               </a>
+              <a href={`${basePath}/messages`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
+                Messages
+              </a>
               {!isNative && (
                 <a href={`${basePath}/settings`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
                   Settings
