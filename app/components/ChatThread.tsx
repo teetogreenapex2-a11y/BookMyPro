@@ -34,21 +34,31 @@ export default function ChatThread({
     setLoading(false);
   }
 
+  const [error, setError] = useState<string | null>(null);
+
   async function send() {
     if (!draft.trim() || sending) return;
     setSending(true);
+    setError(null);
     const body = draft.trim();
     setDraft("");
-    const res = await fetch(`${apiBase}/conversations/${conversationId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body }),
-    });
-    if (res.ok) {
-      const sent = await res.json();
-      setMessages((prev) => [...prev, { ...sent, senderName: "You" }]);
-    } else {
-      setDraft(body); // put it back so nothing typed is lost
+    try {
+      const res = await fetch(`${apiBase}/conversations/${conversationId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      if (res.ok) {
+        const sent = await res.json();
+        setMessages((prev) => [...prev, { ...sent, senderName: "You" }]);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || `Send failed (${res.status})`);
+        setDraft(body);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Send failed");
+      setDraft(body);
     }
     setSending(false);
   }
@@ -81,6 +91,9 @@ export default function ChatThread({
         <div ref={bottomRef} />
       </div>
 
+      <div style={{ padding: "0 16px" }}>
+        {error && <p style={{ fontSize: 12, color: "#B23A3A", margin: "6px 0 0" }}>{error}</p>}
+      </div>
       <div style={{ display: "flex", gap: 8, padding: "12px 16px", borderTop: "1px solid #E3D9C9", background: "#FFF" }}>
         <input
           value={draft}
