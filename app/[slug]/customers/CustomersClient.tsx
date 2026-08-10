@@ -62,12 +62,12 @@ export default function CustomersClient({
   }
 
   const [startingConversationId, setStartingConversationId] = useState<string | null>(null);
-  async function messageCustomer(playerMembershipId: string) {
-    setStartingConversationId(playerMembershipId);
+  async function messageCustomer(playerUserId: string) {
+    setStartingConversationId(playerUserId);
     const res = await fetch(`${apiBase}/conversations/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerMembershipId }),
+      body: JSON.stringify({ playerUserId }),
     });
     setStartingConversationId(null);
     if (res.ok) {

@@ -20,11 +20,18 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor"]);
   if (!membership) return NextResponse.json({ error: "Instructor access required" }, { status: 403 });
 
-  const { playerMembershipId } = await req.json();
-  const playerMembership = await prisma.membership.findUnique({ where: { id: playerMembershipId } });
-  if (!playerMembership || playerMembership.businessId !== business.id || playerMembership.role !== "player") {
+  const { playerUserId } = await req.json();
+  // The customer list's own "id" field is the person's user id, not
+  // their membership id (a pre-existing choice elsewhere in the app) -
+  // matching that here, rather than expecting the frontend to send
+  // something different than what it actually has on hand.
+  const playerMembership = await prisma.membership.findFirst({
+    where: { userId: playerUserId, businessId: business.id, role: "player" },
+  });
+  if (!playerMembership) {
     return NextResponse.json({ error: "Not a player at this business" }, { status: 400 });
   }
+  const playerMembershipId = playerMembership.id;
 
   const conversation = await prisma.conversation.upsert({
     where: { businessId_playerMembershipId: { businessId: business.id, playerMembershipId } },
