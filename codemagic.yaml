@@ -210,6 +210,36 @@ workflows:
           cd ios/App
           agvtool new-version -all $BUILD_NUMBER
           cd ../..
+      - name: Add push notification entitlement
+        script: |
+          # Enabling the capability on the App ID over in Apple's own
+          # developer portal is only half of what's needed - the app
+          # itself also has to explicitly request this permission
+          # through its own signing, or iOS will never actually
+          # register the device for real notifications at all. This
+          # writes that request directly, then wires it into the
+          # Xcode project so it's actually included when the app is
+          # signed and built.
+          cat > ios/App/App/App.entitlements << 'ENTITLEMENTS'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>aps-environment</key>
+            <string>production</string>
+          </dict>
+          </plist>
+          ENTITLEMENTS
+          ruby -e '
+            require "xcodeproj"
+            project = Xcodeproj::Project.open("ios/App/App.xcodeproj")
+            target = project.targets.first
+            target.build_configurations.each do |config|
+              config.build_settings["CODE_SIGN_ENTITLEMENTS"] = "App/App.entitlements"
+            end
+            project.save
+            puts "Wired App.entitlements into the Xcode project"
+          '
       - name: Diagnose project file directly
         script: |
           # The wrapper tool's own error message ("Failed to show build
