@@ -115,6 +115,7 @@ export default function BookingClient({
   >([]);
   const [groupFilter, setGroupFilter] = useState<"all" | "men" | "ladies" | "junior">("all");
   const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "off" | "on" | "enabling">("unknown");
+  const [pushError, setPushError] = useState<string | null>(null);
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -145,6 +146,7 @@ export default function BookingClient({
 
   async function enablePushNotifications() {
     setPushStatus("enabling");
+    setPushError(null);
     try {
       // Native push (inside the wrapped app) uses Firebase Cloud
       // Messaging instead of the browser's own web push APIs below - a
@@ -156,9 +158,15 @@ export default function BookingClient({
         const { receive } = await FirebaseMessaging.requestPermissions();
         if (receive !== "granted") {
           setPushStatus("off");
+          setPushError(`Permission not granted (${receive})`);
           return;
         }
         const { token } = await FirebaseMessaging.getToken();
+        if (!token) {
+          setPushStatus("off");
+          setPushError("No device token was generated");
+          return;
+        }
         const saveRes = await fetch(`${apiBase}/push/fcm-subscribe`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -170,8 +178,10 @@ export default function BookingClient({
           // checking this, the UI would have claimed success anyway,
           // leaving the person thinking notifications were on when no
           // token was ever actually stored to send anything to.
-          console.error("Failed to save push token:", saveRes.status, await saveRes.text());
+          const text = await saveRes.text();
+          console.error("Failed to save push token:", saveRes.status, text);
           setPushStatus("off");
+          setPushError(`Save failed (${saveRes.status}): ${text.slice(0, 200)}`);
           return;
         }
         setPushStatus("on");
@@ -181,6 +191,7 @@ export default function BookingClient({
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setPushStatus("off");
+        setPushError(`Permission not granted (${permission})`);
         return;
       }
       const registration = await navigator.serviceWorker.register("/sw.js");
@@ -196,14 +207,17 @@ export default function BookingClient({
         body: JSON.stringify(subscription.toJSON()),
       });
       if (!saveRes.ok) {
-        console.error("Failed to save push subscription:", saveRes.status, await saveRes.text());
+        const text = await saveRes.text();
+        console.error("Failed to save push subscription:", saveRes.status, text);
         setPushStatus("off");
+        setPushError(`Save failed (${saveRes.status}): ${text.slice(0, 200)}`);
         return;
       }
       setPushStatus("on");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to enable push notifications:", err);
       setPushStatus("off");
+      setPushError(err?.message || String(err));
     }
   }
 
@@ -819,11 +833,14 @@ export default function BookingClient({
             disabled={pushStatus === "enabling"}
             style={{
               display: "flex", alignItems: "center", gap: 6, background: "var(--card)", color: "var(--fairway)",
-              border: "1px solid var(--border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: 16,
+              border: "1px solid var(--border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: pushError ? 4 : 16,
             }}
           >
             {pushStatus === "enabling" ? "Enabling..." : "Get notified about your bookings"}
           </button>
+        )}
+        {pushError && (
+          <p style={{ fontSize: 11, color: "#B23A3A", marginTop: -2, marginBottom: 16 }}>{pushError}</p>
         )}
 
         {myBookings.length > 0 && (
