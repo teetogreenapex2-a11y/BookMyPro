@@ -140,18 +140,19 @@ export default function InstructorClient({
         }
         try {
           const { token } = await FirebaseMessaging.getToken();
-          if (token) {
-            await fetch(`${apiBase}/push/fcm-subscribe`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ token }),
-            });
+          if (!token) {
+            setPushStatus("off");
+            return;
           }
+          const saveRes = await fetch(`${apiBase}/push/fcm-subscribe`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+          });
+          setPushStatus(saveRes.ok ? "on" : "off");
         } catch {
-          // Fine either way - the button below still lets someone
-          // retry by hand.
+          setPushStatus("off");
         }
-        setPushStatus("on");
       });
       return;
     }

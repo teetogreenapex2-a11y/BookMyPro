@@ -135,19 +135,23 @@ export default function BookingClient({
         }
         try {
           const { token } = await FirebaseMessaging.getToken();
-          if (token) {
-            await fetch(`${apiBase}/push/fcm-subscribe`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ token }),
-            });
+          if (!token) {
+            setPushStatus("off");
+            return;
           }
+          const saveRes = await fetch(`${apiBase}/push/fcm-subscribe`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+          });
+          // Only claim success if the save genuinely succeeded - the
+          // earlier version of this fix set "on" unconditionally even
+          // when this failed, which hid the retry button completely
+          // with no way to fix it or even see something was wrong.
+          setPushStatus(saveRes.ok ? "on" : "off");
         } catch {
-          // Fine either way - the button below still lets someone
-          // retry by hand, with the real error now visible if it
-          // happens again.
+          setPushStatus("off");
         }
-        setPushStatus("on");
       });
       return;
     }
