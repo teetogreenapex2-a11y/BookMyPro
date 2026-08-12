@@ -165,6 +165,116 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Genuinely the same flow as the regular package case above, with one
+  // real difference: what's on file as "paid" is the deposit actually
+  // charged today, with the rest tracked as a real balance still owed -
+  // collected in person at the first lesson, not automatically.
+  if (pending.kind === "package_deposit" && pending.packageType) {
+    const pkg = findPackage(pending.packageType);
+    if (pkg) {
+      const fullPriceCents = pending.fullPriceCents ?? 0;
+      const depositChargedCents = payment.amount_money?.amount ?? 0;
+      await ensureMembership(pending.userId, businessId, "player");
+      const createdPackage = await prisma.package.create({
+        data: {
+          businessId,
+          userId: pending.userId,
+          instructorMembershipId: pending.instructorMembershipId,
+          type: pkg.id,
+          lessonsTotal: pkg.lessons,
+          lessonsRemaining: pkg.lessons,
+          pricePaidCents: fullPriceCents,
+          balanceDueCents: Math.max(0, fullPriceCents - depositChargedCents),
+          paymentStatus: "deposit_paid",
+          squareOrderId: orderId,
+        },
+      });
+
+      if (pending.availabilityId) {
+        const slot = await prisma.availability.findFirst({
+          where: { id: pending.availabilityId, businessId, instructorMembershipId: pending.instructorMembershipId, status: "open" },
+        });
+        if (slot) {
+          const needsApproval = business.requireBookingApproval;
+          const booking = await prisma.$transaction(async (tx) => {
+            await tx.availability.update({
+              where: { id: slot.id },
+              data: { status: needsApproval ? "pending" : "booked" },
+            });
+            await tx.package.update({
+              where: { id: createdPackage.id },
+              data: { lessonsRemaining: { decrement: 1 } },
+            });
+            return tx.booking.create({
+              data: {
+                businessId,
+                playerId: pending.userId,
+                serviceType: "lesson",
+                isRemote: pending.isRemote,
+                startTime: slot.startTime,
+                status: needsApproval ? "pending" : "confirmed",
+                priceCents: 0,
+                packageId: createdPackage.id,
+                availabilityId: slot.id,
+                instructorMembershipId: pending.instructorMembershipId,
+                contactName: pending.contactName,
+                contactPhone: pending.contactPhone,
+                contactEmail: pending.contactEmail,
+              },
+            });
+          });
+
+          await checkAndNotifyLowPackage(createdPackage.id);
+
+          if (!needsApproval) {
+            let videoCallUrl: string | null = null;
+            if (booking.isRemote && business.dailyApiKey) {
+              videoCallUrl = await createVideoCallRoom(business.dailyApiKey, slot.startTime);
+              if (videoCallUrl) {
+                await prisma.booking.update({ where: { id: booking.id }, data: { videoCallUrl } });
+              }
+            }
+            const calendarMembership = await getBusinessInstructor(businessId);
+            if (calendarMembership) {
+              try {
+                const eventId = await createEvent(business, calendarMembership, {
+                  summary: `${booking.isRemote ? "Remote golf lesson" : "Golf lesson"} — ${pending.contactName || "Player"}`,
+                  description: `Lesson booked via ${business.name}. Contact: ${pending.contactPhone || "—"}, ${pending.contactEmail || "—"}.${videoCallUrl ? ` Video call: ${videoCallUrl}` : ""}`,
+                  startTime: slot.startTime,
+                  durationMinutes: 60,
+                });
+                if (eventId) {
+                  await prisma.booking.update({ where: { id: booking.id }, data: { googleCalendarEventId: eventId } });
+                }
+              } catch (err) {
+                console.error("Calendar sync failed:", err);
+              }
+            }
+          }
+
+          if (business.notifyOnBooking) {
+            await sendBookingNotification(business.notificationEmail || business.email, {
+              businessName: business.name,
+              serviceLabel: "Lesson (deposit paid)",
+              startTime: slot.startTime,
+              contactName: pending.contactName,
+              contactPhone: pending.contactPhone,
+              contactEmail: pending.contactEmail,
+              priceCents: 0,
+              isPending: needsApproval,
+              reviewUrl: needsApproval ? businessDestination(business.slug, "/instructor") : undefined,
+            });
+          }
+          await sendPushToMembership(pending.instructorMembershipId, {
+            title: needsApproval ? "New booking request" : "New booking",
+            body: `${pending.contactName || "A player"} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: BUSINESS_TIMEZONE })} - deposit paid, balance due at lesson`,
+            url: businessDestination(business.slug, "/instructor"),
+          });
+        }
+      }
+    }
+  }
+
   if (pending.kind === "fitting" && pending.fittingType && pending.availabilityId) {
     const fitting = findFitting(pending.fittingType);
     const slot = await prisma.availability.findFirst({

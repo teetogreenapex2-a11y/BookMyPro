@@ -34,6 +34,7 @@ export async function PATCH(
     if (paymentStatus !== "paid") return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     data.paymentStatus = "paid";
     data.paidAt = new Date();
+    data.balanceDueCents = 0;
   }
 
   if (lessonsRemaining !== undefined) {

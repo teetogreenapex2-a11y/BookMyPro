@@ -944,14 +944,14 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16,
             }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Pay at first lesson</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Deposit option</div>
                 <p style={{ fontSize: 12, color: "var(--faint)", margin: 0 }}>
-                  Let players reserve a package without paying online — you collect payment in person instead.
+                  Let players reserve a package by paying half online now — you collect the rest in person at their first lesson.
                 </p>
               </div>
               <button
                 onClick={() => setBiz((b) => ({ ...b, allowPayLater: !b.allowPayLater }))}
-                aria-label={biz.allowPayLater ? "Disable pay at first lesson" : "Enable pay at first lesson"}
+                aria-label={biz.allowPayLater ? "Disable deposit option" : "Enable deposit option"}
                 aria-pressed={biz.allowPayLater}
                 style={{
                   width: 42, height: 24, borderRadius: 12, border: "none", flexShrink: 0,

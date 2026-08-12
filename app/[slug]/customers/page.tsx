@@ -17,23 +17,13 @@ export default async function CustomersPage({ params }: { params: { slug: string
   const { basePath, apiBase } = getBasePaths(params.slug);
   if (!membership) redirect(`${basePath}/book`);
 
-  const isOwner = membership.role === "owner";
-
   const playerMemberships = await prisma.membership.findMany({
     where: { businessId: business.id, role: "player" },
     include: {
       user: {
         include: {
-          packages: {
-            where: isOwner ? { businessId: business.id } : { businessId: business.id, instructorMembershipId: membership.id },
-            orderBy: { createdAt: "desc" },
-          },
-          bookings: {
-            where: isOwner
-              ? { businessId: business.id, status: "confirmed" }
-              : { businessId: business.id, status: "confirmed", instructorMembershipId: membership.id },
-            orderBy: { startTime: "asc" },
-          },
+          packages: { where: { businessId: business.id }, orderBy: { createdAt: "desc" } },
+          bookings: { where: { businessId: business.id, status: "confirmed" }, orderBy: { startTime: "asc" } },
         },
       },
     },
@@ -47,9 +37,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
   });
   const instructorsById = new Map(instructorMemberships.map((m) => [m.id, m]));
 
-  const customers = playerMemberships
-    .filter(({ user: p }) => isOwner || p.packages.length > 0 || p.bookings.length > 0)
-    .map(({ user: p }) => {
+  const customers = playerMemberships.map(({ user: p }) => {
     const upgradedFromIds = new Set(p.packages.map((pkg) => pkg.upgradedFromId).filter(Boolean));
 
     const packages = p.packages.map((pkg) => {

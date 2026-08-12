@@ -16,7 +16,7 @@ function formatGroupCategory(category?: string | null, ageRange?: string | null)
   const label = labels[category] || category;
   return ageRange ? `${label} - ${ageRange}` : label;
 }
-type Package = { id: string; type: string; lessonsRemaining: number; lessonsTotal: number; paymentStatus?: string; instructorMembershipId?: string | null };
+type Package = { id: string; type: string; lessonsRemaining: number; lessonsTotal: number; paymentStatus?: string; balanceDueCents?: number; instructorMembershipId?: string | null };
 type Instructor = { id: string; name: string | null; email: string; image: string | null; role: string; [key: string]: any };
 
 // A real, well-known iOS timing issue: Apple's own push token takes a
@@ -24,7 +24,7 @@ type Instructor = { id: string; name: string | null; email: string; image: strin
 // asking Firebase for its own token before that arrives fails with "No
 // APNS token specified" - retrying a few times with a short wait, rather
 // than asking once and giving up, is the standard, documented fix.
-async function getFcmTokenWithRetry(FirebaseMessaging: any, attempts = 5, delayMs = 1200) {
+async function getFcmTokenWithRetry(FirebaseMessaging: any, attempts = 12, delayMs = 2000) {
   for (let i = 0; i < attempts; i++) {
     try {
       return await FirebaseMessaging.getToken();
@@ -132,6 +132,19 @@ export default function BookingClient({
   const [groupFilter, setGroupFilter] = useState<"all" | "men" | "ladies" | "junior">("all");
   const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "off" | "on" | "enabling">("unknown");
   const [pushError, setPushError] = useState<string | null>(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  useEffect(() => {
+    function checkUnread() {
+      fetch(`${apiBase}/conversations/unread-count`)
+        .then((r) => r.json())
+        .then((d) => setUnreadMessages(d.count || 0))
+        .catch(() => {});
+    }
+    checkUnread();
+    const interval = setInterval(checkUnread, 15000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -348,11 +361,11 @@ export default function BookingClient({
     setPendingPackageType(null);
   }
 
-  async function payLaterAndBookSlot() {
+  async function depositAndBookSlot() {
     if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
-    const res = await fetch(`${apiBase}/packages/pay-later`, {
+    const res = await fetch(`${apiBase}/packages/deposit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -367,16 +380,8 @@ export default function BookingClient({
     });
     setConfirming(false);
     const data = await res.json();
-    if (res.ok) {
-      setPackages((prev) => [...prev, data]);
-      setMessage("Reserved - you're all set, and you'll pay in person at your first lesson.");
-      setSelected(null);
-      setPendingPackageType(null);
-      loadSlots();
-      loadMyBookings();
-    } else {
-      setMessage(data.error || "Something went wrong.");
-    }
+    if (data.url) window.location.href = data.url;
+    else setMessage(data.error || "Something went wrong.");
   }
 
   // Books directly against an already-owned package - no payment involved.
@@ -575,8 +580,11 @@ export default function BookingClient({
               <a href={`${basePath}/gift-cards`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
                 Gift Cards
               </a>
-              <a href={`${basePath}/messages`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
+              <a href={`${basePath}/messages`} style={{ position: "relative", fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
                 Messages
+                {unreadMessages > 0 && (
+                  <span style={{ position: "absolute", top: -4, right: -8, width: 8, height: 8, borderRadius: "50%", background: "#B8862B" }} />
+                )}
               </a>
               {!isNative && (
                 <a href={`${basePath}/settings`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
@@ -698,7 +706,7 @@ export default function BookingClient({
                     </div>
                     <div className="mono" style={{ fontSize: 11, fontWeight: 600 }}>
                       {selectedPackage
-                        ? `${selectedPackage.lessonsRemaining} of ${selectedPackage.lessonsTotal} left${selectedPackage.paymentStatus === "pending" ? " - pay at lesson" : ""}`
+                        ? `${selectedPackage.lessonsRemaining} of ${selectedPackage.lessonsTotal} left${selectedPackage.paymentStatus === "pending" ? " - pay at lesson" : selectedPackage.paymentStatus === "deposit_paid" && !!selectedPackage.balanceDueCents ? ` - ${centsToDollars(selectedPackage.balanceDueCents)} due at lesson` : ""}`
                         : `${centsToDollars(pendingPackageInfo!.priceCents)} - pick a time, then pay`}
                     </div>
                   </button>
@@ -882,6 +890,11 @@ export default function BookingClient({
         {pushError && (
           <p style={{ fontSize: 11, color: "#B23A3A", marginTop: -2, marginBottom: 16 }}>{pushError}</p>
         )}
+        {pushStatus === "on" && (
+          <p style={{ fontSize: 12, color: "var(--fairway)", marginBottom: 16 }}>
+            🔔 Notifications are on — you'll get an alert when your bookings are confirmed or if anything changes.
+          </p>
+        )}
 
         {myBookings.length > 0 && (
           <div style={{ marginBottom: 20 }}>
@@ -962,8 +975,8 @@ export default function BookingClient({
           (selectedPackage || pendingPackageInfo) && (
             <div style={{
               display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10,
-              background: selectedPackage?.paymentStatus === "pending" || isBuyingPackage ? "#FBF3DE" : "var(--open)",
-              border: `1px solid ${selectedPackage?.paymentStatus === "pending" || isBuyingPackage ? "#E3CE93" : "var(--border)"}`,
+              background: selectedPackage?.paymentStatus === "pending" || (selectedPackage?.paymentStatus === "deposit_paid" && !!selectedPackage?.balanceDueCents) || isBuyingPackage ? "#FBF3DE" : "var(--open)",
+              border: `1px solid ${selectedPackage?.paymentStatus === "pending" || (selectedPackage?.paymentStatus === "deposit_paid" && !!selectedPackage?.balanceDueCents) || isBuyingPackage ? "#E3CE93" : "var(--border)"}`,
               marginBottom: 14,
             }}>
               <span style={{ fontSize: 13, fontWeight: 600 }}>
@@ -978,6 +991,9 @@ export default function BookingClient({
                     <span className="mono" style={{ color: "var(--muted)", fontWeight: 500 }}> - {selectedPackage!.lessonsRemaining} of {selectedPackage!.lessonsTotal} left</span>
                     {selectedPackage!.paymentStatus === "pending" && (
                       <span className="mono" style={{ color: "#9A7A1E", fontWeight: 600 }}> - payment due at first lesson</span>
+                    )}
+                    {selectedPackage!.paymentStatus === "deposit_paid" && !!selectedPackage!.balanceDueCents && (
+                      <span className="mono" style={{ color: "#9A7A1E", fontWeight: 600 }}> - {centsToDollars(selectedPackage!.balanceDueCents)} due at your lesson</span>
                     )}
                   </>
                 )}
@@ -1260,7 +1276,7 @@ export default function BookingClient({
 
             {service === "lesson" && isBuyingPackage && business.allowPayLater && (
               <button
-                onClick={payLaterAndBookSlot}
+                onClick={depositAndBookSlot}
                 disabled={confirming || !contactValid() || !selectedInstructorId}
                 style={{
                   width: "100%", background: "none", color: "var(--chalk)", border: "1px dashed rgba(255,255,255,0.4)",
@@ -1268,7 +1284,7 @@ export default function BookingClient({
                   opacity: confirming || !contactValid() || !selectedInstructorId ? 0.6 : 1,
                 }}
               >
-                Reserve - pay at first lesson instead
+                Pay {centsToDollars(Math.floor((pendingPackageInfo?.priceCents || 0) / 2))} now, rest at your lesson
               </button>
             )}
 

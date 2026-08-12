@@ -253,7 +253,11 @@ model Package {
   pricePaidCents   Int       // the full listed price of this package, before any credit
   creditCents      Int       @default(0) // amount credited from a prior package when upgrading (e.g. single -> 3-pack)
   upgradedFromId   String?   // the package this one replaced, if created via an upgrade
-  paymentStatus    String    @default("paid") // "paid" | "pending" (pay-at-first-lesson, or amount due after credit on an upgrade)
+  paymentStatus    String    @default("paid") // "paid" | "pending" (older, zero-upfront pay-later, kept for backward compatibility) | "deposit_paid" (half now, rest at the lesson)
+  // How much is still owed on this package - 0 once it's fully paid off.
+  // For a deposit package, this starts at half the price and is what
+  // actually needs collecting in person at the first lesson.
+  balanceDueCents  Int       @default(0)
   paidAt           DateTime?
   stripeSessionId  String?
   squareOrderId    String?
@@ -591,6 +595,11 @@ model PendingSquarePayment {
   contactEmail  String?
   instructorMembershipId String?
   isRemote      Boolean  @default(false)
+  // Only set for a deposit payment - the full package price, separate
+  // from the (smaller) amount actually being charged right now, so the
+  // webhook can work out the real remaining balance once payment
+  // succeeds.
+  fullPriceCents Int?
   createdAt     DateTime @default(now())
 }
 

@@ -10,7 +10,7 @@ type Customer = {
   phone: string;
   packages: {
     id: string; type: string; label: string; lessonsTotal: number; lessonsRemaining: number;
-    paymentStatus?: string; creditCents?: number; canUpgrade?: boolean; upgradeTiers: UpgradeTier[];
+    paymentStatus?: string; balanceDueCents?: number; creditCents?: number; canUpgrade?: boolean; upgradeTiers: UpgradeTier[];
   }[];
   fittings: { id: string; label: string; startTime: string }[];
   totalLessonsRemaining: number;
@@ -116,7 +116,7 @@ export default function CustomersClient({
       setCustomers((prev) =>
         prev.map((c) => ({
           ...c,
-          packages: c.packages.map((p) => (p.id === packageId ? { ...p, paymentStatus: "paid" } : p)),
+          packages: c.packages.map((p) => (p.id === packageId ? { ...p, paymentStatus: "paid", balanceDueCents: 0 } : p)),
         }))
       );
     }
@@ -417,6 +417,25 @@ export default function CustomersClient({
                               borderRadius: 4, padding: "1px 6px",
                             }}>
                               PAYMENT DUE
+                            </span>
+                            <button
+                              onClick={() => markPaid(pkg.id)}
+                              disabled={markingPaid === pkg.id}
+                              style={{
+                                fontSize: 10, fontWeight: 700, color: "var(--fairway)", background: "none",
+                                border: "1px solid var(--border)", borderRadius: 4, padding: "1px 6px", cursor: "pointer",
+                              }}
+                            >
+                              {markingPaid === pkg.id ? "…" : "Mark as paid"}
+                            </button>
+                          </div>
+                        ) : pkg.paymentStatus === "deposit_paid" && !!pkg.balanceDueCents ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, color: "#9A7A1E", background: "#FBF3DE",
+                              borderRadius: 4, padding: "1px 6px",
+                            }}>
+                              {centsToDollars(pkg.balanceDueCents)} DUE AT LESSON
                             </span>
                             <button
                               onClick={() => markPaid(pkg.id)}
