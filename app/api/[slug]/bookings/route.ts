@@ -164,6 +164,23 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     url: businessDestination(business.slug, "/instructor"),
   });
 
+  // A player who books directly (no approval needed) only ever saw a
+  // brief on-screen message confirming it, with nothing lasting or
+  // reliable backing that up afterward if they closed the app quickly
+  // or just didn't notice it - a real complaint from a real player
+  // tonight. This gives them something persistent, the same way the
+  // approval-required flow already does for its own "confirmed" moment.
+  if (!needsApproval) {
+    const playerMembership = await getMembership(userId, business.id);
+    if (playerMembership) {
+      await sendPushToMembership(playerMembership.id, {
+        title: "Booking confirmed",
+        body: `Your lesson on ${slot.startTime.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: BUSINESS_TIMEZONE })} is confirmed.`,
+        url: businessDestination(business.slug, "/book"),
+      });
+    }
+  }
+
   return NextResponse.json(booking, { status: 201 });
 }
 
@@ -178,10 +195,15 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   const userId = (session.user as any).id;
   const membership = await getMembership(userId, business.id);
+  const isOwner = membership?.role === "owner";
   const isStaff = membership?.role === "owner" || membership?.role === "instructor";
 
   const bookings = await prisma.booking.findMany({
-    where: isStaff ? { businessId: business.id } : { businessId: business.id, playerId: userId },
+    where: isOwner
+      ? { businessId: business.id }
+      : isStaff
+      ? { businessId: business.id, instructorMembershipId: membership!.id }
+      : { businessId: business.id, playerId: userId },
     include: {
       note: true,
       player: { select: { name: true, email: true, handedness: true, scoreOrHandicap: true, commonIssues: true } },

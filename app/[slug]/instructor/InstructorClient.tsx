@@ -57,7 +57,7 @@ type Player = {
 // Same well-known iOS timing fix as the player page - retrying a few
 // times with a short wait, since Apple's own push token can take a
 // moment to arrive before Firebase's own token is ready to fetch.
-async function getFcmTokenWithRetry(FirebaseMessaging: any, attempts = 5, delayMs = 1200) {
+async function getFcmTokenWithRetry(FirebaseMessaging: any, attempts = 12, delayMs = 2000) {
   for (let i = 0; i < attempts; i++) {
     try {
       return await FirebaseMessaging.getToken();
@@ -130,6 +130,7 @@ export default function InstructorClient({
   const [newPlayerError, setNewPlayerError] = useState<string | null>(null);
   const [creatingPlayer, setCreatingPlayer] = useState(false);
   const [pushStatus, setPushStatus] = useState<"unknown" | "unsupported" | "off" | "on" | "enabling">("unknown");
+  const [pushError, setPushError] = useState<string | null>(null);
   // Capacitor.isNativePlatform() gives a different answer on the server
   // (always false, since the server has no way to know it's rendering
   // for the native app) than on the actual device - checking it directly
@@ -140,6 +141,19 @@ export default function InstructorClient({
   // and only flipping it true after the component has actually mounted
   // on the client avoids that mismatch entirely.
   const [isNative, setIsNative] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  useEffect(() => {
+    function checkUnread() {
+      fetch(`${apiBase}/conversations/unread-count`)
+        .then((r) => r.json())
+        .then((d) => setUnreadMessages(d.count || 0))
+        .catch(() => {});
+    }
+    checkUnread();
+    const interval = setInterval(checkUnread, 15000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
   }, []);
@@ -185,23 +199,42 @@ export default function InstructorClient({
 
   async function enablePushNotifications() {
     setPushStatus("enabling");
+    setPushError(null);
     try {
+      // Native push (inside the wrapped app) uses Firebase Cloud
+      // Messaging instead of the browser's own web push APIs below - a
+      // completely different mechanism under the hood, but the same
+      // end result for the person using it: a real device token gets
+      // registered with the backend.
       if (Capacitor.isNativePlatform()) {
         const { FirebaseMessaging } = await import("@capacitor-firebase/messaging");
         const { receive } = await FirebaseMessaging.requestPermissions();
         if (receive !== "granted") {
           setPushStatus("off");
+          setPushError(`Permission not granted (${receive})`);
           return;
         }
         const tokenResult = await getFcmTokenWithRetry(FirebaseMessaging); const token = tokenResult?.token;
+        if (!token) {
+          setPushStatus("off");
+          setPushError("No device token was generated");
+          return;
+        }
         const saveRes = await fetch(`${apiBase}/push/fcm-subscribe`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
         });
         if (!saveRes.ok) {
-          console.error("Failed to save push token:", saveRes.status, await saveRes.text());
+          // Permission was genuinely granted and a real token was
+          // generated, but saving it to the backend failed - without
+          // checking this, the UI would have claimed success anyway,
+          // leaving the person thinking notifications were on when no
+          // token was ever actually stored to send anything to.
+          const text = await saveRes.text();
+          console.error("Failed to save push token:", saveRes.status, text);
           setPushStatus("off");
+          setPushError(`Save failed (${saveRes.status}): ${text.slice(0, 200)}`);
           return;
         }
         setPushStatus("on");
@@ -211,6 +244,7 @@ export default function InstructorClient({
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setPushStatus("off");
+        setPushError(`Permission not granted (${permission})`);
         return;
       }
       const registration = await navigator.serviceWorker.register("/sw.js");
@@ -226,14 +260,17 @@ export default function InstructorClient({
         body: JSON.stringify(subscription.toJSON()),
       });
       if (!saveRes.ok) {
-        console.error("Failed to save push subscription:", saveRes.status, await saveRes.text());
+        const text = await saveRes.text();
+        console.error("Failed to save push subscription:", saveRes.status, text);
         setPushStatus("off");
+        setPushError(`Save failed (${saveRes.status}): ${text.slice(0, 200)}`);
         return;
       }
       setPushStatus("on");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to enable push notifications:", err);
       setPushStatus("off");
+      setPushError(err?.message || String(err));
     }
   }
 
@@ -684,7 +721,12 @@ export default function InstructorClient({
                 </>
               )}
               <a href={`${basePath}/instructor/shop`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Shop</a>
-              <a href={`${basePath}/instructor/messages`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Messages</a>
+              <a href={`${basePath}/instructor/messages`} style={{ position: "relative", fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
+                Messages
+                {unreadMessages > 0 && (
+                  <span style={{ position: "absolute", top: -4, right: -8, width: 8, height: 8, borderRadius: "50%", background: "#B8862B" }} />
+                )}
+              </a>
               {!isNative && (
                 <a href={`${basePath}/settings`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Settings</a>
               )}
@@ -708,7 +750,7 @@ export default function InstructorClient({
             {teamInstructors.length > 1 ? "Each instructor has their own calendar." : "You can only run a lesson or a fitting at a given time, not both."}
           </p>
 
-          {teamInstructors.length > 1 && (
+          {viewerRole === "owner" && teamInstructors.length > 1 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
               {teamInstructors.map((t) => (
                 <button
@@ -801,11 +843,14 @@ export default function InstructorClient({
             disabled={pushStatus === "enabling"}
             style={{
               display: "flex", alignItems: "center", gap: 6, background: "var(--card)", color: "var(--fairway)",
-              border: "1px solid var(--border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: 16,
+              border: "1px solid var(--border)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: pushError ? 4 : 16,
             }}
           >
             {pushStatus === "enabling" ? "Enabling…" : "🔔 Get notified when a booking comes in"}
           </button>
+        )}
+        {pushError && (
+          <p style={{ fontSize: 11, color: "#B23A3A", marginTop: -2, marginBottom: 16 }}>{pushError}</p>
         )}
         {pushStatus === "on" && (
           <p style={{ fontSize: 12, color: "var(--fairway)", marginBottom: 16 }}>
