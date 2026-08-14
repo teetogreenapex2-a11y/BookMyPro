@@ -1,8 +1,3 @@
-@media (max-width: 640px) {
-  .customers-table > div {
-    grid-template-columns: 1fr !important;
-  }
-  .customers-table .head-only {
-    display: none;
-  }
-}
+/* The card layout is naturally responsive on its own (flex-wrap
+   throughout), so this file is intentionally minimal now - kept
+   around in case a real mobile-specific tweak is needed later. */
