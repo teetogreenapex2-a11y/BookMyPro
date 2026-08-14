@@ -306,7 +306,22 @@ export default function BookingClient({
         setInstructors(list);
         // Most businesses have exactly one instructor - don't make players
         // click through a picker with only one option in it.
-        if (list.length === 1) setSelectedInstructorId(list[0].id);
+        if (list.length === 1) {
+          setSelectedInstructorId(list[0].id);
+        } else if (list.length > 1) {
+          // With more than one, prioritize whoever the player already
+          // has a real, owned package with - a genuine customer hit
+          // this directly: their existing package was tied to one
+          // instructor, but the app defaulted to a different one,
+          // and picking the wrong instructor meant it correctly (but
+          // confusingly) asked them to pay again for something they
+          // already owned. Falls back to the owner if they have no
+          // existing package at all yet.
+          const existingInstructorId = packages.find((p) => p.instructorMembershipId)?.instructorMembershipId;
+          const owner = list.find((i) => i.role === "owner");
+          const defaultId = (existingInstructorId && list.some((i) => i.id === existingInstructorId)) ? existingInstructorId : owner?.id;
+          if (defaultId) setSelectedInstructorId(defaultId);
+        }
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
