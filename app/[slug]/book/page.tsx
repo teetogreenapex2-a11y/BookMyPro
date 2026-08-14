@@ -30,6 +30,27 @@ export default async function BookPage({ params }: { params: { slug: string } })
     orderBy: { createdAt: "desc" },
   });
 
+  // Same reasoning as the instructor's own customer list: the stored
+  // count still decrements the moment a lesson is booked (that's what
+  // actually prevents booking more than what's been paid for), but what
+  // a player sees here adds back any upcoming, not-yet-happened lesson
+  // so the number doesn't visibly drop until that lesson's own time has
+  // genuinely passed.
+  const now = new Date();
+  const lessonBookings = await prisma.booking.findMany({
+    where: { playerId: userId, businessId: business.id, serviceType: "lesson", status: "confirmed", startTime: { gt: now }, packageId: { not: null } },
+    select: { packageId: true },
+  });
+  const upcomingCountByPackage = new Map<string, number>();
+  for (const b of lessonBookings) {
+    if (!b.packageId) continue;
+    upcomingCountByPackage.set(b.packageId, (upcomingCountByPackage.get(b.packageId) || 0) + 1);
+  }
+  const packagesForClient = packages.map((pkg) => {
+    const upcoming = upcomingCountByPackage.get(pkg.id) || 0;
+    return { ...pkg, rawLessonsRemaining: pkg.lessonsRemaining, lessonsRemaining: Math.min(pkg.lessonsRemaining + upcoming, pkg.lessonsTotal) };
+  });
+
   // If the business hasn't set a custom "Instructor name" in Settings yet,
   // fall back to the actual signed-in instructor/owner's account name, so
   // players always see who they're booking with rather than nothing at all.
@@ -50,7 +71,7 @@ export default async function BookPage({ params }: { params: { slug: string } })
 
   return (
     <BookingClient
-      initialPackages={packages}
+      initialPackages={packagesForClient}
       business={{ ...businessForClient, instructorName: instructorDisplayName }}
       remoteLessonsEnabled={!!dailyApiKey}
       slug={params.slug}

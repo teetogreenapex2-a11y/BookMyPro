@@ -9,7 +9,7 @@ type Customer = {
   email: string;
   phone: string;
   packages: {
-    id: string; type: string; label: string; lessonsTotal: number; lessonsRemaining: number;
+    id: string; type: string; label: string; lessonsTotal: number; lessonsRemaining: number; rawLessonsRemaining?: number;
     paymentStatus?: string; balanceDueCents?: number; creditCents?: number; canUpgrade?: boolean; upgradeTiers: UpgradeTier[];
     instructorMembershipId?: string | null; instructorName?: string | null;
   }[];
@@ -158,7 +158,14 @@ export default function CustomersClient({
       setCustomers((prev) =>
         prev.map((c) => ({
           ...c,
-          packages: c.packages.map((p) => (p.id === packageId ? { ...p, lessonsRemaining: parsed } : p)),
+          packages: c.packages.map((p) => {
+            if (p.id !== packageId) return p;
+            // Keep whatever upcoming-lesson add-back was already
+            // reflected in the displayed number - only the raw,
+            // underlying portion actually changed here.
+            const upcomingAddBack = p.lessonsRemaining - (p.rawLessonsRemaining ?? p.lessonsRemaining);
+            return { ...p, rawLessonsRemaining: parsed, lessonsRemaining: Math.min(parsed + upcomingAddBack, p.lessonsTotal) };
+          }),
         }))
       );
       setEditingPackageId(null);
@@ -523,7 +530,7 @@ export default function CustomersClient({
                               </div>
                             ) : (
                               <button
-                                onClick={() => { setEditingPackageId(pkg.id); setEditValue(String(pkg.lessonsRemaining)); }}
+                                onClick={() => { setEditingPackageId(pkg.id); setEditValue(String(pkg.rawLessonsRemaining ?? pkg.lessonsRemaining)); }}
                                 style={{ fontSize: 10, color: "var(--faint)", background: "none", border: "none", padding: 0, cursor: "pointer", textDecoration: "underline" }}
                               >
                                 Adjust

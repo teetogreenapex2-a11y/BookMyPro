@@ -16,7 +16,7 @@ function formatGroupCategory(category?: string | null, ageRange?: string | null)
   const label = labels[category] || category;
   return ageRange ? `${label} - ${ageRange}` : label;
 }
-type Package = { id: string; type: string; lessonsRemaining: number; lessonsTotal: number; paymentStatus?: string; balanceDueCents?: number; instructorMembershipId?: string | null };
+type Package = { id: string; type: string; lessonsRemaining: number; rawLessonsRemaining?: number; lessonsTotal: number; paymentStatus?: string; balanceDueCents?: number; instructorMembershipId?: string | null };
 type Instructor = { id: string; name: string | null; email: string; image: string | null; role: string; [key: string]: any };
 
 // A real, well-known iOS timing issue: Apple's own push token takes a
@@ -320,7 +320,7 @@ export default function BookingClient({
       setSelectedPackageId(null);
       return;
     }
-    const owned = packages.find((p) => p.instructorMembershipId === selectedInstructorId && p.lessonsRemaining > 0);
+    const owned = packages.find((p) => p.instructorMembershipId === selectedInstructorId && (p.rawLessonsRemaining ?? p.lessonsRemaining) > 0);
     setSelectedPackageId(owned?.id || null);
     setPendingPackageType(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -461,7 +461,7 @@ export default function BookingClient({
           : "Lesson booked and synced to the calendar."
       );
       setSelected(null);
-      setPackages((prev) => prev.map((p) => (p.id === selectedPackageId ? { ...p, lessonsRemaining: p.lessonsRemaining - 1 } : p)));
+      setPackages((prev) => prev.map((p) => (p.id === selectedPackageId ? { ...p, rawLessonsRemaining: (p.rawLessonsRemaining ?? p.lessonsRemaining) - 1 } : p)));
       loadSlots();
       loadMyBookings();
     } else {
@@ -568,7 +568,7 @@ export default function BookingClient({
     ? { ...FITTING_TYPES.find((f) => f.id === fittingType)!, priceCents: getFittingPriceCents(selectedInstructor, fittingType) }
     : null;
   // Either an owned package with credits, or a tier chosen to buy - either is enough to pick a slot, but only once an instructor is chosen too.
-  const canPickLessonSlot = !!selectedInstructorId && ((!!selectedPackage && selectedPackage.lessonsRemaining > 0) || !!pendingPackageType);
+  const canPickLessonSlot = !!selectedInstructorId && ((!!selectedPackage && (selectedPackage.rawLessonsRemaining ?? selectedPackage.lessonsRemaining) > 0) || !!pendingPackageType);
   const isBuyingPackage = !selectedPackage && !!pendingPackageType;
 
   useEffect(() => {
@@ -745,12 +745,12 @@ export default function BookingClient({
               )}
               <div>
                 <div className="mono" style={{ fontSize: 11, color: "#9DB8A9", marginBottom: 8, letterSpacing: "0.04em" }}>
-                  {selectedPackage || pendingPackageInfo ? "SWITCH PACKAGE" : packages.some((p) => p.lessonsRemaining > 0) ? "SELECT A PACKAGE" : "CHOOSE A PACKAGE TO GET STARTED"}
+                  {selectedPackage || pendingPackageInfo ? "SWITCH PACKAGE" : packages.some((p) => (p.rawLessonsRemaining ?? p.lessonsRemaining) > 0) ? "SELECT A PACKAGE" : "CHOOSE A PACKAGE TO GET STARTED"}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {visiblePackages(selectedInstructor || {}).length === 0 ? null : (
                     visiblePackages(selectedInstructor || {}).map((p) => {
-                      const owned = packages.find((op) => op.type === p.id && op.instructorMembershipId === selectedInstructorId && op.lessonsRemaining > 0);
+                      const owned = packages.find((op) => op.type === p.id && op.instructorMembershipId === selectedInstructorId && (op.rawLessonsRemaining ?? op.lessonsRemaining) > 0);
                       const isPriced = p.priceCents > 0;
                       return (
                         <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 108 }}>

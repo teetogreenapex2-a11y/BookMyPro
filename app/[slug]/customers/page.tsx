@@ -53,17 +53,32 @@ export default async function CustomersPage({ params }: { params: { slug: string
     .map(({ user: p }) => {
     const upgradedFromIds = new Set(p.packages.map((pkg) => pkg.upgradedFromId).filter(Boolean));
 
+    const now = new Date();
     const packages = p.packages.map((pkg) => {
       const instructorMembership = pkg.instructorMembershipId ? instructorsById.get(pkg.instructorMembershipId) : null;
       const upgradeTiers = instructorMembership
         ? enabledPackages(instructorMembership).filter((t) => t.lessons > pkg.lessonsTotal)
         : [];
+      // The stored count still decrements the moment a lesson is
+      // booked, since that's what actually prevents someone from
+      // booking more lessons than they've paid for. What's shown here
+      // is different on purpose: add back any lesson booked against
+      // this package that hasn't happened yet, so the number a
+      // customer and instructor actually see doesn't visibly drop
+      // until the lesson's own time has genuinely passed.
+      const upcomingAgainstThisPackage = p.bookings.filter(
+        (b) => b.packageId === pkg.id && b.serviceType === "lesson" && b.startTime > now
+      ).length;
       return {
         id: pkg.id,
         type: pkg.type,
         label: findPackage(pkg.type)?.label || pkg.type,
         lessonsTotal: pkg.lessonsTotal,
-        lessonsRemaining: pkg.lessonsRemaining,
+        lessonsRemaining: Math.min(pkg.lessonsRemaining + upcomingAgainstThisPackage, pkg.lessonsTotal),
+        // The true, raw stored value - what "Adjust" should actually
+        // read and save, since saving the computed display number back
+        // would double-count any already-booked, upcoming lessons.
+        rawLessonsRemaining: pkg.lessonsRemaining,
         paymentStatus: pkg.paymentStatus,
         balanceDueCents: pkg.balanceDueCents,
         creditCents: pkg.creditCents,
