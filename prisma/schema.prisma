@@ -91,6 +91,11 @@ model Business {
   // this is a deliberate business risk tradeoff (no-show/non-payment risk
   // vs. lower booking friction), so each business opts in explicitly.
   allowPayLater Boolean @default(false)
+  // A genuinely different thing from a deposit - no money moves through
+  // the app at all here, since a club or the owner is billing the
+  // player separately, outside the app entirely. Both sides need to see
+  // this clearly labeled as such, not mistaken for "pay in person."
+  allowClubBilling Boolean @default(false)
 
   // If enabled, new bookings are held as "pending" until the instructor
   // confirms or denies them, instead of being confirmed immediately.

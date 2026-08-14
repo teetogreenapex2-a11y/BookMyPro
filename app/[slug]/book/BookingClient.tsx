@@ -384,6 +384,37 @@ export default function BookingClient({
     else setMessage(data.error || "Something went wrong.");
   }
 
+  async function clubBilledAndBookSlot() {
+    if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
+    saveProfileFieldsIfProvided();
+    setConfirming(true);
+    const res = await fetch(`${apiBase}/packages/club-billed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        packageType: pendingPackageType,
+        instructorMembershipId: selectedInstructorId,
+        availabilityId: selected.id,
+        contactName: contact.name,
+        contactPhone: contact.phone,
+        contactEmail: contact.email,
+        isRemote,
+      }),
+    });
+    setConfirming(false);
+    const data = await res.json();
+    if (res.ok) {
+      setPackages((prev) => [...prev, data]);
+      setMessage(`Reserved - ${business.name} bills you separately for this.`);
+      setSelected(null);
+      setPendingPackageType(null);
+      loadSlots();
+      loadMyBookings();
+    } else {
+      setMessage(data.error || "Something went wrong.");
+    }
+  }
+
   // Books directly against an already-owned package - no payment involved.
   async function saveProfileFieldsIfProvided() {
     const updates: Record<string, string> = {};
@@ -706,7 +737,7 @@ export default function BookingClient({
                     </div>
                     <div className="mono" style={{ fontSize: 11, fontWeight: 600 }}>
                       {selectedPackage
-                        ? `${selectedPackage.lessonsRemaining} of ${selectedPackage.lessonsTotal} left${selectedPackage.paymentStatus === "pending" ? " - pay at lesson" : selectedPackage.paymentStatus === "deposit_paid" && !!selectedPackage.balanceDueCents ? ` - ${centsToDollars(selectedPackage.balanceDueCents)} due at lesson` : ""}`
+                        ? `${selectedPackage.lessonsRemaining} of ${selectedPackage.lessonsTotal} left${selectedPackage.paymentStatus === "pending" ? " - pay at lesson" : selectedPackage.paymentStatus === "deposit_paid" && !!selectedPackage.balanceDueCents ? ` - ${centsToDollars(selectedPackage.balanceDueCents)} due at lesson` : selectedPackage.paymentStatus === "club_billed" ? ` - billed by ${business.name}` : ""}`
                         : `${centsToDollars(pendingPackageInfo!.priceCents)} - pick a time, then pay`}
                     </div>
                   </button>
@@ -975,8 +1006,8 @@ export default function BookingClient({
           (selectedPackage || pendingPackageInfo) && (
             <div style={{
               display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10,
-              background: selectedPackage?.paymentStatus === "pending" || (selectedPackage?.paymentStatus === "deposit_paid" && !!selectedPackage?.balanceDueCents) || isBuyingPackage ? "#FBF3DE" : "var(--open)",
-              border: `1px solid ${selectedPackage?.paymentStatus === "pending" || (selectedPackage?.paymentStatus === "deposit_paid" && !!selectedPackage?.balanceDueCents) || isBuyingPackage ? "#E3CE93" : "var(--border)"}`,
+              background: selectedPackage?.paymentStatus === "pending" || (selectedPackage?.paymentStatus === "deposit_paid" && !!selectedPackage?.balanceDueCents) || selectedPackage?.paymentStatus === "club_billed" || isBuyingPackage ? "#FBF3DE" : "var(--open)",
+              border: `1px solid ${selectedPackage?.paymentStatus === "pending" || (selectedPackage?.paymentStatus === "deposit_paid" && !!selectedPackage?.balanceDueCents) || selectedPackage?.paymentStatus === "club_billed" || isBuyingPackage ? "#E3CE93" : "var(--border)"}`,
               marginBottom: 14,
             }}>
               <span style={{ fontSize: 13, fontWeight: 600 }}>
@@ -994,6 +1025,9 @@ export default function BookingClient({
                     )}
                     {selectedPackage!.paymentStatus === "deposit_paid" && !!selectedPackage!.balanceDueCents && (
                       <span className="mono" style={{ color: "#9A7A1E", fontWeight: 600 }}> - {centsToDollars(selectedPackage!.balanceDueCents)} due at your lesson</span>
+                    )}
+                    {selectedPackage!.paymentStatus === "club_billed" && (
+                      <span className="mono" style={{ color: "#9A7A1E", fontWeight: 600 }}> - billed by {business.name}</span>
                     )}
                   </>
                 )}
@@ -1285,6 +1319,20 @@ export default function BookingClient({
                 }}
               >
                 Pay {centsToDollars(Math.floor((pendingPackageInfo?.priceCents || 0) / 2))} now, rest at your lesson
+              </button>
+            )}
+
+            {service === "lesson" && isBuyingPackage && business.allowClubBilling && (
+              <button
+                onClick={clubBilledAndBookSlot}
+                disabled={confirming || !contactValid() || !selectedInstructorId}
+                style={{
+                  width: "100%", background: "none", color: "var(--chalk)", border: "1px dashed rgba(255,255,255,0.4)",
+                  borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 14, marginTop: 8,
+                  opacity: confirming || !contactValid() || !selectedInstructorId ? 0.6 : 1,
+                }}
+              >
+                Reserve - {business.name} bills me separately
               </button>
             )}
 

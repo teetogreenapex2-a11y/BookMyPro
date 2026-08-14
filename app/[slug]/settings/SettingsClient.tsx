@@ -41,6 +41,7 @@ type Business = {
   fittingIronPriceCents: number;
   fittingFullPriceCents: number;
   allowPayLater: boolean;
+  allowClubBilling: boolean;
   requireBookingApproval: boolean;
   bookingWindowDays: number;
   calendarProvider: string;
@@ -960,6 +961,32 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               >
                 <span style={{
                   position: "absolute", top: 3, left: biz.allowPayLater ? 21 : 3, width: 18, height: 18,
+                  borderRadius: "50%", background: "#FFF", transition: "left 0.15s",
+                }} />
+              </button>
+            </div>
+
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+              background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16,
+            }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Billed by club or owner</div>
+                <p style={{ fontSize: 12, color: "var(--faint)", margin: 0 }}>
+                  For lessons billed separately - through a club account or by you directly - rather than paid through the app at all. Both you and the player will see this clearly labeled, not mistaken for pay-in-person.
+                </p>
+              </div>
+              <button
+                onClick={() => setBiz((b) => ({ ...b, allowClubBilling: !b.allowClubBilling }))}
+                aria-label={biz.allowClubBilling ? "Disable club/owner billing" : "Enable club/owner billing"}
+                aria-pressed={biz.allowClubBilling}
+                style={{
+                  width: 42, height: 24, borderRadius: 12, border: "none", flexShrink: 0,
+                  background: biz.allowClubBilling ? "var(--fairway)" : "var(--border)", position: "relative",
+                }}
+              >
+                <span style={{
+                  position: "absolute", top: 3, left: biz.allowClubBilling ? 21 : 3, width: 18, height: 18,
                   borderRadius: "50%", background: "#FFF", transition: "left 0.15s",
                 }} />
               </button>

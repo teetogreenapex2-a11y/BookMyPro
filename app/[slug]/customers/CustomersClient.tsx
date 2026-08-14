@@ -530,6 +530,25 @@ export default function CustomersClient({
                                   {markingPaid === pkg.id ? "…" : "Mark as paid"}
                                 </button>
                               </>
+                            ) : pkg.paymentStatus === "club_billed" ? (
+                              <>
+                                <span style={{
+                                  fontSize: 10, fontWeight: 700, color: "#9A7A1E", background: "#FBF3DE",
+                                  borderRadius: 4, padding: "1px 6px",
+                                }}>
+                                  BILLED SEPARATELY
+                                </span>
+                                <button
+                                  onClick={() => markPaid(pkg.id)}
+                                  disabled={markingPaid === pkg.id}
+                                  style={{
+                                    fontSize: 10, fontWeight: 700, color: "var(--fairway)", background: "none",
+                                    border: "1px solid var(--border)", borderRadius: 4, padding: "1px 6px", cursor: "pointer",
+                                  }}
+                                >
+                                  {markingPaid === pkg.id ? "…" : "Mark received"}
+                                </button>
+                              </>
                             ) : null}
 
                             {pkg.canUpgrade && pkg.upgradeTiers.length > 0 && (
