@@ -102,7 +102,7 @@ export default function CustomersClient({
     if (res.ok) {
       setCustomers((prev) => [
         ...prev,
-        { id: data.id, name: data.name, email: data.email, phone: data.phone, packages: [], fittings: [], totalLessonsRemaining: 0, upcomingLessons: 0 },
+        { id: data.id, name: data.name, email: data.email, phone: data.phone, packages: [], fittings: [], lessons: [], totalLessonsRemaining: 0, upcomingLessons: 0 },
       ]);
       setAddForm({ name: "", email: "", phone: "" });
       setAddOpen(false);
