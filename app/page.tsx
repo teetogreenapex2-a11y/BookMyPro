@@ -74,6 +74,12 @@ export default async function HomePage() {
           >
             I'm a coach or instructor
           </a>
+          <a
+            href="/onboarding"
+            style={{ display: "block", marginTop: 16, fontSize: 12, color: "#8A8571", textDecoration: "none" }}
+          >
+            Own golf business, not joining an existing one? Get started
+          </a>
         </div>
       </div>
     );
