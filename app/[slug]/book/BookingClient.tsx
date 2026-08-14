@@ -645,15 +645,15 @@ export default function BookingClient({
           <h1 className="display" style={{ fontSize: 26, margin: "0 0 4px" }}>
             {service === "lesson" ? "Book a lesson" : "Book a club fitting"}
           </h1>
-          {business.instructorName && instructors.length <= 1 && (
-  <p style={{ fontSize: 16, fontWeight: 600, color: "#D7DED9", margin: "0 0 14px" }}>
-    with {business.instructorName}
-  </p>
-)}
+          {business.instructorName && (
+            <p style={{ fontSize: 16, fontWeight: 600, color: "#D7DED9", margin: "0 0 14px" }}>
+              with {business.instructorName}
+            </p>
+          )}
 
           {instructors.length > 1 && (
             <div style={{ marginBottom: 14 }}>
-              <div className="mono" style={{ fontSize: 11, color: "#9DB8A9", marginBottom: 8, letterSpacing: "0.04em" }}>
+              <div className="mono" style={{ fontSize: 11, color: "#FFFFFF", marginBottom: 8, letterSpacing: "0.04em" }}>
                 WHO WOULD YOU LIKE TO BOOK WITH?
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
