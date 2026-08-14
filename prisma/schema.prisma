@@ -23,6 +23,25 @@ model Business {
   // spinning up a live, bookable business (and taking real payments)
   // with zero review at all.
   approved Boolean @default(false)
+
+  // --- Platform billing (BookMyPro's own subscription, not this
+  // business's own Stripe/Square setup for taking payments from their
+  // players - a genuinely separate thing). A trial starts the moment a
+  // business is approved, not the moment it's created, since an
+  // unapproved business can't actually be used for anything yet.
+  trialEndsAt      DateTime?
+  subscriptionStatus String  @default("trial") // "trial" | "active" | "past_due" | "cancelled"
+  platformStripeCustomerId     String?
+  platformStripeSubscriptionId String?
+  // The specific subscription line item for the per-instructor charge -
+  // needed separately from the subscription id itself so its quantity
+  // can be updated later without touching the base-fee line item at all.
+  platformInstructorItemId     String?
+  // Set once, the moment a trial's fate is genuinely decided one way or
+  // the other by the platform admin - lets the admin review screen show
+  // only what's actually still awaiting a decision.
+  trialReviewedAt  DateTime?
+
   logoUrl String? // uploaded via Settings - shown on this business's own booking/instructor pages instead of the platform's generic branding
   email  String @default("")
   hours  String @default("Mon–Sat, 8:00 AM – 5:00 PM") // display-only text, shown on the booking page - not connected to actual calendar generation

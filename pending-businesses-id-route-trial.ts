@@ -22,7 +22,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const { action } = await req.json();
   if (action === "approve") {
-    await prisma.business.update({ where: { id: params.id }, data: { approved: true } });
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+    await prisma.business.update({ where: { id: params.id }, data: { approved: true, trialEndsAt } });
   } else if (action === "deny") {
     await prisma.availability.deleteMany({ where: { businessId: params.id } });
     await prisma.membership.deleteMany({ where: { businessId: params.id } });

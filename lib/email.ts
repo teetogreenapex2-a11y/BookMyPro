@@ -155,6 +155,29 @@ export async function sendGiftCardEmail(to: string, details: { businessName: str
   await sendEmail(to, subject, html);
 }
 
+// Sent to the platform admin (you) the day a business's 30-day trial
+// genuinely runs out - nothing happens to the business automatically,
+// this is just the real, human decision point: review it and either
+// give it more time or delete it entirely.
+export async function sendTrialExpiredNotification(to: string | null | undefined, details: { businessName: string; ownerName: string | null; ownerEmail: string | null; reviewUrl: string }) {
+  if (!to) return;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">A trial just ended</h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        <tr><td style="padding: 4px 0; color: #8A8571;">Business</td><td style="padding: 4px 0; font-weight: 600;">${details.businessName}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Owner</td><td style="padding: 4px 0; font-weight: 600;">${details.ownerName || "—"}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Email</td><td style="padding: 4px 0;">${details.ownerEmail || "—"}</td></tr>
+      </table>
+      <p>Nothing happens automatically - review it and either give it more time or delete it entirely.</p>
+      <a href="${details.reviewUrl}" style="display:inline-block;background:#1B3A2F;color:#F6F4EE;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">Review trial</a>
+    </div>
+  `;
+
+  await sendEmail(to, `Trial ended: ${details.businessName}`, html);
+}
+
 // Sends the actual magic link for passwordless sign-in - this is the
 // custom sendVerificationRequest NextAuth's Email provider calls instead
 // of its own default (which expects raw SMTP credentials we don't have,
