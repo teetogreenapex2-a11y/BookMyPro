@@ -11,11 +11,14 @@ type Customer = {
   packages: {
     id: string; type: string; label: string; lessonsTotal: number; lessonsRemaining: number;
     paymentStatus?: string; balanceDueCents?: number; creditCents?: number; canUpgrade?: boolean; upgradeTiers: UpgradeTier[];
+    instructorMembershipId?: string | null; instructorName?: string | null;
   }[];
   fittings: { id: string; label: string; startTime: string }[];
   totalLessonsRemaining: number;
   upcomingLessons: number;
 };
+
+type Instructor = { id: string; name: string };
 
 type UpgradeTier = { id: string; label: string; lessons: number; priceCents: number };
 
@@ -24,10 +27,11 @@ function centsToDollars(cents: number) {
 }
 
 export default function CustomersClient({
-  customers: initialCustomers, slug, basePath, apiBase,
-}: { customers: Customer[]; slug: string; basePath: string; apiBase: string }) {
+  customers: initialCustomers, slug, basePath, apiBase, isOwner, instructors,
+}: { customers: Customer[]; slug: string; basePath: string; apiBase: string; isOwner: boolean; instructors: Instructor[] }) {
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "remaining">("name");
+  const [instructorFilter, setInstructorFilter] = useState<string>("all");
   const [customers, setCustomers] = useState(initialCustomers);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
@@ -200,11 +204,14 @@ export default function CustomersClient({
     let rows = customers.filter(
       (c) => !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
     );
+    if (instructorFilter !== "all") {
+      rows = rows.filter((c) => c.packages.some((p) => p.instructorMembershipId === instructorFilter));
+    }
     rows = [...rows].sort((a, b) =>
       sortBy === "name" ? a.name.localeCompare(b.name) : b.totalLessonsRemaining - a.totalLessonsRemaining
     );
     return rows;
-  }, [customers, query, sortBy]);
+  }, [customers, query, sortBy, instructorFilter]);
 
   const totalLessonsOutstanding = useMemo(
     () => customers.reduce((sum, c) => sum + c.totalLessonsRemaining, 0),
@@ -269,6 +276,36 @@ export default function CustomersClient({
               fontFamily: "inherit", fontSize: 14, background: "rgba(255,255,255,0.08)", color: "var(--chalk)",
             }}
           />
+
+          {isOwner && instructors.length > 1 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+              <button
+                onClick={() => setInstructorFilter("all")}
+                style={{
+                  padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  border: instructorFilter === "all" ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.2)",
+                  background: instructorFilter === "all" ? "rgba(184,134,43,0.18)" : "transparent",
+                  color: "var(--chalk)",
+                }}
+              >
+                All
+              </button>
+              {instructors.map((inst) => (
+                <button
+                  key={inst.id}
+                  onClick={() => setInstructorFilter(inst.id)}
+                  style={{
+                    padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    border: instructorFilter === inst.id ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.2)",
+                    background: instructorFilter === inst.id ? "rgba(184,134,43,0.18)" : "transparent",
+                    color: "var(--chalk)",
+                  }}
+                >
+                  {inst.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </header>
 
@@ -453,6 +490,11 @@ export default function CustomersClient({
                             }}>
                               {pkg.label} · {pkg.lessonsRemaining}/{pkg.lessonsTotal}
                             </span>
+                            {isOwner && instructors.length > 1 && pkg.instructorName && (
+                              <span style={{ fontSize: 10, color: "var(--faint)", fontWeight: 600 }}>
+                                with {pkg.instructorName}
+                              </span>
+                            )}
 
                             {editingPackageId === pkg.id ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>

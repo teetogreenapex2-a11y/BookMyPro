@@ -17,13 +17,23 @@ export default async function CustomersPage({ params }: { params: { slug: string
   const { basePath, apiBase } = getBasePaths(params.slug);
   if (!membership) redirect(`${basePath}/book`);
 
+  const isOwner = membership.role === "owner";
+
   const playerMemberships = await prisma.membership.findMany({
     where: { businessId: business.id, role: "player" },
     include: {
       user: {
         include: {
-          packages: { where: { businessId: business.id }, orderBy: { createdAt: "desc" } },
-          bookings: { where: { businessId: business.id, status: "confirmed" }, orderBy: { startTime: "asc" } },
+          packages: {
+            where: isOwner ? { businessId: business.id } : { businessId: business.id, instructorMembershipId: membership.id },
+            orderBy: { createdAt: "desc" },
+          },
+          bookings: {
+            where: isOwner
+              ? { businessId: business.id, status: "confirmed" }
+              : { businessId: business.id, status: "confirmed", instructorMembershipId: membership.id },
+            orderBy: { startTime: "asc" },
+          },
         },
       },
     },
@@ -37,7 +47,9 @@ export default async function CustomersPage({ params }: { params: { slug: string
   });
   const instructorsById = new Map(instructorMemberships.map((m) => [m.id, m]));
 
-  const customers = playerMemberships.map(({ user: p }) => {
+  const customers = playerMemberships
+    .filter(({ user: p }) => isOwner || p.packages.length > 0 || p.bookings.length > 0)
+    .map(({ user: p }) => {
     const upgradedFromIds = new Set(p.packages.map((pkg) => pkg.upgradedFromId).filter(Boolean));
 
     const packages = p.packages.map((pkg) => {
@@ -54,6 +66,8 @@ export default async function CustomersPage({ params }: { params: { slug: string
         paymentStatus: pkg.paymentStatus,
         balanceDueCents: pkg.balanceDueCents,
         creditCents: pkg.creditCents,
+        instructorMembershipId: pkg.instructorMembershipId,
+        instructorName: instructorMembership?.name || instructorMembership?.email || null,
         // Only a "single" package can be upgraded, and only once — hide the
         // action once a newer package already references this one as its source.
         canUpgrade: pkg.type === "single" && !upgradedFromIds.has(pkg.id),
@@ -91,6 +105,8 @@ export default async function CustomersPage({ params }: { params: { slug: string
       slug={params.slug}
       basePath={basePath}
       apiBase={apiBase}
+      isOwner={isOwner}
+      instructors={isOwner ? instructorMemberships.map((m) => ({ id: m.id, name: m.name || m.email })) : []}
     />
   );
 }
