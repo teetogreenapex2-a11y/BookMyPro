@@ -44,6 +44,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
   // upgrade tiers priced by the same person it was originally bought from.
   const instructorMemberships = await prisma.membership.findMany({
     where: { businessId: business.id, role: { in: ["owner", "instructor"] } },
+    include: { user: { select: { name: true, email: true } } },
   });
   const instructorsById = new Map(instructorMemberships.map((m) => [m.id, m]));
 
@@ -67,7 +68,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
         balanceDueCents: pkg.balanceDueCents,
         creditCents: pkg.creditCents,
         instructorMembershipId: pkg.instructorMembershipId,
-        instructorName: instructorMembership?.name || instructorMembership?.email || null,
+        instructorName: instructorMembership?.user.name || instructorMembership?.user.email || null,
         // Only a "single" package can be upgraded, and only once — hide the
         // action once a newer package already references this one as its source.
         canUpgrade: pkg.type === "single" && !upgradedFromIds.has(pkg.id),
@@ -89,7 +90,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
         id: b.id,
         startTime: b.startTime.toISOString(),
         isPast: b.startTime < new Date(),
-        instructorName: b.instructorMembershipId ? instructorsById.get(b.instructorMembershipId)?.name || instructorsById.get(b.instructorMembershipId)?.email || null : null,
+        instructorName: b.instructorMembershipId ? instructorsById.get(b.instructorMembershipId)?.user.name || instructorsById.get(b.instructorMembershipId)?.user.email || null : null,
       }))
       .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
@@ -117,7 +118,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
       basePath={basePath}
       apiBase={apiBase}
       isOwner={isOwner}
-      instructors={isOwner ? instructorMemberships.map((m) => ({ id: m.id, name: m.name || m.email })) : []}
+      instructors={isOwner ? instructorMemberships.map((m) => ({ id: m.id, name: m.user.name || m.user.email })) : []}
     />
   );
 }
