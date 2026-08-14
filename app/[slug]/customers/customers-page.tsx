@@ -83,6 +83,16 @@ export default async function CustomersPage({ params }: { params: { slug: string
         startTime: b.startTime.toISOString(),
       }));
 
+    const lessons = p.bookings
+      .filter((b) => b.serviceType === "lesson")
+      .map((b) => ({
+        id: b.id,
+        startTime: b.startTime.toISOString(),
+        isPast: b.startTime < new Date(),
+        instructorName: b.instructorMembershipId ? instructorsById.get(b.instructorMembershipId)?.name || instructorsById.get(b.instructorMembershipId)?.email || null : null,
+      }))
+      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+
     const upcomingLessons = p.bookings.filter(
       (b) => b.serviceType === "lesson" && b.startTime > new Date()
     ).length;
@@ -94,6 +104,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
       phone: p.phone || "—",
       packages,
       fittings,
+      lessons,
       totalLessonsRemaining: packages.reduce((sum, pkg) => sum + pkg.lessonsRemaining, 0),
       upcomingLessons,
     };

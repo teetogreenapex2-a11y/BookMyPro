@@ -14,6 +14,7 @@ type Customer = {
     instructorMembershipId?: string | null; instructorName?: string | null;
   }[];
   fittings: { id: string; label: string; startTime: string }[];
+  lessons: { id: string; startTime: string; isPast: boolean; instructorName: string | null }[];
   totalLessonsRemaining: number;
   upcomingLessons: number;
 };
@@ -42,6 +43,7 @@ export default function CustomersClient({
   const [savingName, setSavingName] = useState(false);
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [openUpgradeFor, setOpenUpgradeFor] = useState<string | null>(null);
+  const [openLessonHistoryFor, setOpenLessonHistoryFor] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ name: "", email: "", phone: "" });
   const [adding, setAdding] = useState(false);
@@ -480,7 +482,7 @@ export default function CustomersClient({
                       </div>
                     </div>
 
-                    {(c.packages.length > 0 || c.fittings.length > 0) && (
+                    {(c.packages.length > 0 || c.fittings.length > 0 || c.lessons.length > 0) && (
                       <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #EFEBDD", display: "flex", flexDirection: "column", gap: 8 }}>
                         {c.packages.map((pkg) => (
                           <div key={pkg.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
@@ -639,6 +641,39 @@ export default function CustomersClient({
                             {f.label} — {new Date(f.startTime).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                           </div>
                         ))}
+
+                        {c.lessons.length > 0 && (
+                          <div>
+                            <button
+                              onClick={() => setOpenLessonHistoryFor(openLessonHistoryFor === c.id ? null : c.id)}
+                              style={{
+                                fontSize: 11, fontWeight: 600, color: "var(--fairway)", background: "none",
+                                border: "none", padding: 0, cursor: "pointer", textDecoration: "underline",
+                              }}
+                            >
+                              {openLessonHistoryFor === c.id ? "Hide" : "Show"} lesson history ({c.lessons.length})
+                            </button>
+                            {openLessonHistoryFor === c.id && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
+                                {c.lessons.map((l) => (
+                                  <div key={l.id} style={{ fontSize: 12, color: l.isPast ? "var(--muted)" : "var(--fairway)" }}>
+                                    {new Date(l.startTime).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                                    {" "}
+                                    <span className="mono" style={{ fontSize: 10, color: "var(--faint)" }}>
+                                      {new Date(l.startTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                                    </span>
+                                    {!l.isPast && (
+                                      <span style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", marginLeft: 6 }}>UPCOMING</span>
+                                    )}
+                                    {isOwner && instructors.length > 1 && l.instructorName && (
+                                      <span style={{ fontSize: 10, color: "var(--faint)", marginLeft: 6 }}>with {l.instructorName}</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
