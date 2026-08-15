@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
+import { SignInWithApple } from "@capacitor-community/apple-sign-in";
 
 export default function LoginPage() {
   return (
@@ -23,6 +24,8 @@ function LoginPageInner() {
   const [linkSent, setLinkSent] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [signingInWithGoogle, setSigningInWithGoogle] = useState(false);
+  const [appleError, setAppleError] = useState<string | null>(null);
+  const [signingInWithApple, setSigningInWithApple] = useState(false);
 
   async function sendMagicLink() {
     if (!email.trim()) return;
@@ -74,6 +77,51 @@ function LoginPageInner() {
     }
   }
 
+  // Apple's native Sign in with Apple SDK is iOS-only - unlike Google,
+  // Apple doesn't block its own web sign-in flow inside an embedded app
+  // view, so Android and the website both just use the normal redirect.
+  // Only the iOS app needs this separate, native path.
+  async function handleAppleSignIn() {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") {
+      signIn("apple", { callbackUrl });
+      return;
+    }
+
+    setAppleError(null);
+    setSigningInWithApple(true);
+    try {
+      const result = await SignInWithApple.authorize({
+        clientId: "com.bookmypro.app",
+        redirectURI: `${process.env.NEXT_PUBLIC_APP_URL || "https://bookmypro.app"}/api/auth/callback/apple`,
+        scopes: "email name",
+      });
+      const identityToken = result?.response?.identityToken;
+      if (!identityToken) throw new Error("Apple didn't return a token");
+
+      // Apple only ever sends the person's name on this very first
+      // authorization - never again after that - so it has to be
+      // captured and sent along right here or it's lost for good.
+      const givenName = result?.response?.givenName;
+      const familyName = result?.response?.familyName;
+      const name = [givenName, familyName].filter(Boolean).join(" ") || undefined;
+
+      const res = await fetch("/api/auth/apple-native", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identityToken, name }),
+      });
+      if (!res.ok) throw new Error("Sign-in failed - try again");
+
+      window.location.href = callbackUrl;
+    } catch (err: any) {
+      console.error("Native Apple sign-in failed:", err);
+      const detail = err?.message || err?.code || JSON.stringify(err) || "unknown error";
+      setAppleError(`Couldn't sign in with Apple: ${detail}`);
+    } finally {
+      setSigningInWithApple(false);
+    }
+  }
+
   return (
     <div
       style={{
@@ -121,6 +169,28 @@ function LoginPageInner() {
         </button>
         {googleError && (
           <p style={{ fontSize: 12, color: "#B23A3A", marginTop: 8 }}>{googleError}</p>
+        )}
+
+        <button
+          onClick={handleAppleSignIn}
+          disabled={signingInWithApple}
+          style={{
+            width: "100%",
+            background: "#000",
+            color: "#FFF",
+            border: "none",
+            borderRadius: 8,
+            padding: "12px 20px",
+            fontWeight: 700,
+            fontSize: 14,
+            marginTop: 10,
+            opacity: signingInWithApple ? 0.6 : 1,
+          }}
+        >
+          {signingInWithApple ? "Signing in..." : "Continue with Apple"}
+        </button>
+        {appleError && (
+          <p style={{ fontSize: 12, color: "#B23A3A", marginTop: 8 }}>{appleError}</p>
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0" }}>
