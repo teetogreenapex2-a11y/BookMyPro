@@ -7,6 +7,25 @@ import { prisma } from "./prisma";
 import { sendMagicLinkEmail } from "./email";
 import { generateAppleClientSecret } from "./appleAuth";
 
+// Built ahead of time, defensively - a malformed or misconfigured Apple
+// key should only ever mean the Apple button doesn't show up, never a
+// crash that takes down every route in the app that checks who's signed
+// in (which is most of them, since they all import authOptions).
+function buildAppleProvider() {
+  if (!process.env.APPLE_CLIENT_ID || !process.env.APPLE_PRIVATE_KEY) return null;
+  try {
+    return AppleProvider({
+      clientId: process.env.APPLE_CLIENT_ID,
+      clientSecret: generateAppleClientSecret(),
+      allowDangerousEmailAccountLinking: true,
+    });
+  } catch (err) {
+    console.error("Apple sign-in isn't configured correctly - the Apple button will be hidden until it's fixed:", err);
+    return null;
+  }
+}
+const appleProvider = buildAppleProvider();
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -16,19 +35,7 @@ export const authOptions: NextAuthOptions = {
       authorization: { params: { scope: "openid email profile" } },
       allowDangerousEmailAccountLinking: true,
     }),
-    // Only registered if the Apple credentials are actually configured -
-    // avoids a hard crash on every sign-in attempt while this is still
-    // being set up, since an empty/missing provider config would
-    // otherwise break NextAuth entirely rather than just hiding the button.
-    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_PRIVATE_KEY
-      ? [
-          AppleProvider({
-            clientId: process.env.APPLE_CLIENT_ID,
-            clientSecret: generateAppleClientSecret(),
-            allowDangerousEmailAccountLinking: true,
-          }),
-        ]
-      : []),
+    ...(appleProvider ? [appleProvider] : []),
     EmailProvider({
       server: { host: "unused", port: 587, auth: { user: "unused", pass: "unused" } },
       from: process.env.RESEND_FROM_EMAIL || "notifications@example.com",
