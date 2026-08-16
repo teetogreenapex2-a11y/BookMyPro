@@ -51,7 +51,13 @@ function LoginPageInner() {
     setGoogleError(null);
     setSigningInWithGoogle(true);
     try {
-      await GoogleSignIn.initialize({ clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID! });
+      const clientIdInUse = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      setGoogleError(`DEBUG: client id is "${clientIdInUse || "(EMPTY)"}"`);
+      if (!clientIdInUse) {
+        setSigningInWithGoogle(false);
+        return;
+      }
+      await GoogleSignIn.initialize({ clientId: clientIdInUse });
       const result = await GoogleSignIn.signIn();
       if (!result.idToken) throw new Error("Google didn't return a token");
 
