@@ -23,7 +23,6 @@ function LoginPageInner() {
   const [sendingLink, setSendingLink] = useState(false);
   const [linkSent, setLinkSent] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
-  const [debugClientId, setDebugClientId] = useState<string | null>(null);
   const [signingInWithGoogle, setSigningInWithGoogle] = useState(false);
   const [appleError, setAppleError] = useState<string | null>(null);
   const [signingInWithApple, setSigningInWithApple] = useState(false);
@@ -52,9 +51,7 @@ function LoginPageInner() {
     setGoogleError(null);
     setSigningInWithGoogle(true);
     try {
-      const clientIdInUse = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-      setDebugClientId(`"${clientIdInUse || "(EMPTY)"}"`);
-      await GoogleSignIn.initialize({ clientId: clientIdInUse! });
+      await GoogleSignIn.initialize({ clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID! });
       const result = await GoogleSignIn.signIn();
       if (!result.idToken) throw new Error("Google didn't return a token");
 
@@ -136,9 +133,6 @@ function LoginPageInner() {
         padding: 20,
       }}
     >
-      <div style={{ position: "fixed", top: 0, left: 0, right: 0, background: "#FBF3DE", color: "#1B3A2F", fontSize: 11, padding: "10px 14px", zIndex: 9999, wordBreak: "break-all", fontFamily: "monospace" }}>
-        DEBUG client id: "{process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "(EMPTY)"}"
-      </div>
       <div
         style={{
           background: "var(--chalk)",
@@ -175,11 +169,6 @@ function LoginPageInner() {
         </button>
         {googleError && (
           <p style={{ fontSize: 12, color: "#B23A3A", marginTop: 8 }}>{googleError}</p>
-        )}
-        {debugClientId && (
-          <p style={{ fontSize: 11, color: "#1B3A2F", background: "#FBF3DE", padding: "6px 10px", borderRadius: 6, marginTop: 8, wordBreak: "break-all" }}>
-            DEBUG client id: {debugClientId}
-          </p>
         )}
 
         <button
