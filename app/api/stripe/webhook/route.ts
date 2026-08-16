@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { findPackage, findFitting } from "@/lib/pricing";
 import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
-import { getBusinessInstructor, ensureMembership } from "@/lib/tenant";
+import { getBusinessInstructor, ensureMembership, getBookingNotificationRecipients } from "@/lib/tenant";
 import { sendBookingNotification } from "@/lib/email";
 import { sendPushToMembership, checkAndNotifyLowPackage } from "@/lib/pushNotifications";
 import { BUSINESS_TIMEZONE } from "@/lib/time";
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
             }
 
             if (business.notifyOnBooking) {
-              await sendBookingNotification(business.notificationEmail || business.email, {
+              await sendBookingNotification(await getBookingNotificationRecipients(business, meta.instructorMembershipId), {
                 businessName: business.name,
                 serviceLabel: "Lesson",
                 startTime: slot.startTime,
@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
             }
 
             if (business.notifyOnBooking) {
-              await sendBookingNotification(business.notificationEmail || business.email, {
+              await sendBookingNotification(await getBookingNotificationRecipients(business, meta.instructorMembershipId), {
                 businessName: business.name,
                 serviceLabel: "Lesson (deposit paid)",
                 startTime: slot.startTime,
@@ -334,7 +334,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (business.notifyOnBooking) {
-          await sendBookingNotification(business.notificationEmail || business.email, {
+          await sendBookingNotification(await getBookingNotificationRecipients(business, meta.instructorMembershipId), {
             businessName: business.name,
             serviceLabel: fitting.label,
             startTime: slot.startTime,
@@ -395,7 +395,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (business.notifyOnBooking) {
-          await sendBookingNotification(business.notificationEmail || business.email, {
+          await sendBookingNotification(await getBookingNotificationRecipients(business, meta.instructorMembershipId), {
             businessName: business.name,
             serviceLabel: "Group lesson",
             startTime: slot.startTime,

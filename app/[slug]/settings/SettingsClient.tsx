@@ -47,6 +47,7 @@ type Business = {
   calendarProvider: string;
   notifyOnBooking: boolean;
   notificationEmail: string | null;
+  bookingNotifyTarget: string;
   paymentProvider: string;
   dailyApiKey: string | null;
   listedInDirectory: boolean;
@@ -931,12 +932,41 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                 </button>
               </div>
               {biz.notifyOnBooking && (
-                <Field
-                  label="Send alerts to"
-                  value={biz.notificationEmail || ""}
-                  onChange={(v) => setBiz((b) => ({ ...b, notificationEmail: v }))}
-                  placeholder={biz.email || "you@example.com"}
-                />
+                <>
+                  <Field
+                    label="Send alerts to"
+                    value={biz.notificationEmail || ""}
+                    onChange={(v) => setBiz((b) => ({ ...b, notificationEmail: v }))}
+                    placeholder={biz.email || "you@example.com"}
+                  />
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>Who gets notified</div>
+                    <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 8px" }}>
+                      For a business with more than one instructor - a real gap before this existed, since every
+                      booking used to email this one address above regardless of who it was actually with.
+                    </p>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {([
+                        { id: "owner", label: "Owner only" },
+                        { id: "instructor", label: "That instructor" },
+                        { id: "both", label: "Both" },
+                      ] as const).map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => setBiz((b) => ({ ...b, bookingNotifyTarget: opt.id }))}
+                          style={{
+                            padding: "7px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+                            border: biz.bookingNotifyTarget === opt.id ? "1px solid var(--fairway)" : "1px solid var(--border)",
+                            background: biz.bookingNotifyTarget === opt.id ? "var(--open)" : "#FFF",
+                            color: "var(--ink)",
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 

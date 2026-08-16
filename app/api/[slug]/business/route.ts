@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
     "packageSinglePriceCents", "packagePlayingPriceCents", "packageVideoPriceCents", "packageThreePriceCents", "packageFivePriceCents", "packageTenPriceCents",
     "fittingDriverEnabled", "fittingIronEnabled", "fittingFullEnabled",
     "fittingDriverPriceCents", "fittingIronPriceCents", "fittingFullPriceCents",
-    "allowPayLater", "allowClubBilling", "requireBookingApproval", "calendarProvider", "notifyOnBooking", "notificationEmail",
+    "allowPayLater", "allowClubBilling", "requireBookingApproval", "calendarProvider", "notifyOnBooking", "notificationEmail", "bookingNotifyTarget",
     "bookingWindowDays", "dailyApiKey",
     "listedInDirectory", "city", "state", "zipCode",
   ];

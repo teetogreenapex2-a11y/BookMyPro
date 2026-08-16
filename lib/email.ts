@@ -13,7 +13,7 @@ function getClient(): Resend | null {
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "notifications@example.com";
 
-async function sendEmail(to: string, subject: string, html: string) {
+async function sendEmail(to: string | string[], subject: string, html: string) {
   const client = getClient();
   if (!client) {
     console.warn("RESEND_API_KEY is not set — skipping notification email.");
@@ -43,8 +43,9 @@ type BookingAlertDetails = {
 // bookings and pending requests (the wording just changes slightly), from
 // every place a booking can be created: app/api/{slug}/bookings,
 // app/api/stripe/webhook, app/api/square/webhook.
-export async function sendBookingNotification(to: string | null | undefined, details: BookingAlertDetails) {
-  if (!to) return; // no notification email configured — nothing to do
+export async function sendBookingNotification(to: string | string[] | null | undefined, details: BookingAlertDetails) {
+  const recipients = Array.isArray(to) ? to.filter(Boolean) : to ? [to] : [];
+  if (recipients.length === 0) return; // no notification email configured — nothing to do
 
   const when = details.startTime.toLocaleString(undefined, {
     weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit",
@@ -76,7 +77,7 @@ export async function sendBookingNotification(to: string | null | undefined, det
     </div>
   `;
 
-  await sendEmail(to, subject, html);
+  await sendEmail(recipients, subject, html);
 }
 
 // Sent to the business owner when someone requests to join as an

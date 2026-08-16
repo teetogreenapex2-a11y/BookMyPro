@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, getInstructorById, getBusinessInstructor, getMembership } from "@/lib/tenant";
+import { getBusinessBySlug, getInstructorById, getBusinessInstructor, getMembership, getBookingNotificationRecipients } from "@/lib/tenant";
 import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
 import { sendBookingNotification } from "@/lib/email";
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // un-awaited promise can get killed once the response is sent. The
     // function already catches its own errors internally, so this can't
     // fail the booking itself, just adds a small amount of latency.
-    await sendBookingNotification(business.notificationEmail || business.email, {
+    await sendBookingNotification(await getBookingNotificationRecipients(business, instructorMembershipId), {
       businessName: business.name,
       serviceLabel: "Lesson",
       startTime: slot.startTime,

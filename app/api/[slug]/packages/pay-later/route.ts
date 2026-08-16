@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, ensureMembership, getInstructorById } from "@/lib/tenant";
+import { getBusinessBySlug, ensureMembership, getInstructorById, getBookingNotificationRecipients } from "@/lib/tenant";
 import { findPackage, getPackagePriceCents, isPackageEnabled, isPackagePriceSet } from "@/lib/pricing";
 import { sendBookingNotification } from "@/lib/email";
 import { sendPushToMembership, checkAndNotifyLowPackage } from "@/lib/pushNotifications";
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   });
 
   if (business.notifyOnBooking) {
-    await sendBookingNotification(business.notificationEmail || business.email, {
+    await sendBookingNotification(await getBookingNotificationRecipients(business, instructorMembershipId), {
       businessName: business.name,
       serviceLabel: "Lesson",
       startTime: slot.startTime,

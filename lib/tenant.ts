@@ -76,6 +76,40 @@ export async function getInstructorById(businessId: string, membershipId: string
   });
 }
 
+// Works out who actually gets emailed about a new booking, based on the
+// business's own preference - just the instructor it was actually with,
+// just the owner (the old, hardcoded default), or both. A real gap
+// before this existed: every booking notification always went to one
+// fixed, business-wide address regardless of which instructor a
+// booking was actually with, so a second instructor never heard about
+// their own bookings at all.
+export async function getBookingNotificationRecipients(
+  business: { id: string; notificationEmail: string | null; email: string; bookingNotifyTarget: string },
+  instructorMembershipId: string | null | undefined
+) {
+  const ownerEmail = business.notificationEmail || business.email || null;
+  const target = business.bookingNotifyTarget || "owner";
+
+  let instructorEmail: string | null = null;
+  if (instructorMembershipId && (target === "instructor" || target === "both")) {
+    const instructor = await prisma.membership.findUnique({
+      where: { id: instructorMembershipId },
+      include: { user: { select: { email: true } } },
+    });
+    instructorEmail = instructor?.user.email || null;
+  }
+
+  const recipients =
+    target === "instructor" ? [instructorEmail]
+    : target === "both" ? [instructorEmail, ownerEmail]
+    : [ownerEmail];
+
+  // De-duplicated - the owner and the instructor are sometimes the same
+  // real person (e.g. the owner booking a slot on their own calendar),
+  // and nobody wants the same email twice.
+  return [...new Set(recipients.filter((e): e is string => !!e))];
+}
+
 // Ensures a Membership exists for a user at a business, creating one with
 // the given role if it doesn't. Useful the first time a player books with
 // a business, or when an owner completes onboarding.

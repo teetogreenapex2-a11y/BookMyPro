@@ -113,6 +113,12 @@ model Business {
   // notificationEmail isn't set separately.
   notifyOnBooking  Boolean @default(false)
   notificationEmail String?
+  // Who actually gets emailed when a booking comes in - a real gap
+  // before this existed: the email always went to this business-wide
+  // address regardless of which specific instructor a booking was
+  // actually with, so a second instructor never heard about their own
+  // bookings at all.
+  bookingNotifyTarget String @default("owner") // "instructor" | "owner" | "both"
 
   memberships  Membership[]
   availability Availability[]
