@@ -136,6 +136,9 @@ function LoginPageInner() {
         padding: 20,
       }}
     >
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, background: "#FBF3DE", color: "#1B3A2F", fontSize: 11, padding: "10px 14px", zIndex: 9999, wordBreak: "break-all", fontFamily: "monospace" }}>
+        DEBUG client id: "{process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "(EMPTY)"}"
+      </div>
       <div
         style={{
           background: "var(--chalk)",
