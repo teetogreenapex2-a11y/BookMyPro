@@ -2,97 +2,83 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, requireMembership, getBusinessInstructors } from "@/lib/tenant";
+import { getBusinessBySlug, getMembership } from "@/lib/tenant";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
 
-async function authorizedMembershipFor(req: NextRequest, slug: string, conversationId: string) {
+// POST /api/{slug}/conversations/blast  { body }
+//
+// Sends one message to every customer's own conversation at once - the
+// same real, one-thread-per-player conversation they'd already see if
+// they messaged in individually, not some separate announcement
+// channel. Scoped the same way the customer list itself already is: a
+// regular instructor only reaches their own customers, the owner
+// reaches everyone at the business.
+export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session) return null;
+  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
 
-  const business = await getBusinessBySlug(slug);
-  if (!business) return null;
+  const business = await getBusinessBySlug(params.slug);
+  if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
-  const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor", "player"]);
-  if (!membership) return null;
-
-  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
-  if (!conversation || conversation.businessId !== business.id) return null;
-
-  // A player can only ever be in their own conversation - an
-  // instructor/owner can see any conversation at this business, since
-  // the whole point of one shared thread per player is that anyone on
-  // staff can pick it up.
-  if (membership.role === "player" && conversation.playerMembershipId !== membership.id) return null;
-
-  return { business, membership, conversation };
-}
-
-// GET /api/{slug}/conversations/{id}/messages
-// Also marks the other side's messages as read the moment this is
-// called, since fetching the thread is what "opening it" means here -
-// there's no separate "mark as read" action to remember to call.
-export async function GET(req: NextRequest, { params }: { params: { slug: string; id: string } }) {
-  const auth = await authorizedMembershipFor(req, params.slug, params.id);
-  if (!auth) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const messages = await prisma.message.findMany({
-    where: { conversationId: params.id },
-    include: { sender: { select: { role: true, user: { select: { name: true, email: true } } } } },
-    orderBy: { createdAt: "asc" },
-  });
-
-  await prisma.message.updateMany({
-    where: { conversationId: params.id, senderMembershipId: { not: auth.membership.id }, readAt: null },
-    data: { readAt: new Date() },
-  });
-
-  return NextResponse.json(
-    messages.map((m) => ({
-      id: m.id,
-      body: m.body,
-      createdAt: m.createdAt,
-      isMine: m.senderMembershipId === auth.membership.id,
-      senderName: m.sender.user.name || m.sender.user.email,
-    }))
-  );
-}
-
-// POST /api/{slug}/conversations/{id}/messages  { body }
-export async function POST(req: NextRequest, { params }: { params: { slug: string; id: string } }) {
-  const auth = await authorizedMembershipFor(req, params.slug, params.id);
-  if (!auth) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const membership = await getMembership((session.user as any).id, business.id);
+  const isStaff = membership?.role === "owner" || membership?.role === "instructor";
+  if (!membership || !isStaff) return NextResponse.json({ error: "Instructor access required" }, { status: 403 });
 
   const { body } = await req.json();
   if (!body?.trim()) return NextResponse.json({ error: "Message can't be empty" }, { status: 400 });
+  const isOwner = membership.role === "owner";
 
-  const message = await prisma.message.create({
-    data: { conversationId: params.id, senderMembershipId: auth.membership.id, body: body.trim() },
+  // Every real player at the business, scoped to just this instructor's
+  // own customers unless they're the owner - same real history check
+  // the customer list itself already uses, so this only reaches people
+  // who've actually booked or bought something, not every account that
+  // merely exists.
+  const players = await prisma.membership.findMany({
+    where: {
+      businessId: business.id,
+      role: "player",
+      OR: isOwner
+        ? undefined
+        : [
+            { packages: { some: { instructorMembershipId: membership.id } } },
+            { bookings: { some: { instructorMembershipId: membership.id } } },
+          ],
+    },
+    select: { id: true },
   });
 
-  await prisma.conversation.update({ where: { id: params.id }, data: { lastMessageAt: message.createdAt } });
-
-  const url = getBusinessAbsoluteUrl(req, params.slug, auth.membership.role === "player" ? "/messages" : `/instructor/messages/${params.id}`);
-  const preview = body.trim().length > 80 ? body.trim().slice(0, 80) + "..." : body.trim();
-
-  try {
-    if (auth.membership.role === "player") {
-      // Notify every instructor/owner at the business - whoever's around
-      // can pick it up, same as the shared-inbox idea behind one thread
-      // per player rather than per instructor.
-      const staff = await getBusinessInstructors(auth.business.id);
-      await Promise.all(
-        staff.map((s) => sendPushToMembership(s.id, { title: "New message", body: preview, url }))
-      );
-    } else {
-      await sendPushToMembership(auth.conversation.playerMembershipId, { title: `Message from ${auth.business.name}`, body: preview, url });
-    }
-  } catch (err) {
-    // The message itself already saved successfully above - a
-    // notification failure shouldn't ever cause the whole send to look
-    // like it failed to the person who just sent it.
-    console.error("Failed to send message notification:", err);
+  if (players.length === 0) {
+    return NextResponse.json({ error: "No customers to message yet" }, { status: 400 });
   }
 
-  return NextResponse.json({ id: message.id, body: message.body, createdAt: message.createdAt, isMine: true });
+  const preview = body.trim().length > 80 ? body.trim().slice(0, 80) + "..." : body.trim();
+  let sent = 0;
+
+  for (const player of players) {
+    const conversation = await prisma.conversation.upsert({
+      where: { businessId_playerMembershipId: { businessId: business.id, playerMembershipId: player.id } },
+      update: { lastMessageAt: new Date() },
+      create: { businessId: business.id, playerMembershipId: player.id },
+    });
+
+    await prisma.message.create({
+      data: { conversationId: conversation.id, senderMembershipId: membership.id, body: body.trim() },
+    });
+    sent++;
+
+    try {
+      await sendPushToMembership(player.id, {
+        title: `Message from ${business.name}`,
+        body: preview,
+        url: getBusinessAbsoluteUrl(req, business.slug, "/messages"),
+      });
+    } catch (err) {
+      // A single failed notification shouldn't stop the rest of the
+      // blast from going out - the message itself already saved either way.
+      console.error("Blast notification failed for one recipient:", err);
+    }
+  }
+
+  return NextResponse.json({ sent });
 }

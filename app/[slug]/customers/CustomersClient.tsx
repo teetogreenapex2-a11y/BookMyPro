@@ -45,6 +45,10 @@ export default function CustomersClient({
   const [openUpgradeFor, setOpenUpgradeFor] = useState<string | null>(null);
   const [openLessonHistoryFor, setOpenLessonHistoryFor] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [blastOpen, setBlastOpen] = useState(false);
+  const [blastBody, setBlastBody] = useState("");
+  const [blastSending, setBlastSending] = useState(false);
+  const [blastResult, setBlastResult] = useState<string | null>(null);
   const [addForm, setAddForm] = useState({ name: "", email: "", phone: "" });
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -82,6 +86,25 @@ export default function CustomersClient({
     } else {
       const text = await res.text();
       alert(`Couldn't start the conversation (${res.status}): ${text.slice(0, 300)}`);
+    }
+  }
+
+  async function sendBlast() {
+    if (!blastBody.trim()) return;
+    setBlastSending(true);
+    setBlastResult(null);
+    const res = await fetch(`${apiBase}/conversations/blast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: blastBody }),
+    });
+    const data = await res.json();
+    setBlastSending(false);
+    if (res.ok) {
+      setBlastResult(`Sent to ${data.sent} customer${data.sent === 1 ? "" : "s"}.`);
+      setBlastBody("");
+    } else {
+      setBlastResult(data.error || "Something went wrong.");
     }
   }
 
@@ -333,6 +356,15 @@ export default function CustomersClient({
             >
               + Add customer
             </button>
+            <button
+              onClick={() => { setBlastOpen((o) => !o); setBlastResult(null); }}
+              style={{
+                background: "#FFF", color: "var(--fairway)", border: "1px solid var(--fairway)", borderRadius: 8,
+                padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              Message all
+            </button>
             <SortButton active={sortBy === "name"} onClick={() => setSortBy("name")} label="Name" />
             <SortButton active={sortBy === "remaining"} onClick={() => setSortBy("remaining")} label="Lessons left" />
           </div>
@@ -378,6 +410,40 @@ export default function CustomersClient({
                 style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
               >
                 {adding ? "Adding…" : "Add customer"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {blastOpen && (
+          <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18, boxShadow: "0 2px 10px rgba(27,58,47,0.06)" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Message all customers</div>
+            <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 14px" }}>
+              Sends this to everyone's own conversation with you — same as messaging them individually, just all at
+              once. {isOwner ? "Reaches every customer at the business." : "Reaches your own customers."}
+            </p>
+            <textarea
+              value={blastBody}
+              onChange={(e) => setBlastBody(e.target.value)}
+              placeholder="Type your message…"
+              rows={3}
+              style={{ ...inputStyle, width: "100%", resize: "vertical", marginBottom: 10 }}
+            />
+            {blastResult && <p style={{ fontSize: 12, color: blastResult.startsWith("Sent") ? "var(--fairway)" : "#B23A3A", margin: "0 0 10px" }}>{blastResult}</p>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setBlastOpen(false)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm(`Send this message to all ${customers.length} customer${customers.length === 1 ? "" : "s"}?`)) {
+                    sendBlast();
+                  }
+                }}
+                disabled={blastSending || !blastBody.trim()}
+                style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                {blastSending ? "Sending…" : "Send to all"}
               </button>
             </div>
           </div>
