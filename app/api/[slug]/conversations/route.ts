@@ -41,8 +41,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       OR: isOwner
         ? undefined
         : [
-            { packages: { some: { instructorMembershipId: membership.id } } },
-            { bookings: { some: { instructorMembershipId: membership.id } } },
+            { user: { packages: { some: { instructorMembershipId: membership.id } } } },
+            { user: { bookings: { some: { instructorMembershipId: membership.id } } } },
           ],
     },
     select: { id: true },

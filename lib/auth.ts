@@ -45,6 +45,22 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   session: { strategy: "database" },
+  // Apple's own callback arrives as a genuine cross-site POST request
+  // (its own quirk - Google's doesn't work this way), and the default
+  // cookie setting doesn't survive that trip at all, which is exactly
+  // what was causing "PKCE code_verifier cookie was missing" on every
+  // real sign-in attempt. This is the documented, known fix.
+  cookies: {
+    pkceCodeVerifier: {
+      name: "next-auth.pkce.code_verifier",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: true,
+      },
+    },
+  },
   callbacks: {
     async session({ session, user }) {
       if (session.user) {
