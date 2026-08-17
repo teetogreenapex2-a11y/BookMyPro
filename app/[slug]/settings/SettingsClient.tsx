@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { Capacitor } from "@capacitor/core";
 
 type User = {
   name: string | null;
@@ -89,6 +90,15 @@ export default function SettingsClient({
   apiBase: string;
 }) {
   const [tab, setTab] = useState<"profile" | "notifications" | "business">("profile");
+  // The native tab bar sits on top of the page rather than shrinking the
+  // space available to it, so anything reaching the very bottom of the
+  // screen - like the Save button - needs its own extra clearance to
+  // avoid getting covered. Detected after mount, same as elsewhere, to
+  // avoid a server/client mismatch since the server has no way to know.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
   const [profile, setProfile] = useState({
     name: user.name || "",
     phone: user.phone || "",
@@ -1161,7 +1171,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
           </div>
         )}
 
-        <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ marginTop: 20, marginBottom: isNative ? 76 : 0, display: "flex", alignItems: "center", gap: 12 }}>
           {saved && <span style={{ fontSize: 13, color: "var(--fairway)", fontWeight: 600 }}>Saved</span>}
           <button onClick={save} style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "10px 20px", fontWeight: 700, fontSize: 14 }}>
             Save changes
