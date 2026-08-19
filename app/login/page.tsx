@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
-import { SignInWithApple } from "@capacitor-community/apple-sign-in";
 
 export default function LoginPage() {
   return (
@@ -81,45 +80,13 @@ function LoginPageInner() {
   // Apple doesn't block its own web sign-in flow inside an embedded app
   // view, so Android and the website both just use the normal redirect.
   // Only the iOS app needs this separate, native path.
-  async function handleAppleSignIn() {
-    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") {
-      signIn("apple", { callbackUrl });
-      return;
-    }
-
-    setAppleError(null);
-    setSigningInWithApple(true);
-    try {
-      const result = await SignInWithApple.authorize({
-        clientId: "com.bookmypro.app",
-        redirectURI: `${process.env.NEXT_PUBLIC_APP_URL || "https://bookmypro.app"}/api/auth/callback/apple`,
-        scopes: "email name",
-      });
-      const identityToken = result?.response?.identityToken;
-      if (!identityToken) throw new Error("Apple didn't return a token");
-
-      // Apple only ever sends the person's name on this very first
-      // authorization - never again after that - so it has to be
-      // captured and sent along right here or it's lost for good.
-      const givenName = result?.response?.givenName;
-      const familyName = result?.response?.familyName;
-      const name = [givenName, familyName].filter(Boolean).join(" ") || undefined;
-
-      const res = await fetch("/api/auth/apple-native", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identityToken, name }),
-      });
-      if (!res.ok) throw new Error("Sign-in failed - try again");
-
-      window.location.href = callbackUrl;
-    } catch (err: any) {
-      console.error("Native Apple sign-in failed:", err);
-      const detail = err?.message || err?.code || JSON.stringify(err) || "unknown error";
-      setAppleError(`Couldn't sign in with Apple: ${detail}`);
-    } finally {
-      setSigningInWithApple(false);
-    }
+  // Unlike Google, Apple's own web sign-in flow isn't blocked inside an
+  // embedded native app view - so unlike Google (which genuinely needs
+  // its own separate native path on iOS), Apple can safely use this
+  // same, reliable web redirect on every platform: the website,
+  // Android, and iOS alike.
+  function handleAppleSignIn() {
+    signIn("apple", { callbackUrl });
   }
 
   return (
