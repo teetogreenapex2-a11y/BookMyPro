@@ -48,6 +48,16 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true,
     },
+    // Only Google is actually used through this plugin - excluding the
+    // others keeps their SDKs (and app size) out of the build entirely.
+    SocialLogin: {
+      providers: {
+        google: true,
+        facebook: false,
+        apple: false,
+        twitter: false,
+      },
+    },
   },
 };
 

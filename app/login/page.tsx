@@ -4,7 +4,7 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
+import { SocialLogin } from "@capgo/capacitor-social-login";
 
 export default function LoginPage() {
   return (
@@ -50,14 +50,26 @@ function LoginPageInner() {
     setGoogleError(null);
     setSigningInWithGoogle(true);
     try {
-      await GoogleSignIn.initialize({ clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID! });
-      const result = await GoogleSignIn.signIn();
-      if (!result.idToken) throw new Error("Google didn't return a token");
+      await SocialLogin.initialize({
+        google: { webClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID! },
+      });
+      // filterByAuthorizedAccounts defaults to true, which only shows
+      // accounts that have already signed into this exact app before -
+      // genuinely useless for every brand-new tester, who by definition
+      // has never done that yet. Setting it false shows every Google
+      // account on the device instead, same as the account picker
+      // people actually expect to see.
+      const { result } = await SocialLogin.login({
+        provider: "google",
+        options: { scopes: ["email", "profile"], filterByAuthorizedAccounts: false },
+      });
+      const idToken = "idToken" in result ? result.idToken : null;
+      if (!idToken) throw new Error("Google didn't return a token");
 
       const res = await fetch("/api/auth/google-native", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken: result.idToken }),
+        body: JSON.stringify({ idToken }),
       });
       if (!res.ok) throw new Error("Sign-in failed - try again");
 
