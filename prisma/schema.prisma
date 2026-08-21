@@ -191,12 +191,12 @@ model Membership {
   outlookTokenExpiresAt DateTime?
 
   createdAt DateTime @default(now())
-  // Lets getBusinessInstructor() below pick whichever instructor's Google
-  // Calendar was connected most recently when a business has more than
-  // one - without this, that lookup has no reliable way to prefer a
-  // fresh reconnect over an older, possibly-stale token sitting on a
-  // different instructor's row.
-  updatedAt DateTime @updatedAt
+  // @default(now()) is required here, not just @updatedAt alone - without
+  // it, this migration has no value to give the rows that already exist,
+  // and Prisma refuses to apply it (would otherwise require resetting the
+  // whole database). New rows get "now" as their initial value the same
+  // as createdAt above, then this auto-updates on every future change.
+  updatedAt DateTime @default(now()) @updatedAt
   assignedBookings Booking[]
   soldPackages Package[]
   availability Availability[]
