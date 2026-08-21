@@ -20,15 +20,20 @@ async function inspect(membershipId: string) {
     where: { id: membershipId },
     include: { user: true, business: { select: { slug: true } } },
   });
-  if (!membership) return { membership: null };
+  if (!membership) return { membership: null, conversationIds: [] as string[] };
 
-  const [availabilityCount, bookingCount, packageCount, videoCount, sketchCount] = await Promise.all([
+  const [availabilityCount, bookingCount, packageCount, videoCount, sketchCount, conversations] = await Promise.all([
     prisma.availability.count({ where: { instructorMembershipId: membershipId } }),
     prisma.booking.count({ where: { instructorMembershipId: membershipId } }),
     prisma.package.count({ where: { instructorMembershipId: membershipId } }),
     prisma.videoSubmission.count({ where: { instructorMembershipId: membershipId } }),
     prisma.swingSketch.count({ where: { instructorMembershipId: membershipId } }),
+    prisma.conversation.findMany({ where: { playerMembershipId: membershipId }, select: { id: true } }),
   ]);
+  const conversationIds = conversations.map((c) => c.id);
+  const messageCount = conversationIds.length
+    ? await prisma.message.count({ where: { conversationId: { in: conversationIds } } })
+    : 0;
 
   const realDataCount = bookingCount + packageCount + videoCount + sketchCount;
 
@@ -39,8 +44,9 @@ async function inspect(membershipId: string) {
       business: membership.business.slug,
       user: { id: membership.user.id, name: membership.user.name, email: membership.user.email },
     },
-    attached: { availabilityCount, bookingCount, packageCount, videoCount, sketchCount },
+    attached: { availabilityCount, bookingCount, packageCount, videoCount, sketchCount, conversationCount: conversationIds.length, messageCount },
     safeToDelete: realDataCount === 0,
+    conversationIds,
   };
 }
 
@@ -72,6 +78,13 @@ export async function GET(req: NextRequest) {
 
   try {
     await prisma.$transaction([
+      // Messages sent BY the other party, inside a conversation this
+      // membership is the player side of - these wouldn't be caught by
+      // the "sentMessages" cleanup below at all, since this membership
+      // isn't their sender. Has to come before deleting the conversation
+      // itself, which has to come before deleting the membership.
+      prisma.message.deleteMany({ where: { conversationId: { in: result.conversationIds } } }),
+      prisma.conversation.deleteMany({ where: { id: { in: result.conversationIds } } }),
       // These are device/notification-setup noise, not real business
       // data - the same category as Availability above, just not
       // checked for in safeToDelete since none of them would ever be a
