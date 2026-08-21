@@ -91,6 +91,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
             videoUrl: blob.url,
             title: meta.title || null,
             playerNote: meta.playerNote || null,
+            swingSessionId: meta.swingSessionId || null,
+            angle: meta.angle || null,
             ...(meta.uploaderIsStaff ? { status: "reviewed", reviewedAt: new Date() } : {}),
           },
         });

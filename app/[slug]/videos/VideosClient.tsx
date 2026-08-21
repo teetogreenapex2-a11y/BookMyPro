@@ -197,6 +197,9 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
           <p style={{ fontSize: 13, color: "#D7DED9", margin: "4px 0 0" }}>
             Upload a video and your instructor will leave comments pinned to specific moments.
           </p>
+          <a href={`${basePath}/swing-session`} style={{ fontSize: 13, color: "var(--gold)", fontWeight: 700, textDecoration: "none", display: "inline-block", marginTop: 8 }}>
+            Record two angles at once (down-the-line + face-on) &rarr;
+          </a>
         </div>
       </header>
 

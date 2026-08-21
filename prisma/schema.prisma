@@ -125,6 +125,7 @@ model Business {
   bookings     Booking[]
   packages     Package[]
   conversations Conversation[]
+  swingSessions SwingSession[]
   syncLogs     SyncLog[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
@@ -382,6 +383,27 @@ model Booking {
 // deliberately timestamped text comments rather than frame-by-frame visual
 // annotation (drawing lines on the video) — a real, useful v1 without the
 // much larger scope a full annotation tool would take on.
+// Links two separately-recorded videos of the same swing together - one
+// device creates a session and gets a short code, a second device
+// (typically mounted down the target line, while the first is face-on)
+// joins using that code. Each device uploads independently through the
+// same existing video upload flow, just tagged with this session and
+// its own angle, rather than needing true, frame-perfect hardware sync
+// between two phones, which would be a much bigger, riskier thing to
+// build for the same real coaching value.
+model SwingSession {
+  id                     String    @id @default(cuid())
+  business               Business  @relation(fields: [businessId], references: [id])
+  businessId             String
+  createdByUserId        String
+  // Short, easy to read aloud/type on a second phone - not a full cuid.
+  joinCode               String    @unique
+  instructorMembershipId String
+  playerId               String
+  videos                 VideoSubmission[]
+  createdAt              DateTime  @default(now())
+}
+
 model VideoSubmission {
   id                      String    @id @default(cuid())
   business                Business  @relation(fields: [businessId], references: [id])
@@ -397,6 +419,11 @@ model VideoSubmission {
   submittedAt             DateTime  @default(now())
   reviewedAt              DateTime?
   comments                VideoComment[]
+  // Set only for a video that's part of a two-camera session - null for
+  // every normal, single-angle submission, which is still the common case.
+  swingSession            SwingSession? @relation(fields: [swingSessionId], references: [id])
+  swingSessionId          String?
+  angle                   String?   // "down_the_line" | "face_on" - only meaningful when swingSessionId is set
 }
 
 model VideoComment {
