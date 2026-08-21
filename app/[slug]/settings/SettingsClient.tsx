@@ -130,9 +130,20 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
     setBiz((b) => ({ ...b, logoUrl: data.logoUrl }));
   }
   const [saved, setSaved] = useState(false);
+  async function handleDisconnectGoogleCal() {
+    if (!confirm("Disconnect Google Calendar? Bookings will stop syncing until you reconnect.")) return;
+    setDisconnectingGoogleCal(true);
+    try {
+      await fetch(`${apiBase}/calendar/disconnect`, { method: "POST" });
+      setGoogleCalStatus({ connected: false });
+    } finally {
+      setDisconnectingGoogleCal(false);
+    }
+  }
   const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; chargesEnabled: boolean; detailsSubmitted?: boolean } | null>(null);
   const [squareStatus, setSquareStatus] = useState<{ connected: boolean; expired: boolean } | null>(null);
   const [googleCalStatus, setGoogleCalStatus] = useState<{ connected: boolean } | null>(null);
+  const [disconnectingGoogleCal, setDisconnectingGoogleCal] = useState(false);
   const [outlookStatus, setOutlookStatus] = useState<{ connected: boolean } | null>(null);
   const [team, setTeam] = useState<{ id: string; name: string | null; email: string; role: string; [key: string]: any }[]>([]);
   const [pendingRequests, setPendingRequests] = useState<{ id: string; name: string | null; email: string; requestedAt: string }[]>([]);
@@ -582,9 +593,20 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               ) : googleCalStatus === null ? (
                 <p style={{ fontSize: 13, color: "var(--faint)" }}>Checking status…</p>
               ) : googleCalStatus.connected ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3E7A56" }} />
                   <span style={{ fontSize: 13, fontWeight: 600 }}>Connected — bookings will sync</span>
+                  <button
+                    onClick={handleDisconnectGoogleCal}
+                    disabled={disconnectingGoogleCal}
+                    style={{
+                      marginLeft: "auto", background: "none", border: "1px solid var(--border)",
+                      color: "var(--faint)", fontSize: 12, fontWeight: 600, padding: "5px 10px",
+                      borderRadius: 6, cursor: disconnectingGoogleCal ? "default" : "pointer",
+                    }}
+                  >
+                    {disconnectingGoogleCal ? "Disconnecting…" : "Disconnect"}
+                  </button>
                 </div>
               ) : (
                 <div>
