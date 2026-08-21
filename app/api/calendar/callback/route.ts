@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getRefreshTokenFromCode } from "@/lib/googleCalendar";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, requireMembership, ensureMembership } from "@/lib/tenant";
+import { getBusinessBySlug, getMembership, ensureMembership } from "@/lib/tenant";
 import { businessDestination } from "@/lib/businessUrl";
 
 // This route's URL is fixed (registered in Google Cloud Console) and can't
@@ -23,9 +23,22 @@ export async function GET(req: NextRequest) {
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
   const userId = (session.user as any).id;
+  // getMembership, not requireMembership - we need whatever membership
+  // already exists (even a "player" one) so we can upgrade it below,
+  // rather than only matching if it's already owner/instructor.
+  const existingMembership = await getMembership(userId, business.id);
   const membership =
-    (await requireMembership(userId, business.id, ["owner", "instructor"])) ||
-    (await ensureMembership(userId, business.id, "instructor"));
+    existingMembership && (existingMembership.role === "owner" || existingMembership.role === "instructor")
+      ? existingMembership
+      : existingMembership
+      // Reaching this callback at all required passing the owner/instructor
+      // check in /calendar/connect before Google ever showed a consent
+      // screen. A "player" (or other lower-role) membership existing here
+      // means the same account was used to test both sides - upgrading it
+      // is what that earlier check already established should happen,
+      // not a new privilege being granted on the spot.
+      ? await prisma.membership.update({ where: { id: existingMembership.id }, data: { role: "instructor" } })
+      : await ensureMembership(userId, business.id, "instructor");
 
   const refreshToken = await getRefreshTokenFromCode(code);
   if (!refreshToken) {
