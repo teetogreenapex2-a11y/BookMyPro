@@ -70,10 +70,26 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  await prisma.$transaction([
-    prisma.availability.deleteMany({ where: { instructorMembershipId: membershipId } }),
-    prisma.membership.delete({ where: { id: membershipId } }),
-  ]);
+  try {
+    await prisma.$transaction([
+      // These are device/notification-setup noise, not real business
+      // data - the same category as Availability above, just not
+      // checked for in safeToDelete since none of them would ever be a
+      // reason to refuse the delete. Left unhandled, any of these still
+      // pointing at this membership would block the delete below with a
+      // foreign key error.
+      prisma.pushSubscription.deleteMany({ where: { membershipId } }),
+      prisma.fcmToken.deleteMany({ where: { membershipId } }),
+      prisma.message.deleteMany({ where: { senderMembershipId: membershipId } }),
+      prisma.availability.deleteMany({ where: { instructorMembershipId: membershipId } }),
+      prisma.membership.delete({ where: { id: membershipId } }),
+    ]);
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: "Delete failed", detail: err?.message || String(err), ...result },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ deleted: true, ...result });
 }
