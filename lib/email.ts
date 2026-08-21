@@ -195,3 +195,44 @@ export async function sendMagicLinkEmail(to: string, url: string, businessName?:
   `;
   await sendEmail(to, subject, html);
 }
+
+// The daily "here's your day" email sent each morning by
+// lib/dailySchedule.ts - only ever called when there's at least one
+// booking to show (see that file for why).
+export async function sendDailyScheduleEmail(
+  to: string,
+  details: {
+    businessName: string;
+    instructorName: string | null;
+    items: { time: string; label: string; contactName: string | null }[];
+    scheduleUrl: string;
+  }
+) {
+  const rows = details.items
+    .map(
+      (item) => `
+        <tr>
+          <td style="padding: 8px 0; color: #8A8571; white-space: nowrap; vertical-align: top;">${item.time}</td>
+          <td style="padding: 8px 0 8px 12px;">
+            <div style="font-weight: 600;">${item.label}</div>
+            ${item.contactName ? `<div style="color: #5C6459; font-size: 13px;">${item.contactName}</div>` : ""}
+          </td>
+        </tr>`
+    )
+    .join("");
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">Today's schedule</h2>
+      <p style="color: #5C6459; margin-top: 0;">
+        ${details.instructorName ? `Morning, ${details.instructorName.split(" ")[0]} — ` : ""}${details.items.length} ${details.items.length === 1 ? "booking" : "bookings"} at ${details.businessName} today.
+      </p>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        ${rows}
+      </table>
+      <a href="${details.scheduleUrl}" style="display:inline-block;background:#1B3A2F;color:#F6F4EE;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">View full schedule</a>
+    </div>
+  `;
+
+  await sendEmail(to, `Today's schedule: ${details.items.length} ${details.items.length === 1 ? "booking" : "bookings"}`, html);
+}

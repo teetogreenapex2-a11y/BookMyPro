@@ -713,6 +713,25 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               placeholder="Rick Stitzer"
             />
             <Field label="Business email" value={biz.email} onChange={(v) => setBiz((b) => ({ ...b, email: v }))} />
+            <label style={{ display: "block" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Timezone</div>
+              <select
+                value={biz.timezone || "America/New_York"}
+                onChange={(e) => setBiz((b) => ({ ...b, timezone: e.target.value }))}
+                style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, background: "#FFF" }}
+              >
+                <option value="America/New_York">Eastern</option>
+                <option value="America/Chicago">Central</option>
+                <option value="America/Denver">Mountain</option>
+                <option value="America/Phoenix">Mountain (no daylight saving) — Arizona</option>
+                <option value="America/Los_Angeles">Pacific</option>
+                <option value="America/Anchorage">Alaska</option>
+                <option value="Pacific/Honolulu">Hawaii</option>
+              </select>
+            </label>
+            <p style={{ fontSize: 12, color: "var(--faint)", margin: "-8px 0 0" }}>
+              Used for your daily schedule email/notification, and for showing booking times correctly.
+            </p>
             <div style={{ display: "flex", gap: 12 }}>
               <label style={{ display: "block", flex: 1 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Calendar opens at</div>

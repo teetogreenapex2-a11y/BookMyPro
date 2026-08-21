@@ -2,6 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     { "path": "/api/cron/video-retention", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/check-trials", "schedule": "0 9 * * *" }
+    { "path": "/api/cron/check-trials", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/daily-schedule", "schedule": "0 * * * *" }
   ]
 }

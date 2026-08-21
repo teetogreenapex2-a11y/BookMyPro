@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
     "fittingDriverEnabled", "fittingIronEnabled", "fittingFullEnabled",
     "fittingDriverPriceCents", "fittingIronPriceCents", "fittingFullPriceCents",
     "allowPayLater", "allowClubBilling", "requireBookingApproval", "calendarProvider", "notifyOnBooking", "notificationEmail", "bookingNotifyTarget",
-    "bookingWindowDays", "dailyApiKey",
+    "bookingWindowDays", "dailyApiKey", "timezone",
     "listedInDirectory", "city", "state", "zipCode",
   ];
   const data: Record<string, unknown> = {};

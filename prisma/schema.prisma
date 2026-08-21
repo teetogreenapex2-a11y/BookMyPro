@@ -18,6 +18,11 @@ model Business {
   id     String @id @default(cuid())
   slug   String @unique // URL-friendly identifier, e.g. "tee-to-green" -> /tee-to-green/book
   name   String @default("My Golf Business")
+  // IANA name (e.g. "America/Chicago"). Defaulted to the value every
+  // existing business was already hardcoded to assume in lib/time.ts, so
+  // this migration doesn't change anyone's actual behavior until they set
+  // it explicitly in Settings.
+  timezone String @default("America/New_York")
   // False for anything self-onboarded through /onboarding until the
   // platform admin approves it - a real safeguard against someone
   // spinning up a live, bookable business (and taking real payments)
