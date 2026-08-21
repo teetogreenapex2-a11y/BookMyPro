@@ -4,11 +4,18 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getMembership } from "@/lib/tenant";
 
-// PATCH /api/{slug}/instructors/{id}  { specialty }
+// PATCH /api/{slug}/instructors/{id}  { specialty?, active? }
 // Profile-level fields (as opposed to pricing, handled by the sibling
-// /pricing route) — currently just specialty, the short tagline shown to
-// players when choosing who to book with. Same permission shape as
-// pricing: the owner can edit anyone's, an instructor can edit their own.
+// /pricing route) — specialty (the short tagline shown to players when
+// choosing who to book with) can be edited by the owner or by the
+// instructor themselves. Deactivating/reactivating a team member (active)
+// is owner-only - this is what "removing" someone who's left actually
+// means: it keeps every real booking, package, video, and message they
+// were ever part of fully intact, just takes them off the active
+// instructor list and booking page, and is fully reversible if they come
+// back. A hard delete was never the right tool for this - see the
+// temporary /api/admin/remove-duplicate-membership route for why that's
+// only safe for an account with zero real data attached.
 export async function PATCH(req: NextRequest, { params }: { params: { slug: string; id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
@@ -29,10 +36,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   });
   if (!target) return NextResponse.json({ error: "Instructor not found" }, { status: 404 });
 
-  const { specialty } = await req.json();
-  const updated = await prisma.membership.update({
-    where: { id: target.id },
-    data: { specialty: typeof specialty === "string" ? specialty.slice(0, 120) : target.specialty },
-  });
+  const { specialty, active } = await req.json();
+  const data: Record<string, unknown> = {};
+  if (typeof specialty === "string") data.specialty = specialty.slice(0, 120);
+
+  if (typeof active === "boolean") {
+    if (!isOwner) return NextResponse.json({ error: "Only the owner can deactivate a team member" }, { status: 403 });
+    if (isSelf && !active) return NextResponse.json({ error: "You can't deactivate yourself" }, { status: 400 });
+    if (!active && target.role === "owner") {
+      const otherActiveOwners = await prisma.membership.count({
+        where: { businessId: business.id, role: "owner", status: "active", id: { not: target.id } },
+      });
+      if (otherActiveOwners === 0) {
+        return NextResponse.json({ error: "Can't deactivate the only remaining owner" }, { status: 400 });
+      }
+    }
+    data.status = active ? "active" : "inactive";
+  }
+
+  const updated = await prisma.membership.update({ where: { id: target.id }, data });
   return NextResponse.json(updated);
 }

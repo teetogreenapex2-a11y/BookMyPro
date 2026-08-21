@@ -180,7 +180,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   const [savingPricing, setSavingPricing] = useState(false);
 
   async function loadTeam() {
-    const res = await fetch(`${apiBase}/instructors`);
+    const res = await fetch(`${apiBase}/instructors${isOwner ? "?includeInactive=true" : ""}`);
     if (res.ok) {
       const list = await res.json();
       setTeam(list);
@@ -188,6 +188,23 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       // owner viewing someone else's team can switch via the picker below.
       const defaultId = list.find((t: any) => t.email === user.email)?.id || list[0]?.id || null;
       setPricingInstructorId((prev) => prev || defaultId);
+    }
+  }
+  const [togglingActiveId, setTogglingActiveId] = useState<string | null>(null);
+  async function toggleActive(membershipId: string, active: boolean) {
+    if (!active && !confirm("Remove this person from the active team? Their past bookings, packages, and messages all stay intact - this can be undone anytime.")) return;
+    setTogglingActiveId(membershipId);
+    try {
+      const res = await fetch(`${apiBase}/instructors/${membershipId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "Something went wrong."); return; }
+      setTeam((prev) => prev.map((t) => (t.id === membershipId ? { ...t, status: data.status } : t)));
+    } finally {
+      setTogglingActiveId(null);
     }
   }
 
@@ -824,10 +841,12 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: isOwner ? 12 : 0 }}>
                 {team.map((t) => {
                   const canEditThis = isOwner || t.email === user.email;
+                  const isInactive = t.status === "inactive";
                   return (
                   <div key={t.id} style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
                     background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px",
+                    opacity: isInactive ? 0.55 : 1,
                   }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name || t.email}</div>
@@ -855,8 +874,21 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                       fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--muted)",
                       background: "#EFEBDD", borderRadius: 4, padding: "2px 6px", flexShrink: 0,
                     }}>
-                      {t.role}
+                      {isInactive ? "Inactive" : t.role}
                     </span>
+                    {isOwner && t.email !== user.email && (
+                      <button
+                        onClick={() => toggleActive(t.id, isInactive)}
+                        disabled={togglingActiveId === t.id}
+                        style={{
+                          background: "none", border: "1px solid var(--border)", color: isInactive ? "var(--fairway)" : "#B23A3A",
+                          fontSize: 11, fontWeight: 700, padding: "5px 10px", borderRadius: 6, flexShrink: 0,
+                          cursor: togglingActiveId === t.id ? "default" : "pointer",
+                        }}
+                      >
+                        {togglingActiveId === t.id ? "…" : isInactive ? "Reactivate" : "Remove"}
+                      </button>
+                    )}
                   </div>
                   );
                 })}

@@ -45,9 +45,17 @@ export async function requireMembership(
 
 // Every staff member (owner or instructor role) a player can choose to book
 // with — a business with multiple instructors on staff shows all of them.
-export async function getBusinessInstructors(businessId: string) {
+// includeInactive is for the owner's own Team management view in Settings
+// (see the deactivate/reactivate feature) - the public booking flow never
+// wants a deactivated instructor showing up as a bookable option, so it
+// stays false there.
+export async function getBusinessInstructors(businessId: string, includeInactive = false) {
   return prisma.membership.findMany({
-    where: { businessId, role: { in: ["owner", "instructor"] }, status: "active" },
+    where: {
+      businessId,
+      role: { in: ["owner", "instructor"] },
+      status: includeInactive ? { in: ["active", "inactive"] } : "active",
+    },
     include: { user: { select: { id: true, name: true, email: true, image: true } } },
     orderBy: { createdAt: "asc" },
   });
