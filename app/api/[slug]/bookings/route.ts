@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, getInstructorById, getBusinessInstructor, getMembership, getBookingNotificationRecipients } from "@/lib/tenant";
+import { getBusinessBySlug, getInstructorById, getMembership, getBookingNotificationRecipients } from "@/lib/tenant";
 import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
 import { sendBookingNotification } from "@/lib/email";
@@ -115,13 +115,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
   }
 
-  // Sync to the business's shared Google Calendar right away — but only if
-  // this booking didn't need approval. Pending bookings get synced once
-  // confirmed (see the /confirm route), so nothing unapproved shows up on
-  // the real calendar. This is one shared calendar connection regardless of
-  // which instructor the booking is with — not per-instructor.
+  // Sync to the specific instructor's own connected Google Calendar right
+  // away — but only if this booking didn't need approval. Pending bookings
+  // get synced once confirmed (see the /confirm route), so nothing
+  // unapproved shows up on the real calendar.
   if (!needsApproval) {
-    const calendarMembership = await getBusinessInstructor(business.id);
+    const calendarMembership = instructorMembership;
     if (calendarMembership) {
     try {
       const eventId = await createEvent(business, calendarMembership, {

@@ -191,6 +191,12 @@ model Membership {
   outlookTokenExpiresAt DateTime?
 
   createdAt DateTime @default(now())
+  // Lets getBusinessInstructor() below pick whichever instructor's Google
+  // Calendar was connected most recently when a business has more than
+  // one - without this, that lookup has no reliable way to prefer a
+  // fresh reconnect over an older, possibly-stale token sitting on a
+  // different instructor's row.
+  updatedAt DateTime @updatedAt
   assignedBookings Booking[]
   soldPackages Package[]
   availability Availability[]

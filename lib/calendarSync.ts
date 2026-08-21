@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import { listEvents, hasCalendarConnected, type NormalizedEvent } from "./calendar";
 import { findFitting, getFittingPriceCents } from "./pricing";
-import { getBusinessInstructor } from "./tenant";
+import type { Business, Membership } from "@prisma/client";
 
 const SLOT_BLOCK_MINUTES = 60; // matches the hourly grid used throughout the app
 const SYNC_WINDOW_DAYS = 28;
@@ -26,22 +26,19 @@ function parseBookingTag(title: string): { email: string; fittingType?: string }
   return { email, fittingType };
 }
 
-// Syncs a single business's calendar. Call this per-business — see
-// syncAllBusinesses() below for the scheduled-job entry point that loops
-// over every business with a connected calendar (Google or Outlook).
-//
-// Calendar sync is deliberately one shared connection for the whole
-// business (not per-instructor), even though availability itself is now
-// per-instructor — getBusinessInstructor() finds whichever staff member
-// actually connected a calendar, and external events on THAT PERSON's
-// calendar block THAT PERSON's own availability specifically (not every
-// instructor's). Bookings created from "Book: email" tags are also
-// assigned to that same instructor for the same reason.
-export async function syncBusinessCalendar(businessId: string, triggeredBy: "manual" | "cron" = "manual") {
-  const business = await prisma.business.findUnique({ where: { id: businessId } });
-  const instructorMembership = await getBusinessInstructor(businessId);
+// Syncs one specific instructor's own connected calendar. External events
+// on THIS PERSON's calendar block THIS PERSON's own availability
+// specifically (not every instructor at the business), and bookings
+// created from "Book: email" tags on their calendar are assigned to them
+// too — each instructor's calendar only ever affects their own slots.
+export async function syncInstructorCalendar(
+  business: Business,
+  instructorMembership: Membership,
+  triggeredBy: "manual" | "cron" = "manual"
+) {
+  const businessId = business.id;
 
-  if (!business || !hasCalendarConnected(business, instructorMembership)) {
+  if (!hasCalendarConnected(business, instructorMembership)) {
     await prisma.syncLog.create({
       data: { businessId, success: false, message: "No instructor calendar connected", triggeredBy },
     });
@@ -52,11 +49,11 @@ export async function syncBusinessCalendar(businessId: string, triggeredBy: "man
     const now = new Date();
     const windowEnd = new Date(now.getTime() + SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-    const events: NormalizedEvent[] = await listEvents(business, instructorMembership!, now, windowEnd);
+    const events: NormalizedEvent[] = await listEvents(business, instructorMembership, now, windowEnd);
     const externalEvents = events.filter((e) => !e.isAppOwned && e.startTime && e.endTime);
 
     const slots = await prisma.availability.findMany({
-      where: { businessId, instructorMembershipId: instructorMembership!.id, startTime: { gte: now, lte: windowEnd } },
+      where: { businessId, instructorMembershipId: instructorMembership.id, startTime: { gte: now, lte: windowEnd } },
     });
 
     let created = 0;
@@ -84,7 +81,7 @@ export async function syncBusinessCalendar(businessId: string, triggeredBy: "man
         // Packages are instructor-specific now — only a credit bought
         // from *this* instructor can be redeemed on their calendar.
         const pkg = await prisma.package.findFirst({
-          where: { userId: player.id, businessId, instructorMembershipId: instructorMembership!.id, lessonsRemaining: { gt: 0 } },
+          where: { userId: player.id, businessId, instructorMembershipId: instructorMembership.id, lessonsRemaining: { gt: 0 } },
           orderBy: { createdAt: "asc" },
         });
         if (!pkg) continue; // no credits available — don't silently consume a slot for nothing
@@ -96,7 +93,7 @@ export async function syncBusinessCalendar(businessId: string, triggeredBy: "man
             data: {
               businessId,
               playerId: player.id,
-              instructorMembershipId: instructorMembership!.id,
+              instructorMembershipId: instructorMembership.id,
               serviceType: "lesson",
               startTime: slot.startTime,
               priceCents: 0,
@@ -115,11 +112,11 @@ export async function syncBusinessCalendar(businessId: string, triggeredBy: "man
             data: {
               businessId,
               playerId: player.id,
-              instructorMembershipId: instructorMembership!.id,
+              instructorMembershipId: instructorMembership.id,
               serviceType: "fitting",
               fittingType: fitting.id,
               startTime: slot.startTime,
-              priceCents: getFittingPriceCents(instructorMembership!, fitting.id),
+              priceCents: getFittingPriceCents(instructorMembership, fitting.id),
               availabilityId: slot.id,
               googleCalendarEventId: event.id || null,
             },
@@ -172,8 +169,54 @@ export async function syncBusinessCalendar(businessId: string, triggeredBy: "man
   }
 }
 
-// Scheduled-job entry point — loops over every business that has a
-// connected calendar (Google or Outlook) and syncs each one.
+// Syncs every connected instructor at a business, one at a time - each
+// instructor's own calendar only ever affects their own slots and
+// bookings (see syncInstructorCalendar above), so this is genuinely N
+// independent syncs, not one shared one split N ways.
+export async function syncBusinessCalendar(businessId: string, triggeredBy: "manual" | "cron" = "manual") {
+  const business = await prisma.business.findUnique({ where: { id: businessId } });
+  if (!business) {
+    await prisma.syncLog.create({
+      data: { businessId, success: false, message: "Business not found", triggeredBy },
+    });
+    return { synced: false, reason: "Business not found" };
+  }
+
+  const connectedInstructors = await prisma.membership.findMany({
+    where: {
+      businessId,
+      role: { in: ["owner", "instructor"] },
+      OR: [{ googleRefreshToken: { not: null } }, { outlookRefreshToken: { not: null } }],
+    },
+  });
+
+  if (connectedInstructors.length === 0) {
+    await prisma.syncLog.create({
+      data: { businessId, success: false, message: "No instructor calendar connected", triggeredBy },
+    });
+    return { synced: false, reason: "No instructor calendar connected" };
+  }
+
+  const perInstructor = [];
+  for (const instructorMembership of connectedInstructors) {
+    perInstructor.push({
+      instructorMembershipId: instructorMembership.id,
+      ...(await syncInstructorCalendar(business, instructorMembership, triggeredBy)),
+    });
+  }
+
+  return {
+    synced: perInstructor.some((r) => r.synced),
+    instructors: perInstructor,
+    bookingsCreated: perInstructor.reduce((sum, r) => sum + (r.bookingsCreated || 0), 0),
+    slotsBlocked: perInstructor.reduce((sum, r) => sum + (r.slotsBlocked || 0), 0),
+    slotsUnblocked: perInstructor.reduce((sum, r) => sum + (r.slotsUnblocked || 0), 0),
+  };
+}
+
+// Scheduled-job entry point — loops over every business that has at least
+// one instructor with a connected calendar (Google or Outlook) and syncs
+// each of them via syncBusinessCalendar above.
 export async function syncAllBusinesses() {
   const connected = await prisma.membership.findMany({
     where: {

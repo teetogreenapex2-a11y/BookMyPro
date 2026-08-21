@@ -43,18 +43,6 @@ export async function requireMembership(
   return membership;
 }
 
-// The instructor for a business — used anywhere the app currently assumes
-// "the" single instructor (calendar sync, booking confirmations, etc.).
-// Multiple instructors per business isn't modeled yet; this returns the
-// first one found, matching today's single-instructor behavior per business.
-export async function getBusinessInstructor(businessId: string) {
-  const membership = await prisma.membership.findFirst({
-    where: { businessId, role: { in: ["owner", "instructor"] }, googleRefreshToken: { not: null } },
-    include: { user: true },
-  });
-  return membership;
-}
-
 // Every staff member (owner or instructor role) a player can choose to book
 // with — a business with multiple instructors on staff shows all of them.
 export async function getBusinessInstructors(businessId: string) {

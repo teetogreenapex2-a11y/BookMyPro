@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { findPackage, findFitting } from "@/lib/pricing";
 import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
-import { getBusinessInstructor, ensureMembership, getBookingNotificationRecipients } from "@/lib/tenant";
+import { getInstructorById, ensureMembership, getBookingNotificationRecipients } from "@/lib/tenant";
 import { sendBookingNotification } from "@/lib/email";
 import { sendPushToMembership, checkAndNotifyLowPackage } from "@/lib/pushNotifications";
 import { BUSINESS_TIMEZONE } from "@/lib/time";
@@ -122,7 +122,9 @@ export async function POST(req: NextRequest) {
                   await prisma.booking.update({ where: { id: booking.id }, data: { videoCallUrl } });
                 }
               }
-              const calendarMembership = await getBusinessInstructor(businessId);
+              const calendarMembership = booking.instructorMembershipId
+                ? await getInstructorById(businessId, booking.instructorMembershipId)
+                : null;
               if (calendarMembership) {
                 try {
                   const eventId = await createEvent(business, calendarMembership, {
@@ -233,7 +235,9 @@ export async function POST(req: NextRequest) {
                   await prisma.booking.update({ where: { id: booking.id }, data: { videoCallUrl } });
                 }
               }
-              const calendarMembership = await getBusinessInstructor(businessId);
+              const calendarMembership = booking.instructorMembershipId
+                ? await getInstructorById(businessId, booking.instructorMembershipId)
+                : null;
               if (calendarMembership) {
                 try {
                   const eventId = await createEvent(business, calendarMembership, {
@@ -315,7 +319,9 @@ export async function POST(req: NextRequest) {
         // Only sync to the calendar immediately if this didn't need
         // approval — pending ones sync once confirmed (see the /confirm route).
         if (!needsApproval) {
-          const calendarMembership = await getBusinessInstructor(businessId);
+          const calendarMembership = booking.instructorMembershipId
+            ? await getInstructorById(businessId, booking.instructorMembershipId)
+            : null;
           if (calendarMembership) {
             try {
               const eventId = await createEvent(business, calendarMembership, {

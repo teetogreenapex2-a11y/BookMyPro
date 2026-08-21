@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, getBusinessInstructor, getMembership } from "@/lib/tenant";
+import { getBusinessBySlug, getInstructorById, getMembership } from "@/lib/tenant";
 import { deleteEvent } from "@/lib/calendar";
 
 export async function POST(
@@ -29,7 +29,9 @@ export async function POST(
     return NextResponse.json({ error: "Already cancelled" }, { status: 400 });
   }
 
-  const calendarMembership = await getBusinessInstructor(business.id);
+  const calendarMembership = booking.instructorMembershipId
+    ? await getInstructorById(business.id, booking.instructorMembershipId)
+    : null;
 
   await prisma.$transaction(async (tx) => {
     await tx.booking.update({ where: { id: booking.id }, data: { status: "cancelled" } });

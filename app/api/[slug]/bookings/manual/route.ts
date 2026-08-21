@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, getInstructorById, getBusinessInstructor, requireMembership } from "@/lib/tenant";
+import { getBusinessBySlug, getInstructorById, requireMembership } from "@/lib/tenant";
 import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
 import { findFitting, getFittingPriceCents, isFittingEnabled, findPackage, getPackagePriceCents } from "@/lib/pricing";
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
   }
 
-  const calendarMembership = await getBusinessInstructor(business.id);
+  const calendarMembership = instructorMembership;
   if (calendarMembership) {
     try {
       const eventId = await createEvent(business, calendarMembership, {

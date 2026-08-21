@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, requireMembership, getBusinessInstructor, getMembership } from "@/lib/tenant";
+import { getBusinessBySlug, requireMembership, getInstructorById, getMembership } from "@/lib/tenant";
 import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
 import { findFitting } from "@/lib/pricing";
@@ -48,7 +48,9 @@ export async function POST(
     }
   }
 
-  const calendarMembership = await getBusinessInstructor(business.id);
+  const calendarMembership = booking.instructorMembershipId
+    ? await getInstructorById(business.id, booking.instructorMembershipId)
+    : null;
   if (calendarMembership) {
     try {
       const isFitting = booking.serviceType === "fitting";
