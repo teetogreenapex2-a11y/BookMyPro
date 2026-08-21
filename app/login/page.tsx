@@ -61,7 +61,7 @@ function LoginPageInner() {
       // people actually expect to see.
       const { result } = await SocialLogin.login({
         provider: "google",
-        options: { scopes: ["email", "profile"], filterByAuthorizedAccounts: false },
+        options: { filterByAuthorizedAccounts: false },
       });
       const idToken = "idToken" in result ? result.idToken : null;
       if (!idToken) throw new Error("Google didn't return a token");

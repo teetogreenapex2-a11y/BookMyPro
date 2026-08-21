@@ -12,7 +12,7 @@ dependencies {
     implementation project(':capacitor-firebase-messaging')
     implementation project(':capacitor-camera')
     implementation project(':capacitor-splash-screen')
-    implementation project(':capawesome-capacitor-google-sign-in')
+    implementation project(':capgo-capacitor-social-login')
 
 }
 
