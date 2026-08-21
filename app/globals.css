@@ -33,6 +33,10 @@ body {
   font-family: 'Inter', sans-serif;
   background: var(--chalk);
   color: var(--ink);
+  /* Pushes every screen's content down below the status bar/notch on
+     the native app. env() resolves to 0 on the regular website (no
+     notch to account for there), so this is a no-op outside the app. */
+  padding-top: env(safe-area-inset-top);
 }
 
 button {
