@@ -55,6 +55,7 @@ type Business = {
   city: string | null;
   state: string | null;
   zipCode: string | null;
+  timezone: string;
 };
 
 const PACKAGE_ROWS = [
