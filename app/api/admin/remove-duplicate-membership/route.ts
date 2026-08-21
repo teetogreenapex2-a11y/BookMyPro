@@ -55,20 +55,14 @@ export async function GET(req: NextRequest) {
 
   const result = await inspect(membershipId);
   if (!result.membership) return NextResponse.json({ error: "Membership not found" }, { status: 404 });
-  return NextResponse.json(result);
-}
 
-export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
-  const isAdmin = await isPlatformAdmin((session.user as any).id);
-  if (!isAdmin) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+  // Preview by default - add &confirm=yes-delete to actually delete, once
+  // the preview's been checked. A GET (not POST) specifically so this can
+  // be triggered just by visiting a link from a phone browser, using
+  // whatever session is already signed in there.
+  const confirmed = req.nextUrl.searchParams.get("confirm") === "yes-delete";
+  if (!confirmed) return NextResponse.json({ preview: true, ...result });
 
-  const { membershipId } = await req.json();
-  if (!membershipId) return NextResponse.json({ error: "membershipId required" }, { status: 400 });
-
-  const result = await inspect(membershipId);
-  if (!result.membership) return NextResponse.json({ error: "Membership not found" }, { status: 404 });
   if (!result.safeToDelete) {
     return NextResponse.json(
       { error: "Refusing to delete - real data is attached to this membership.", ...result },
