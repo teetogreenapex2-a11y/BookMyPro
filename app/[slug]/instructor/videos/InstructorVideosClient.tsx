@@ -47,6 +47,14 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  // The clip just recorded, waiting for the instructor to review it (with
+  // slow-mo scrubbing) and decide whether to save it or discard and
+  // re-record - this is the actual "go straight to video instead of
+  // uploading blind" step. Cleared (and its object URL revoked) once
+  // they save, discard, or record again.
+  const [reviewFile, setReviewFile] = useState<File | null>(null);
+  const [reviewUrl, setReviewUrl] = useState<string | null>(null);
+  const reviewVideoRef = useRef<HTMLVideoElement | null>(null);
   // Checking Capacitor.isNativePlatform() directly during render caused a
   // hydration mismatch (the server always renders as if it's not native,
   // since it has no way to know) - starting this state at false to match
@@ -62,6 +70,10 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   }
 
   async function recordVideo() {
+    if (!uploadPlayerId) {
+      setUploadError("Choose which player this is for first.");
+      return;
+    }
     setUploadError(null);
     setRecording(true);
     try {
@@ -70,12 +82,25 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
       const res = await fetch(result.webPath!);
       const blob = await res.blob();
       const recordedFile = new File([blob], `swing-${Date.now()}.mp4`, { type: blob.type || "video/mp4" });
-      await uploadVideo(recordedFile);
+      setReviewFile(recordedFile);
+      setReviewUrl(URL.createObjectURL(recordedFile));
     } catch (err) {
       console.error("Failed to record video:", err);
     } finally {
       setRecording(false);
     }
+  }
+
+  function discardReview() {
+    if (reviewUrl) URL.revokeObjectURL(reviewUrl);
+    setReviewFile(null);
+    setReviewUrl(null);
+  }
+
+  async function saveReview() {
+    if (!reviewFile) return;
+    await uploadVideo(reviewFile);
+    discardReview();
   }
 
   async function uploadVideo(file: File) {
@@ -226,6 +251,57 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
           >
             + Upload a video
           </button>
+
+          {reviewFile && reviewUrl && (
+            <div style={{ background: "#000", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+              <video
+                ref={reviewVideoRef}
+                src={reviewUrl}
+                controls
+                autoPlay
+                playsInline
+                style={{ width: "100%", borderRadius: 8, display: "block", marginBottom: 12 }}
+              />
+              <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                {[1, 0.5, 0.25].map((rate) => (
+                  <button
+                    key={rate}
+                    onClick={() => { if (reviewVideoRef.current) reviewVideoRef.current.playbackRate = rate; }}
+                    style={{
+                      flex: 1, background: "rgba(255,255,255,0.1)", color: "#FFF", border: "1px solid rgba(255,255,255,0.3)",
+                      borderRadius: 8, padding: "8px 0", fontSize: 12, fontWeight: 700,
+                    }}
+                  >
+                    {rate === 1 ? "Normal" : `${rate}x`}
+                  </button>
+                ))}
+              </div>
+              {uploadError && <p style={{ fontSize: 12, color: "#FF8A8A", margin: "0 0 12px" }}>{uploadError}</p>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={discardReview}
+                  disabled={uploading}
+                  style={{ flex: 1, background: "none", border: "1px solid rgba(255,255,255,0.3)", color: "#FFF", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700 }}
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={() => { discardReview(); recordVideo(); }}
+                  disabled={uploading || recording}
+                  style={{ flex: 1, background: "none", border: "1px solid rgba(255,255,255,0.3)", color: "#FFF", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700 }}
+                >
+                  Record again
+                </button>
+                <button
+                  onClick={saveReview}
+                  disabled={uploading}
+                  style={{ flex: 1, background: "var(--gold)", color: "var(--fairway)", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, opacity: uploading ? 0.7 : 1 }}
+                >
+                  {uploading ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {uploadOpen && (
             <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
