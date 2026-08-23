@@ -51,7 +51,16 @@ function LoginPageInner() {
     setSigningInWithGoogle(true);
     try {
       await SocialLogin.initialize({
-        google: { webClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID! },
+        google: {
+          webClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+          // Same real iOS OAuth client whose reversed form is already
+          // registered as a URL scheme in Info.plist by codemagic.yaml's
+          // "Add Google Sign-In URL scheme" step - hardcoded to match
+          // that file directly (this is a public client id, not a
+          // secret) rather than a new env var, both need to point at the
+          // exact same client for sign-in to actually complete on iOS.
+          iOSClientId: "748505012241-0ri4odsjmdmbcv9usac2ka67pgbqf9ao.apps.googleusercontent.com",
+        },
       });
       // filterByAuthorizedAccounts defaults to true, which only shows
       // accounts that have already signed into this exact app before -
