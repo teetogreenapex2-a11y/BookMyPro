@@ -28,6 +28,10 @@ export async function GET(req: NextRequest) {
   if (!membership.googleRefreshToken) {
     return NextResponse.json({ error: "No googleRefreshToken stored on this membership" }, { status: 400 });
   }
+  // First 8 / last 4 characters only - enough to tell whether the stored
+  // value actually changes between reconnect attempts, without exposing
+  // the real, working token.
+  const tokenFingerprint = `${membership.googleRefreshToken.slice(0, 8)}...${membership.googleRefreshToken.slice(-4)} (${membership.googleRefreshToken.length} chars)`;
 
   const client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -54,6 +58,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       membershipId: membership.id,
       user: { name: membership.user.name, email: membership.user.email },
+      tokenFingerprint,
       tokenRefreshSucceeded: true,
       hasAccessToken: !!credentials.access_token,
       expiresAt: credentials.expiry_date ? new Date(credentials.expiry_date).toISOString() : null,
@@ -64,6 +69,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       membershipId: membership.id,
       user: { name: membership.user.name, email: membership.user.email },
+      tokenFingerprint,
       tokenRefreshSucceeded: false,
       // The real, raw error from Google - this is the actual "why"
       // instead of the generic invalid_grant label the app shows.
