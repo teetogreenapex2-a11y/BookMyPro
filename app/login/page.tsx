@@ -156,7 +156,19 @@ function LoginPageInner() {
           {signingInWithGoogle ? "Signing in..." : "Continue with Google"}
         </button>
         {googleError && (
-          <p style={{ fontSize: 12, color: "#B23A3A", marginTop: 8 }}>{googleError}</p>
+          <div style={{ marginTop: 8 }}>
+            <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{googleError}</p>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(googleError)}
+              style={{
+                marginTop: 4, background: "none", border: "1px solid #B23A3A", color: "#B23A3A",
+                fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6,
+              }}
+            >
+              Copy error
+            </button>
+          </div>
         )}
 
         <button
