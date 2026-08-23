@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -249,7 +250,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
               border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 700, marginBottom: uploadOpen ? 12 : 20,
             }}
           >
-            + Upload a video
+            + Add a video
           </button>
 
           {reviewFile && reviewUrl && (
