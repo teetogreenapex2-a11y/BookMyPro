@@ -60,6 +60,23 @@ export const authOptions: NextAuthOptions = {
         secure: true,
       },
     },
+    // Same root cause as pkceCodeVerifier above, hitting a different
+    // cookie: connecting Google Calendar sends the instructor's browser
+    // through accounts.google.com and back before landing on our own
+    // /api/calendar/callback - inside the native iOS app specifically,
+    // WKWebView doesn't reliably carry a sameSite:lax (the default)
+    // cookie through that round trip, so by the time the callback runs,
+    // getServerSession() finds no session at all ("Sign in required")
+    // even though the person was genuinely signed in when they started.
+    sessionToken: {
+      name: "__Secure-next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: true,
+      },
+    },
   },
   callbacks: {
     async session({ session, user }) {
