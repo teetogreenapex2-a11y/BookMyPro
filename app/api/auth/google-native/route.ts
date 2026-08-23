@@ -25,10 +25,21 @@ export async function POST(req: NextRequest) {
   const { idToken } = await req.json();
   if (!idToken) return NextResponse.json({ error: "Missing idToken" }, { status: 400 });
 
-  const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  const client = new OAuth2Client();
   let payload;
   try {
-    const ticket = await client.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
+    const ticket = await client.verifyIdToken({
+      idToken,
+      // Android and the web use the Web client id as their audience, but
+      // Google's native iOS SDK issues its ID token against the separate
+      // iOS client id passed to SocialLogin.initialize() on that
+      // platform - accepting both here is what actually lets one shared
+      // route verify tokens from every platform correctly.
+      audience: [
+        process.env.GOOGLE_CLIENT_ID!,
+        "748505012241-0ri4odsjmdmbcv9usac2ka67pgbqf9ao.apps.googleusercontent.com",
+      ],
+    });
     payload = ticket.getPayload();
   } catch (err) {
     console.error("Native Google sign-in - token verification failed:", err);
