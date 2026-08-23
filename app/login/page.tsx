@@ -90,7 +90,7 @@ function LoginPageInner() {
       // console on an iPad without a Mac, so this is the most direct
       // way to actually see what's failing. Safe to revert to the
       // generic message once this is sorted out.
-      const detail = err?.message || err?.code || JSON.stringify(err) || "unknown error";
+      const detail = JSON.stringify(err, Object.getOwnPropertyNames(err || {})) || String(err) || "unknown error";
       setGoogleError(`Couldn't sign in with Google: ${detail}`);
     } finally {
       setSigningInWithGoogle(false);
