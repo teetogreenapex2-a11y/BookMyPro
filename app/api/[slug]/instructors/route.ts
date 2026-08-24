@@ -18,10 +18,16 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
   const requesterMembership = await getMembership((session.user as any).id, business.id);
+  const isStaff = requesterMembership?.role === "owner" || requesterMembership?.role === "instructor";
   const wantsInactive = req.nextUrl.searchParams.get("includeInactive") === "true";
   const includeInactive = wantsInactive && requesterMembership?.role === "owner";
 
-  const instructors = await getBusinessInstructors(business.id, includeInactive);
+  let instructors = await getBusinessInstructors(business.id, includeInactive);
+  // A player (or anyone not on staff) never sees a hidden instructor at
+  // all - owner/instructor accounts still see everyone, since they're the
+  // ones who'd need to manage or work alongside a hidden entry.
+  if (!isStaff) instructors = instructors.filter((m) => !m.hiddenFromBooking);
+
   const shaped = instructors.map((m) => ({
     id: m.id, // this is the Membership id — what bookings actually reference
     name: m.user.name,
@@ -30,6 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     role: m.role,
     status: m.status,
     specialty: m.specialty,
+    hiddenFromBooking: m.hiddenFromBooking,
     // Each instructor's own pricing — spread directly rather than
     // hand-listing every field, since lib/pricing.ts's helpers just read
     // whichever field names they need off this object (see schema.prisma's

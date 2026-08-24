@@ -182,6 +182,12 @@ model Membership {
   // access on its own, only the actual approval does.
   status     String   @default("active")
   specialty  String?  // short tagline shown to players, e.g. "Short game, junior coaching" — only meaningful for owner/instructor roles
+  // Keeps this person out of the player-facing booking picker without
+  // touching their own access to the app at all - unlike status
+  // "inactive" (which also blocks their own Settings/calendar access),
+  // this is purely about whether players can see and book with them.
+  // For test/demo instructor accounts, internal-only staff, etc.
+  hiddenFromBooking Boolean @default(false)
 
   // Google Calendar sync token — set when this member (as an instructor)
   // connects their calendar for this specific business.

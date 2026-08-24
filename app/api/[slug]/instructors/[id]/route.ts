@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getMembership } from "@/lib/tenant";
 
-// PATCH /api/{slug}/instructors/{id}  { specialty?, active? }
+// PATCH /api/{slug}/instructors/{id}  { specialty?, active?, hiddenFromBooking? }
 // Profile-level fields (as opposed to pricing, handled by the sibling
 // /pricing route) — specialty (the short tagline shown to players when
 // choosing who to book with) can be edited by the owner or by the
@@ -16,6 +16,11 @@ import { getBusinessBySlug, getMembership } from "@/lib/tenant";
 // back. A hard delete was never the right tool for this - see the
 // temporary /api/admin/remove-duplicate-membership route for why that's
 // only safe for an account with zero real data attached.
+// hiddenFromBooking is a different, narrower thing than active - it only
+// controls whether players see this person as bookable, without touching
+// their own access to the app at all (Settings, calendar connection,
+// etc. keep working). For test/demo instructor accounts, internal-only
+// staff, and similar.
 export async function PATCH(req: NextRequest, { params }: { params: { slug: string; id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
@@ -36,7 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   });
   if (!target) return NextResponse.json({ error: "Instructor not found" }, { status: 404 });
 
-  const { specialty, active } = await req.json();
+  const { specialty, active, hiddenFromBooking } = await req.json();
   const data: Record<string, unknown> = {};
   if (typeof specialty === "string") data.specialty = specialty.slice(0, 120);
 
@@ -52,6 +57,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
       }
     }
     data.status = active ? "active" : "inactive";
+  }
+
+  if (typeof hiddenFromBooking === "boolean") {
+    if (!isOwner) return NextResponse.json({ error: "Only the owner can change booking-page visibility" }, { status: 403 });
+    data.hiddenFromBooking = hiddenFromBooking;
   }
 
   const updated = await prisma.membership.update({ where: { id: target.id }, data });

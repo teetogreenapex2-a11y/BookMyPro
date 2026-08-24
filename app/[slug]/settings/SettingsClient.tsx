@@ -208,6 +208,23 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
     }
   }
 
+  const [togglingHiddenId, setTogglingHiddenId] = useState<string | null>(null);
+  async function toggleHidden(membershipId: string, hiddenFromBooking: boolean) {
+    setTogglingHiddenId(membershipId);
+    try {
+      const res = await fetch(`${apiBase}/instructors/${membershipId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hiddenFromBooking }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "Something went wrong."); return; }
+      setTeam((prev) => prev.map((t) => (t.id === membershipId ? { ...t, hiddenFromBooking: data.hiddenFromBooking } : t)));
+    } finally {
+      setTogglingHiddenId(null);
+    }
+  }
+
   useEffect(() => {
     const found = team.find((t) => t.id === pricingInstructorId);
     setInstructorPricing(found || null);
@@ -876,6 +893,28 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                     }}>
                       {isInactive ? "Inactive" : t.role}
                     </span>
+                    {t.hiddenFromBooking && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--faint)",
+                        border: "1px solid var(--border)", borderRadius: 4, padding: "2px 6px", flexShrink: 0,
+                      }}>
+                        Hidden
+                      </span>
+                    )}
+                    {isOwner && (
+                      <button
+                        onClick={() => toggleHidden(t.id, !t.hiddenFromBooking)}
+                        disabled={togglingHiddenId === t.id}
+                        title="Controls whether players see this person as bookable - doesn't affect their own access to the app"
+                        style={{
+                          background: "none", border: "1px solid var(--border)", color: "var(--muted)",
+                          fontSize: 11, fontWeight: 700, padding: "5px 10px", borderRadius: 6, flexShrink: 0,
+                          cursor: togglingHiddenId === t.id ? "default" : "pointer",
+                        }}
+                      >
+                        {togglingHiddenId === t.id ? "…" : t.hiddenFromBooking ? "Show on booking" : "Hide from booking"}
+                      </button>
+                    )}
                     {isOwner && t.email !== user.email && (
                       <button
                         onClick={() => toggleActive(t.id, isInactive)}
