@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 
 // ---- Drawing math -----------------------------------------------------
 
@@ -58,6 +59,7 @@ const TOOLS = [
   { id: "circle", label: "Circle" },
   { id: "angle", label: "Angle" },
   { id: "text", label: "Label" },
+  { id: "trace", label: "Clubhead trace" },
   { id: "erase", label: "Erase" },
 ] as const;
 
@@ -68,7 +70,12 @@ type Shape =
   | { type: "line" | "arrow"; color: string; width: number; from: Point; to: Point }
   | { type: "circle"; color: string; width: number; center: Point; radius: number }
   | { type: "angle"; color: string; width: number; vertex: Point; p1: Point; p2: Point; degrees: number }
-  | { type: "text"; color: string; width: number; point: Point; text: string };
+  | { type: "text"; color: string; width: number; point: Point; text: string }
+  // A handful of deliberately-placed points, one per key moment in the
+  // swing (address, top, impact, etc.), each tapped on its own captured
+  // video frame rather than dragged in one freehand motion like "pen" -
+  // rendered as a smooth curve through them, not a raw point-to-point path.
+  | { type: "trace"; color: string; width: number; points: Point[] };
 
 // How close a click needs to be to a shape's actual line/edge to count as
 // hitting it, in canvas pixels - generous enough to comfortably tap a
@@ -79,6 +86,7 @@ function hitTestShape(shape: Shape, p: Point): boolean {
   switch (shape.type) {
     case "pen":
     case "erase":
+    case "trace":
       return shape.points.some((pt) => dist(pt, p) < HIT_TOLERANCE);
     case "line":
     case "arrow":
@@ -104,6 +112,7 @@ function translateShape(shape: Shape, dx: number, dy: number): Shape {
   switch (shape.type) {
     case "pen":
     case "erase":
+    case "trace":
       return { ...shape, points: shape.points.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })) };
     case "line":
     case "arrow":
@@ -169,6 +178,18 @@ export default function SwingCanvas({
   const [hasImage, setHasImage] = useState(false);
   const [pendingVideoUrl, setPendingVideoUrl] = useState<string | null>(null); // set while scrubbing a video, before a frame is captured
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const traceImgRef = useRef<HTMLImageElement | null>(null);
+  // Clubhead trace: points accumulate across several separately-captured
+  // frames (one tap per key swing position), rather than one continuous
+  // drag like the pen tool. tracePendingFrameUrl is non-null only in the
+  // brief "tap to place this one point" step between marking a frame and
+  // going back to the video scrubber. traceBackgroundImageUrl is fixed to
+  // whichever frame was captured first, and becomes the final background
+  // image once the trace is finished - address position is usually the
+  // clearest, most static reference frame for this.
+  const [tracePoints, setTracePoints] = useState<Point[]>([]);
+  const [tracePendingFrameUrl, setTracePendingFrameUrl] = useState<string | null>(null);
+  const [traceBackgroundImageUrl, setTraceBackgroundImageUrl] = useState<string | null>(null);
   const [textPrompt, setTextPrompt] = useState<Point | null>(null);
   const [textDraft, setTextDraft] = useState("");
 
@@ -271,6 +292,32 @@ export default function SwingCanvas({
       } else if (s.type === "text") {
         ctx.font = "bold 22px sans-serif";
         ctx.fillText(s.text, s.point.x, s.point.y);
+      } else if (s.type === "trace") {
+        if (s.points.length >= 2) {
+          // Quadratic curves through consecutive midpoints - a standard
+          // way to get a smooth-looking path through a handful of
+          // discrete points, rather than the sharp corners a straight
+          // point-to-point line would have.
+          ctx.beginPath();
+          ctx.moveTo(s.points[0].x, s.points[0].y);
+          for (let i = 1; i < s.points.length - 1; i++) {
+            const mid = { x: (s.points[i].x + s.points[i + 1].x) / 2, y: (s.points[i].y + s.points[i + 1].y) / 2 };
+            ctx.quadraticCurveTo(s.points[i].x, s.points[i].y, mid.x, mid.y);
+          }
+          ctx.lineTo(s.points[s.points.length - 1].x, s.points[s.points.length - 1].y);
+          ctx.stroke();
+          const last = s.points[s.points.length - 1];
+          const secondLast = s.points[s.points.length - 2];
+          drawArrowHead(ctx, secondLast, last, 14 + s.width, s.color);
+        }
+        // A small dot at each marked position, so the discrete key
+        // moments (address, top, impact...) stay visible under the
+        // smoothed curve connecting them.
+        s.points.forEach((p) => {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, Math.max(3, s.width / 2), 0, Math.PI * 2);
+          ctx.fill();
+        });
       }
       ctx.restore();
     };
@@ -480,6 +527,63 @@ export default function SwingCanvas({
     img.src = off.toDataURL("image/png");
   }
 
+  // Same underlying capture technique as captureFrame above, but for one
+  // point in an in-progress clubhead trace: freezes the current moment as
+  // a still image to tap a point on, instead of replacing the whole
+  // canvas with it.
+  function markFrameForTrace() {
+    const video = videoRef.current;
+    if (!video) return;
+    const off = document.createElement("canvas");
+    off.width = dims.w;
+    off.height = dims.h;
+    const offCtx = off.getContext("2d")!;
+    offCtx.drawImage(video, 0, 0, dims.w, dims.h);
+    const dataUrl = off.toDataURL("image/png");
+    setTracePendingFrameUrl(dataUrl);
+    // Only the very first marked frame becomes the eventual background -
+    // later marks just add points, they don't change which image the
+    // trace ends up drawn on top of.
+    setTraceBackgroundImageUrl((prev) => prev ?? dataUrl);
+  }
+
+  function placeTracePoint(e: ReactMouseEvent<HTMLImageElement>) {
+    const img = traceImgRef.current;
+    if (!img) return;
+    const rect = img.getBoundingClientRect();
+    const p = { x: ((e.clientX - rect.left) / rect.width) * dims.w, y: ((e.clientY - rect.top) / rect.height) * dims.h };
+    setTracePoints((prev) => [...prev, p]);
+    setTracePendingFrameUrl(null); // back to the video scrubber for the next point
+  }
+
+  function undoTracePoint() {
+    setTracePoints((prev) => prev.slice(0, -1));
+  }
+
+  function cancelTrace() {
+    setTracePoints([]);
+    setTracePendingFrameUrl(null);
+    setTraceBackgroundImageUrl(null);
+    setPendingVideoUrl(null);
+  }
+
+  function finishTrace() {
+    if (tracePoints.length < 2 || !traceBackgroundImageUrl) return;
+    setShapes((s) => [...s, { type: "trace", color, width: lineWidth, points: tracePoints }]);
+    const img = new Image();
+    img.onload = () => {
+      imgRef.current = img;
+      setHasImage(true);
+      redraw();
+    };
+    img.src = traceBackgroundImageUrl;
+    setTracePoints([]);
+    setTracePendingFrameUrl(null);
+    setTraceBackgroundImageUrl(null);
+    setPendingVideoUrl(null);
+    setTool("move");
+  }
+
   async function exportPng(): Promise<Blob> {
     return new Promise((resolve, reject) => {
       const canvas = canvasRef.current;
@@ -551,7 +655,64 @@ export default function SwingCanvas({
         </button>
       </div>
 
-      {pendingVideoUrl && (
+      {pendingVideoUrl && tool === "trace" && !tracePendingFrameUrl && (
+        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 10 }}>
+          <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 8px" }}>
+            Scrub to a key moment (address, top, impact...), then mark the clubhead there. Repeat for each position, then finish.
+          </p>
+          <video ref={videoRef} src={pendingVideoUrl} controls style={{ width: "100%", borderRadius: 8, marginBottom: 8, background: "#000" }} />
+          <div style={{ display: "flex", gap: 8, marginBottom: tracePoints.length > 0 ? 8 : 0 }}>
+            <button
+              onClick={cancelTrace}
+              style={{ flex: 1, background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600 }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={markFrameForTrace}
+              style={{ flex: 2, background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 700 }}
+            >
+              📍 Mark clubhead at this frame
+            </button>
+          </div>
+          {tracePoints.length > 0 && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: "var(--faint)", flex: 1 }}>
+                {tracePoints.length} {tracePoints.length === 1 ? "point" : "points"} marked
+              </span>
+              <button onClick={undoTracePoint} style={{ fontSize: 12, fontWeight: 700, background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px" }}>
+                Undo last
+              </button>
+              <button
+                onClick={finishTrace}
+                disabled={tracePoints.length < 2}
+                style={{
+                  fontSize: 12, fontWeight: 700, background: "var(--gold)", color: "var(--fairway)", border: "none",
+                  borderRadius: 8, padding: "6px 12px", opacity: tracePoints.length < 2 ? 0.5 : 1,
+                }}
+              >
+                Finish trace
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tracePendingFrameUrl && (
+        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 10 }}>
+          <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 8px" }}>
+            Tap the clubhead's position in this frame.
+          </p>
+          <img
+            ref={traceImgRef}
+            src={tracePendingFrameUrl}
+            onClick={placeTracePoint}
+            style={{ width: "100%", borderRadius: 8, cursor: "crosshair", touchAction: "none" }}
+          />
+        </div>
+      )}
+
+      {pendingVideoUrl && tool !== "trace" && (
         <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 10 }}>
           <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 8px" }}>
             Scrub to the moment you want, then capture it as a still frame to draw on.
@@ -577,6 +738,12 @@ export default function SwingCanvas({
       {tool === "angle" && angleClicks.length > 0 && (
         <p style={{ fontSize: 12, color: "var(--faint)", margin: 0 }}>
           {angleClicks.length === 1 ? "Now tap the first end point." : "Now tap the second end point."}
+        </p>
+      )}
+
+      {tool === "trace" && !pendingVideoUrl && !tracePendingFrameUrl && (
+        <p style={{ fontSize: 12, color: "var(--faint)", margin: 0 }}>
+          Add a video above to trace the clubhead across the swing.
         </p>
       )}
 
