@@ -77,6 +77,21 @@ export const authOptions: NextAuthOptions = {
         secure: true,
       },
     },
+    // Same root cause as pkceCodeVerifier above - Apple's OAuth flow also
+    // stashes a state value in a cookie for CSRF protection, sent through
+    // the same cross-site POST callback. Missed this one the first time;
+    // without it, NextAuth can't match the returned state and silently
+    // rejects the whole callback, which looks exactly like being bounced
+    // straight back to the sign-in screen with no explanation.
+    state: {
+      name: "next-auth.state",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: true,
+      },
+    },
   },
   callbacks: {
     async session({ session, user }) {
