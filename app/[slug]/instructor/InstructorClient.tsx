@@ -646,7 +646,7 @@ export default function InstructorClient({
     // Find the booking tied to this slot to load/save its note.
     const res = await fetch(`${apiBase}/bookings`);
     const bookings = await res.json();
-    const match = bookings.find((b: any) => b.availabilityId === slot.id || b.startTime === slot.startTime);
+    const match = bookings.find((b: any) => b.status !== "cancelled" && (b.availabilityId === slot.id || b.startTime === slot.startTime));
     if (match) {
       setBookingId(match.id);
       setNoteText(match.note?.text || "");
