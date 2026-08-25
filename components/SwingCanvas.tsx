@@ -81,7 +81,11 @@ type Shape =
   // between shoulders/elbows/wrists/hips/knees/ankles) plus small dots at
   // each joint. Distinct from "trace" above: this is a full-body snapshot
   // detected automatically, not a hand-placed path across several frames.
-  | { type: "pose"; color: string; width: number; points: Point[] };
+  // lowConfidenceIndices marks which compact-array positions MediaPipe
+  // itself wasn't confident about, so those get drawn lighter/dashed
+  // instead of presented as solid fact - optional since a pose shape
+  // saved before this field existed won't have it.
+  | { type: "pose"; color: string; width: number; points: Point[]; lowConfidenceIndices?: number[] };
 
 // How close a click needs to be to a shape's actual line/edge to count as
 // hitting it, in canvas pixels - generous enough to comfortably tap a
@@ -175,7 +179,7 @@ async function getPoseLandmarker() {
       const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm");
       return PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
         },
         runningMode: "IMAGE",
       });
@@ -374,18 +378,29 @@ export default function SwingCanvas({
           ctx.fill();
         });
       } else if (s.type === "pose") {
+        const lowConf = new Set(s.lowConfidenceIndices || []);
         POSE_CONNECTIONS.forEach(([a, b]) => {
           const pa = s.points[a], pb = s.points[b];
           if (!pa || !pb) return; // a landmark can be missing if it wasn't visible/confident enough
+          const uncertain = lowConf.has(a) || lowConf.has(b);
+          ctx.save();
+          if (uncertain) {
+            ctx.setLineDash([5, 4]);
+            ctx.globalAlpha = 0.45;
+          }
           ctx.beginPath();
           ctx.moveTo(pa.x, pa.y);
           ctx.lineTo(pb.x, pb.y);
           ctx.stroke();
+          ctx.restore();
         });
-        s.points.forEach((p) => {
+        s.points.forEach((p, i) => {
+          ctx.save();
+          if (lowConf.has(i)) ctx.globalAlpha = 0.45;
           ctx.beginPath();
           ctx.arc(p.x, p.y, Math.max(3, s.width / 2), 0, Math.PI * 2);
           ctx.fill();
+          ctx.restore();
         });
       }
       ctx.restore();
@@ -672,7 +687,25 @@ export default function SwingCanvas({
         x: rawLandmarks[i].x * dims.w,
         y: rawLandmarks[i].y * dims.h,
       }));
-      setShapes((s) => [...s, { type: "pose", color, width: lineWidth, points }]);
+      // MediaPipe scores how sure it is about each individual landmark
+      // (0-1) - below ~0.5 is genuinely more guess than detection, so
+      // those get flagged rather than drawn as confidently as everything
+      // else. A confidence-flagged skeleton is a lot more useful than one
+      // that looks equally certain everywhere when it isn't.
+      const CONFIDENCE_THRESHOLD = 0.5;
+      const lowConfidenceIndices = POSE_LANDMARK_INDICES
+        .map((i, compactIndex) => ({ compactIndex, visibility: rawLandmarks[i].visibility ?? 1 }))
+        .filter((l) => l.visibility < CONFIDENCE_THRESHOLD)
+        .map((l) => l.compactIndex);
+
+      if (lowConfidenceIndices.length > POSE_LANDMARK_INDICES.length / 2) {
+        const proceed = confirm(
+          "This frame is hard to read clearly - more than half the body isn't confidently detected, likely from the angle, lighting, or part of the golfer being out of frame. The result will show as mostly unreliable. Add it anyway?"
+        );
+        if (!proceed) return;
+      }
+
+      setShapes((s) => [...s, { type: "pose", color, width: lineWidth, points, lowConfidenceIndices }]);
     } catch (err) {
       console.error("Pose detection failed:", err);
       alert("Something went wrong detecting the pose. Try again.");
