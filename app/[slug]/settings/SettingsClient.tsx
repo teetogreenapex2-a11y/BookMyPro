@@ -930,7 +930,6 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{t.specialty}</div>
                       ) : null}
                     </div>
-                    </div>
                     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                     <span style={{
                       fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--muted)",
