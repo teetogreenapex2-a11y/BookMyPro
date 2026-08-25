@@ -881,11 +881,11 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                   const isInactive = t.status === "inactive";
                   return (
                   <div key={t.id} style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+                    display: "flex", flexDirection: "column", gap: 8,
                     background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px",
                     opacity: isInactive ? 0.55 : 1,
                   }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ minWidth: 0 }}>
                       {canEditThis && editingNameId === t.id ? (
                         <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
                           <input
@@ -930,6 +930,8 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{t.specialty}</div>
                       ) : null}
                     </div>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                     <span style={{
                       fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--muted)",
                       background: "#EFEBDD", borderRadius: 4, padding: "2px 6px", flexShrink: 0,
@@ -971,6 +973,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         {togglingActiveId === t.id ? "…" : isInactive ? "Reactivate" : "Remove"}
                       </button>
                     )}
+                    </div>
                   </div>
                   );
                 })}
@@ -1194,9 +1197,11 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                 Each instructor sets their own rates — what a player pays depends on who they book with.
               </p>
 
-              {team.length > 1 && (
+              {(() => {
+                const activeTeam = team.filter((t) => t.status !== "inactive");
+                return activeTeam.length > 1 && (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-                  {team.map((t) => (
+                  {activeTeam.map((t) => (
                     <button
                       key={t.id}
                       onClick={() => setPricingInstructorId(t.id)}
@@ -1210,7 +1215,8 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                     </button>
                   ))}
                 </div>
-              )}
+                );
+              })()}
 
               {!instructorPricing ? (
                 <p style={{ fontSize: 13, color: "var(--faint)" }}>Loading…</p>
