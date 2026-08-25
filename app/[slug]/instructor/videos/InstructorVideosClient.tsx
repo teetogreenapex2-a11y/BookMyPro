@@ -1,9 +1,9 @@
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
+import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton } from "@/lib/poseDetection";
 
 type Comment = { id: string; timestampSeconds: number; text: string };
 type Submission = {
@@ -56,6 +56,10 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [reviewFile, setReviewFile] = useState<File | null>(null);
   const [reviewUrl, setReviewUrl] = useState<string | null>(null);
   const reviewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [aiAnalysisEnabled, setAiAnalysisEnabled] = useState(false);
+  const [showPoseOverlay, setShowPoseOverlay] = useState(false);
+  const poseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const poseLoopRef = useRef<number | null>(null);
   // Checking Capacitor.isNativePlatform() directly during render caused a
   // hydration mismatch (the server always renders as if it's not native,
   // since it has no way to know) - starting this state at false to match
@@ -69,6 +73,59 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   function loadPlayers() {
     fetch(`${apiBase}/players`).then((r) => r.json()).then((list) => setPlayers(Array.isArray(list) ? list : [])).catch(() => {});
   }
+
+  useEffect(() => {
+    if (!uploadPlayerId) { setAiAnalysisEnabled(false); return; }
+    fetch(`${apiBase}/players/${uploadPlayerId}/ai-analysis`)
+      .then((r) => r.json())
+      .then((data) => setAiAnalysisEnabled(!!data.enabled))
+      .catch(() => setAiAnalysisEnabled(false));
+  }, [uploadPlayerId, apiBase]);
+
+  useEffect(() => {
+    if (!showPoseOverlay) return;
+    let cancelled = false;
+
+    (async () => {
+      const landmarker = await getVideoPoseLandmarker();
+      if (cancelled) return;
+
+      function loop() {
+        if (cancelled) return;
+        const video = reviewVideoRef.current;
+        const canvas = poseOverlayCanvasRef.current;
+        if (video && canvas && !video.paused && !video.ended && video.readyState >= 2) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            // Keep the overlay canvas sized to match the video's actual
+            // displayed dimensions, which can change (e.g. on rotation).
+            if (canvas.width !== video.clientWidth || canvas.height !== video.clientHeight) {
+              canvas.width = video.clientWidth;
+              canvas.height = video.clientHeight;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const result = landmarker.detectForVideo(video, performance.now());
+            const rawLandmarks = result?.landmarks?.[0];
+            if (rawLandmarks) {
+              const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
+              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+            }
+          }
+        }
+        poseLoopRef.current = requestAnimationFrame(loop);
+      }
+      poseLoopRef.current = requestAnimationFrame(loop);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (poseLoopRef.current) cancelAnimationFrame(poseLoopRef.current);
+      poseLoopRef.current = null;
+      const canvas = poseOverlayCanvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+  }, [showPoseOverlay]);
 
   async function recordVideo() {
     if (!uploadPlayerId) {
@@ -96,6 +153,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
     if (reviewUrl) URL.revokeObjectURL(reviewUrl);
     setReviewFile(null);
     setReviewUrl(null);
+    setShowPoseOverlay(false);
   }
 
   async function saveReview() {
@@ -255,14 +313,32 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
 
           {reviewFile && reviewUrl && (
             <div style={{ background: "#000", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <video
-                ref={reviewVideoRef}
-                src={reviewUrl}
-                controls
-                autoPlay
-                playsInline
-                style={{ width: "100%", borderRadius: 8, display: "block", marginBottom: 12 }}
-              />
+              <div style={{ position: "relative", marginBottom: 12 }}>
+                <video
+                  ref={reviewVideoRef}
+                  src={reviewUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  style={{ width: "100%", borderRadius: 8, display: "block" }}
+                />
+                <canvas
+                  ref={poseOverlayCanvasRef}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}
+                />
+              </div>
+              {aiAnalysisEnabled && (
+                <button
+                  onClick={() => setShowPoseOverlay((v) => !v)}
+                  style={{
+                    width: "100%", marginBottom: 12, background: showPoseOverlay ? "var(--gold)" : "rgba(255,255,255,0.1)",
+                    color: showPoseOverlay ? "var(--fairway)" : "#FFF", border: "1px solid rgba(255,255,255,0.3)",
+                    borderRadius: 8, padding: "8px 0", fontSize: 12, fontWeight: 700,
+                  }}
+                >
+                  {showPoseOverlay ? "🤖 Body position: on" : "🤖 Show body position"}
+                </button>
+              )}
               <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                 {[1, 0.5, 0.25].map((rate) => (
                   <button

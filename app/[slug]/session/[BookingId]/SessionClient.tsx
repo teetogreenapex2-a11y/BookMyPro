@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import SwingCanvas, { SwingCanvasHandle } from "@/components/SwingCanvas";
+import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton } from "@/lib/poseDetection";
 
 declare global {
   interface Window {
@@ -50,6 +51,16 @@ export default function SessionClient({
   const [joinError, setJoinError] = useState<string | null>(null);
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
+  const [aiAnalysisEnabled, setAiAnalysisEnabled] = useState(false);
+  const [showPoseOverlay, setShowPoseOverlay] = useState(false);
+
+  useEffect(() => {
+    if (!isInstructor) return;
+    fetch(`${apiBase}/players/${playerId}/ai-analysis`)
+      .then((r) => r.json())
+      .then((data) => setAiAnalysisEnabled(!!data.enabled))
+      .catch(() => setAiAnalysisEnabled(false));
+  }, [isInstructor, playerId, apiBase]);
 
   const updateParticipant = useCallback((sessionId: string, patch: Partial<ParticipantMedia>) => {
     setParticipants((prev) => ({
@@ -195,26 +206,37 @@ export default function SessionClient({
           {Object.values(participants)
             .filter((p) => !p.isLocal)
             .map((p) => (
-              <VideoTile key={p.sessionId} participant={p} />
+              <VideoTile key={p.sessionId} participant={p} showOverlay={showPoseOverlay} />
             ))}
           {/* Local self-view - small, corner-positioned, like any normal call UI */}
           {Object.values(participants)
             .filter((p) => p.isLocal)
             .map((p) => (
               <div key={p.sessionId} style={{ position: "absolute", bottom: 10, right: 10, width: 100, height: 75, borderRadius: 8, overflow: "hidden", border: "2px solid rgba(255,255,255,0.3)" }}>
-                <VideoTile participant={p} muted />
+                <VideoTile participant={p} muted showOverlay={showPoseOverlay} />
               </div>
             ))}
         </div>
 
         {joined && (
-          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
             <button onClick={toggleMic} style={{ background: micOn ? "#333" : "#B23A3A", color: "#FFF", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 700 }}>
               {micOn ? "Mute" : "Unmute"}
             </button>
             <button onClick={toggleCamera} style={{ background: cameraOn ? "#333" : "#B23A3A", color: "#FFF", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 700 }}>
               {cameraOn ? "Camera off" : "Camera on"}
             </button>
+            {isInstructor && aiAnalysisEnabled && (
+              <button
+                onClick={() => setShowPoseOverlay((v) => !v)}
+                style={{
+                  background: showPoseOverlay ? "var(--gold)" : "#333", color: showPoseOverlay ? "var(--fairway)" : "#FFF",
+                  border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 700,
+                }}
+              >
+                {showPoseOverlay ? "🤖 Body position: on" : "🤖 Show body position"}
+              </button>
+            )}
             <button onClick={leaveCall} style={{ background: "#B23A3A", color: "#FFF", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 700 }}>
               Leave
             </button>
@@ -270,8 +292,10 @@ export default function SessionClient({
 // directly, giving real, direct access to the video data. React doesn't
 // support srcObject as a normal prop, so it's set imperatively via a ref,
 // same pattern Daily's own docs use for custom UI.
-function VideoTile({ participant, muted }: { participant: ParticipantMedia; muted?: boolean }) {
+function VideoTile({ participant, muted, showOverlay }: { participant: ParticipantMedia; muted?: boolean; showOverlay?: boolean }) {
   const videoElRef = useRef<HTMLVideoElement | null>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const poseLoopRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = videoElRef.current;
@@ -282,9 +306,55 @@ function VideoTile({ participant, muted }: { participant: ParticipantMedia; mute
     el.srcObject = tracks.length > 0 ? new MediaStream(tracks) : null;
   }, [participant.videoTrack, participant.audioTrack, muted]);
 
+  useEffect(() => {
+    if (!showOverlay) return;
+    let cancelled = false;
+
+    (async () => {
+      const landmarker = await getVideoPoseLandmarker();
+      if (cancelled) return;
+
+      function loop() {
+        if (cancelled) return;
+        const video = videoElRef.current;
+        const canvas = overlayCanvasRef.current;
+        if (video && canvas && video.readyState >= 2 && video.videoWidth > 0) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            if (canvas.width !== video.clientWidth || canvas.height !== video.clientHeight) {
+              canvas.width = video.clientWidth;
+              canvas.height = video.clientHeight;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const result = landmarker.detectForVideo(video, performance.now());
+            const rawLandmarks = result?.landmarks?.[0];
+            if (rawLandmarks) {
+              const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
+              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+            }
+          }
+        }
+        poseLoopRef.current = requestAnimationFrame(loop);
+      }
+      poseLoopRef.current = requestAnimationFrame(loop);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (poseLoopRef.current) cancelAnimationFrame(poseLoopRef.current);
+      poseLoopRef.current = null;
+      const canvas = overlayCanvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+  }, [showOverlay]);
+
   return (
     <div style={{ position: "relative", flex: "1 1 300px", minHeight: 200, background: "#111" }}>
       <video ref={videoElRef} autoPlay playsInline muted={muted} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      {showOverlay && (
+        <canvas ref={overlayCanvasRef} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
+      )}
       {!participant.videoTrack && (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#888", fontSize: 12 }}>
           {participant.userName || "Waiting..."}

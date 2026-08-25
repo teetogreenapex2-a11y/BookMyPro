@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { getImagePoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, POSE_CONNECTIONS } from "@/lib/poseDetection";
 
 // ---- Drawing math -----------------------------------------------------
 
@@ -92,25 +93,6 @@ type Shape =
 // thin line on a phone screen without needing pixel-perfect precision.
 const HIT_TOLERANCE = 16;
 
-// MediaPipe's pose model returns 33 landmarks in a fixed order, but only
-// these 12 (shoulders/elbows/wrists/hips/knees/ankles) matter for a golf
-// swing - face and hand detail landmarks exist in the raw data but aren't
-// useful here. POSE_LANDMARK_INDICES is the map from "compact" position
-// (what's actually stored and drawn) back to MediaPipe's own original
-// index, used once at detection time; POSE_CONNECTIONS below already
-// refers to the compact positions, not MediaPipe's raw indices.
-const POSE_LANDMARK_INDICES = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
-// Compact positions: 0/1 shoulders, 2/3 elbows, 4/5 wrists, 6/7 hips, 8/9 knees, 10/11 ankles (L/R each).
-const POSE_CONNECTIONS: [number, number][] = [
-  [0, 1], // shoulder to shoulder
-  [0, 2], [2, 4], // left arm
-  [1, 3], [3, 5], // right arm
-  [0, 6], [1, 7], // shoulder to hip (torso sides)
-  [6, 7], // hip to hip
-  [6, 8], [8, 10], // left leg
-  [7, 9], [9, 11], // right leg
-];
-
 function hitTestShape(shape: Shape, p: Point): boolean {
   switch (shape.type) {
     case "pen":
@@ -166,27 +148,6 @@ export type SwingCanvasHandle = {
   exportPng: () => Promise<Blob>;
   getShapesJson: () => string;
 };
-
-// Cached across every SwingCanvas instance for the lifetime of the app -
-// loading the WASM runtime and model file takes real time, so this makes
-// every detection after the very first one fast. Lazily created the first
-// time it's actually needed, not on component mount.
-let cachedPoseLandmarkerPromise: Promise<any> | null = null;
-async function getPoseLandmarker() {
-  if (!cachedPoseLandmarkerPromise) {
-    cachedPoseLandmarkerPromise = (async () => {
-      const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
-      const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm");
-      return PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
-        },
-        runningMode: "IMAGE",
-      });
-    })();
-  }
-  return cachedPoseLandmarkerPromise;
-}
 
 export default function SwingCanvas({
   initialSourceUrl,
@@ -378,30 +339,7 @@ export default function SwingCanvas({
           ctx.fill();
         });
       } else if (s.type === "pose") {
-        const lowConf = new Set(s.lowConfidenceIndices || []);
-        POSE_CONNECTIONS.forEach(([a, b]) => {
-          const pa = s.points[a], pb = s.points[b];
-          if (!pa || !pb) return; // a landmark can be missing if it wasn't visible/confident enough
-          const uncertain = lowConf.has(a) || lowConf.has(b);
-          ctx.save();
-          if (uncertain) {
-            ctx.setLineDash([5, 4]);
-            ctx.globalAlpha = 0.45;
-          }
-          ctx.beginPath();
-          ctx.moveTo(pa.x, pa.y);
-          ctx.lineTo(pb.x, pb.y);
-          ctx.stroke();
-          ctx.restore();
-        });
-        s.points.forEach((p, i) => {
-          ctx.save();
-          if (lowConf.has(i)) ctx.globalAlpha = 0.45;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, Math.max(3, s.width / 2), 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        });
+        drawPoseSkeleton(ctx, s.points, s.lowConfidenceIndices || [], s.color, s.width);
       }
       ctx.restore();
     };
@@ -673,32 +611,16 @@ export default function SwingCanvas({
     if (!img) return;
     setDetectingPose(true);
     try {
-      const landmarker = await getPoseLandmarker();
+      const landmarker = await getImagePoseLandmarker();
       const result = landmarker.detect(img);
       const rawLandmarks = result?.landmarks?.[0]; // first (and only) detected person
       if (!rawLandmarks) {
         alert("Couldn't detect a person in this frame clearly enough. Try a frame where the golfer is fully in view.");
         return;
       }
-      // Landmarks come back normalized (0-1 relative to the image), not
-      // in the pixel coordinates every other shape on this canvas uses -
-      // scale by the same dims.w/h the image itself was captured at.
-      const points: Point[] = POSE_LANDMARK_INDICES.map((i) => ({
-        x: rawLandmarks[i].x * dims.w,
-        y: rawLandmarks[i].y * dims.h,
-      }));
-      // MediaPipe scores how sure it is about each individual landmark
-      // (0-1) - below ~0.5 is genuinely more guess than detection, so
-      // those get flagged rather than drawn as confidently as everything
-      // else. A confidence-flagged skeleton is a lot more useful than one
-      // that looks equally certain everywhere when it isn't.
-      const CONFIDENCE_THRESHOLD = 0.5;
-      const lowConfidenceIndices = POSE_LANDMARK_INDICES
-        .map((i, compactIndex) => ({ compactIndex, visibility: rawLandmarks[i].visibility ?? 1 }))
-        .filter((l) => l.visibility < CONFIDENCE_THRESHOLD)
-        .map((l) => l.compactIndex);
+      const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, dims.w, dims.h);
 
-      if (lowConfidenceIndices.length > POSE_LANDMARK_INDICES.length / 2) {
+      if (lowConfidenceIndices.length > points.length / 2) {
         const proceed = confirm(
           "This frame is hard to read clearly - more than half the body isn't confidently detected, likely from the angle, lighting, or part of the golfer being out of frame. The result will show as mostly unreliable. Add it anyway?"
         );
