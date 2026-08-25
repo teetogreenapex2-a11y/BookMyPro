@@ -217,6 +217,7 @@ model Membership {
   fcmTokens         FcmToken[]
   conversationsAsPlayer Conversation[]
   sentMessages          Message[]
+  aiAnalysisPreferences AiAnalysisPreference[]
 
   // Per-instructor pricing — each instructor on staff sets their own rates,
   // rather than one shared business-wide price. Mirrors the exact same
@@ -276,6 +277,7 @@ model User {
   swingSketches SwingSketch[]
   orders         Order[]
   giftCardsPurchased GiftCard[] @relation("PurchasedGiftCards")
+  aiAnalysisPreferences AiAnalysisPreference[]
   accounts       Account[]
   sessions       Session[]
   createdAt      DateTime     @default(now())
@@ -455,6 +457,25 @@ model VideoComment {
 // Swing Sketch: an instructor draws directly on a photo/frame (lines,
 // angles, arrows, circles, labels) to illustrate a swing position —
 // deliberately separate from swing video review above. That's a player
+// Per-relationship opt-in for AI-assisted pose detection in Swing Sketch -
+// deliberately scoped to one specific (instructor, player) pair rather
+// than a single business-wide or per-instructor switch, since a player
+// might be fine with it for one instructor but not another, and an
+// instructor might want it on for some students and not others.
+// Missing row = off (the default) - a row only ever exists once someone
+// has actually turned it on for that pair.
+model AiAnalysisPreference {
+  id                     String     @id @default(cuid())
+  instructor             Membership @relation(fields: [instructorMembershipId], references: [id])
+  instructorMembershipId String
+  player                 User       @relation(fields: [playerId], references: [id])
+  playerId               String
+  enabled                Boolean    @default(false)
+  updatedAt              DateTime   @updatedAt
+
+  @@unique([instructorMembershipId, playerId])
+}
+
 // submitting a clip for the instructor to comment on; this is the
 // instructor actively marking up a still image, usually live in a lesson.
 model SwingSketch {

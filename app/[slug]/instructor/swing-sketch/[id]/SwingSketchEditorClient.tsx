@@ -20,6 +20,7 @@ export default function SwingSketchEditorClient({
   const [playerName, setPlayerName] = useState<string | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [shapesJson, setShapesJson] = useState<string | null>(null);
+  const [aiAnalysisEnabled, setAiAnalysisEnabled] = useState(false);
 
   const canvasHandleRef = useRef<SwingCanvasHandle | null>(null);
 
@@ -48,6 +49,14 @@ export default function SwingSketchEditorClient({
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!playerId) return;
+    fetch(`${apiBase}/players/${playerId}/ai-analysis`)
+      .then((r) => r.json())
+      .then((data) => setAiAnalysisEnabled(!!data.enabled))
+      .catch(() => {});
+  }, [playerId, apiBase]);
 
   async function save() {
     if (!canvasHandleRef.current || !playerId) return;
@@ -121,6 +130,7 @@ export default function SwingSketchEditorClient({
               initialSourceUrl={sourceUrl}
               initialShapesJson={shapesJson}
               onReady={(handle) => { canvasHandleRef.current = handle; }}
+              aiAnalysisEnabled={aiAnalysisEnabled}
             />
 
             {error && <p style={{ fontSize: 12, color: "#B23A3A", margin: "10px 0 0" }}>{error}</p>}

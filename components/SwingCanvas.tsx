@@ -75,18 +75,44 @@ type Shape =
   // swing (address, top, impact, etc.), each tapped on its own captured
   // video frame rather than dragged in one freehand motion like "pen" -
   // rendered as a smooth curve through them, not a raw point-to-point path.
-  | { type: "trace"; color: string; width: number; points: Point[] };
+  | { type: "trace"; color: string; width: number; points: Point[] }
+  // AI-detected body landmarks on one still frame - 33 points from
+  // MediaPipe's pose model, rendered as a skeleton (connecting lines
+  // between shoulders/elbows/wrists/hips/knees/ankles) plus small dots at
+  // each joint. Distinct from "trace" above: this is a full-body snapshot
+  // detected automatically, not a hand-placed path across several frames.
+  | { type: "pose"; color: string; width: number; points: Point[] };
 
 // How close a click needs to be to a shape's actual line/edge to count as
 // hitting it, in canvas pixels - generous enough to comfortably tap a
 // thin line on a phone screen without needing pixel-perfect precision.
 const HIT_TOLERANCE = 16;
 
+// MediaPipe's pose model returns 33 landmarks in a fixed order, but only
+// these 12 (shoulders/elbows/wrists/hips/knees/ankles) matter for a golf
+// swing - face and hand detail landmarks exist in the raw data but aren't
+// useful here. POSE_LANDMARK_INDICES is the map from "compact" position
+// (what's actually stored and drawn) back to MediaPipe's own original
+// index, used once at detection time; POSE_CONNECTIONS below already
+// refers to the compact positions, not MediaPipe's raw indices.
+const POSE_LANDMARK_INDICES = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+// Compact positions: 0/1 shoulders, 2/3 elbows, 4/5 wrists, 6/7 hips, 8/9 knees, 10/11 ankles (L/R each).
+const POSE_CONNECTIONS: [number, number][] = [
+  [0, 1], // shoulder to shoulder
+  [0, 2], [2, 4], // left arm
+  [1, 3], [3, 5], // right arm
+  [0, 6], [1, 7], // shoulder to hip (torso sides)
+  [6, 7], // hip to hip
+  [6, 8], [8, 10], // left leg
+  [7, 9], [9, 11], // right leg
+];
+
 function hitTestShape(shape: Shape, p: Point): boolean {
   switch (shape.type) {
     case "pen":
     case "erase":
     case "trace":
+    case "pose":
       return shape.points.some((pt) => dist(pt, p) < HIT_TOLERANCE);
     case "line":
     case "arrow":
@@ -113,6 +139,7 @@ function translateShape(shape: Shape, dx: number, dy: number): Shape {
     case "pen":
     case "erase":
     case "trace":
+    case "pose":
       return { ...shape, points: shape.points.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })) };
     case "line":
     case "arrow":
@@ -136,14 +163,41 @@ export type SwingCanvasHandle = {
   getShapesJson: () => string;
 };
 
+// Cached across every SwingCanvas instance for the lifetime of the app -
+// loading the WASM runtime and model file takes real time, so this makes
+// every detection after the very first one fast. Lazily created the first
+// time it's actually needed, not on component mount.
+let cachedPoseLandmarkerPromise: Promise<any> | null = null;
+async function getPoseLandmarker() {
+  if (!cachedPoseLandmarkerPromise) {
+    cachedPoseLandmarkerPromise = (async () => {
+      const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
+      const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm");
+      return PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+        },
+        runningMode: "IMAGE",
+      });
+    })();
+  }
+  return cachedPoseLandmarkerPromise;
+}
+
 export default function SwingCanvas({
   initialSourceUrl,
   initialShapesJson,
   onReady,
+  aiAnalysisEnabled,
 }: {
   initialSourceUrl?: string | null;
   initialShapesJson?: string | null;
   onReady?: (handle: SwingCanvasHandle) => void;
+  // Per-instructor, per-student opt-in (see the AiAnalysisPreference model)
+  // - only shows the "Detect body pose" action when the specific
+  // instructor working on this sketch has turned it on for this specific
+  // player, not a blanket feature flag.
+  aiAnalysisEnabled?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -176,6 +230,7 @@ export default function SwingCanvas({
   const [current, setCurrent] = useState<Shape | null>(null);
   const [angleClicks, setAngleClicks] = useState<Point[]>([]);
   const [hasImage, setHasImage] = useState(false);
+  const [detectingPose, setDetectingPose] = useState(false);
   const [pendingVideoUrl, setPendingVideoUrl] = useState<string | null>(null); // set while scrubbing a video, before a frame is captured
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const traceImgRef = useRef<HTMLImageElement | null>(null);
@@ -313,6 +368,20 @@ export default function SwingCanvas({
         // A small dot at each marked position, so the discrete key
         // moments (address, top, impact...) stay visible under the
         // smoothed curve connecting them.
+        s.points.forEach((p) => {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, Math.max(3, s.width / 2), 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else if (s.type === "pose") {
+        POSE_CONNECTIONS.forEach(([a, b]) => {
+          const pa = s.points[a], pb = s.points[b];
+          if (!pa || !pb) return; // a landmark can be missing if it wasn't visible/confident enough
+          ctx.beginPath();
+          ctx.moveTo(pa.x, pa.y);
+          ctx.lineTo(pb.x, pb.y);
+          ctx.stroke();
+        });
         s.points.forEach((p) => {
           ctx.beginPath();
           ctx.arc(p.x, p.y, Math.max(3, s.width / 2), 0, Math.PI * 2);
@@ -584,6 +653,34 @@ export default function SwingCanvas({
     setTool("move");
   }
 
+  async function detectPose() {
+    const img = imgRef.current;
+    if (!img) return;
+    setDetectingPose(true);
+    try {
+      const landmarker = await getPoseLandmarker();
+      const result = landmarker.detect(img);
+      const rawLandmarks = result?.landmarks?.[0]; // first (and only) detected person
+      if (!rawLandmarks) {
+        alert("Couldn't detect a person in this frame clearly enough. Try a frame where the golfer is fully in view.");
+        return;
+      }
+      // Landmarks come back normalized (0-1 relative to the image), not
+      // in the pixel coordinates every other shape on this canvas uses -
+      // scale by the same dims.w/h the image itself was captured at.
+      const points: Point[] = POSE_LANDMARK_INDICES.map((i) => ({
+        x: rawLandmarks[i].x * dims.w,
+        y: rawLandmarks[i].y * dims.h,
+      }));
+      setShapes((s) => [...s, { type: "pose", color, width: lineWidth, points }]);
+    } catch (err) {
+      console.error("Pose detection failed:", err);
+      alert("Something went wrong detecting the pose. Try again.");
+    } finally {
+      setDetectingPose(false);
+    }
+  }
+
   async function exportPng(): Promise<Blob> {
     return new Promise((resolve, reject) => {
       const canvas = canvasRef.current;
@@ -745,6 +842,20 @@ export default function SwingCanvas({
         <p style={{ fontSize: 12, color: "var(--faint)", margin: 0 }}>
           Add a video above to trace the clubhead across the swing.
         </p>
+      )}
+
+      {aiAnalysisEnabled && hasImage && !pendingVideoUrl && !tracePendingFrameUrl && (
+        <button
+          onClick={detectPose}
+          disabled={detectingPose}
+          style={{
+            alignSelf: "flex-start", background: "var(--fairway)", color: "var(--chalk)", border: "none",
+            borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 700,
+            opacity: detectingPose ? 0.7 : 1,
+          }}
+        >
+          {detectingPose ? "Detecting…" : "🤖 Detect body pose"}
+        </button>
       )}
 
       <canvas

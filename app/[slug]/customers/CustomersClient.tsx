@@ -17,6 +17,7 @@ type Customer = {
   lessons: { id: string; startTime: string; isPast: boolean; instructorName: string | null }[];
   totalLessonsRemaining: number;
   upcomingLessons: number;
+  aiAnalysisEnabled: boolean;
 };
 
 type Instructor = { id: string; name: string };
@@ -125,7 +126,7 @@ export default function CustomersClient({
     if (res.ok) {
       setCustomers((prev) => [
         ...prev,
-        { id: data.id, name: data.name, email: data.email, phone: data.phone, packages: [], fittings: [], lessons: [], totalLessonsRemaining: 0, upcomingLessons: 0 },
+        { id: data.id, name: data.name, email: data.email, phone: data.phone, packages: [], fittings: [], lessons: [], totalLessonsRemaining: 0, upcomingLessons: 0, aiAnalysisEnabled: false },
       ]);
       setAddForm({ name: "", email: "", phone: "" });
       setAddOpen(false);
@@ -164,6 +165,23 @@ export default function CustomersClient({
     if (res.ok) {
       setCustomers((prev) => prev.map((c) => (c.id === customerId ? { ...c, name: nameValue.trim() } : c)));
       setEditingNameId(null);
+    }
+  }
+
+  const [togglingAiId, setTogglingAiId] = useState<string | null>(null);
+  async function toggleAiAnalysis(customerId: string, enabled: boolean) {
+    setTogglingAiId(customerId);
+    try {
+      const res = await fetch(`${apiBase}/players/${customerId}/ai-analysis`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      if (res.ok) {
+        setCustomers((prev) => prev.map((c) => (c.id === customerId ? { ...c, aiAnalysisEnabled: enabled } : c)));
+      }
+    } finally {
+      setTogglingAiId(null);
     }
   }
 
@@ -510,6 +528,18 @@ export default function CustomersClient({
                         <div style={{ fontSize: 12, color: "var(--muted)" }}>
                           {c.email}{c.phone && c.phone !== "—" ? ` · ${c.phone}` : ""}
                         </div>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, cursor: togglingAiId === c.id ? "default" : "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={c.aiAnalysisEnabled}
+                            disabled={togglingAiId === c.id}
+                            onChange={(e) => toggleAiAnalysis(c.id, e.target.checked)}
+                            style={{ width: 14, height: 14 }}
+                          />
+                          <span style={{ fontSize: 11, color: "var(--faint)", fontWeight: 600 }}>
+                            AI swing analysis {togglingAiId === c.id ? "…" : c.aiAnalysisEnabled ? "on" : "off"}
+                          </span>
+                        </label>
                       </div>
 
                       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>

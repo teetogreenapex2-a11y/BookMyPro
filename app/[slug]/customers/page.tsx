@@ -48,6 +48,14 @@ export default async function CustomersPage({ params }: { params: { slug: string
   });
   const instructorsById = new Map(instructorMemberships.map((m) => [m.id, m]));
 
+  // One query covering every player this instructor has an opinion on,
+  // rather than a separate lookup per customer row.
+  const aiPrefs = await prisma.aiAnalysisPreference.findMany({
+    where: { instructorMembershipId: membership.id },
+    select: { playerId: true, enabled: true },
+  });
+  const aiEnabledByPlayerId = new Map(aiPrefs.map((p) => [p.playerId, p.enabled]));
+
   const customers = playerMemberships
     .filter(({ user: p }) => isOwner || p.packages.length > 0 || p.bookings.length > 0)
     .map(({ user: p }) => {
@@ -123,6 +131,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
       lessons,
       totalLessonsRemaining: packages.reduce((sum, pkg) => sum + pkg.lessonsRemaining, 0),
       upcomingLessons,
+      aiAnalysisEnabled: aiEnabledByPlayerId.get(p.id) ?? false,
     };
   });
 
