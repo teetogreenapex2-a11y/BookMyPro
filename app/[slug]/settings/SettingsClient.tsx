@@ -209,6 +209,26 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   }
 
   const [togglingHiddenId, setTogglingHiddenId] = useState<string | null>(null);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [nameValue, setNameValue] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  async function saveInstructorName(membershipId: string) {
+    if (!nameValue.trim()) return;
+    setSavingName(true);
+    try {
+      const res = await fetch(`${apiBase}/instructors/${membershipId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: nameValue.trim() }),
+      });
+      if (res.ok) {
+        setTeam((prev) => prev.map((t) => (t.id === membershipId ? { ...t, name: nameValue.trim() } : t)));
+        setEditingNameId(null);
+      }
+    } finally {
+      setSavingName(false);
+    }
+  }
   async function toggleHidden(membershipId: string, hiddenFromBooking: boolean) {
     setTogglingHiddenId(membershipId);
     try {
@@ -866,7 +886,30 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                     opacity: isInactive ? 0.55 : 1,
                   }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name || t.email}</div>
+                      {canEditThis && editingNameId === t.id ? (
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
+                          <input
+                            value={nameValue}
+                            onChange={(e) => setNameValue(e.target.value)}
+                            autoFocus
+                            style={{ fontSize: 13, fontWeight: 600, border: "1px solid var(--border)", borderRadius: 6, padding: "3px 6px", fontFamily: "inherit", width: 140 }}
+                          />
+                          <button onClick={() => saveInstructorName(t.id)} disabled={savingName} style={{ fontSize: 10, fontWeight: 700, background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 6, padding: "4px 8px" }}>
+                            {savingName ? "…" : "Save"}
+                          </button>
+                          <button onClick={() => setEditingNameId(null)} style={{ fontSize: 10, color: "var(--faint)", background: "none", border: "none", cursor: "pointer" }}>
+                            cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={canEditThis ? () => { setEditingNameId(t.id); setNameValue(t.name || ""); } : undefined}
+                          style={{ fontSize: 13, fontWeight: 600, cursor: canEditThis ? "pointer" : "default" }}
+                          title={canEditThis ? "Click to edit name" : undefined}
+                        >
+                          {t.name || t.email}
+                        </div>
+                      )}
                       <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: canEditThis ? 4 : 0 }}>{t.email}</div>
                       {canEditThis ? (
                         <input

@@ -4,18 +4,23 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getMembership } from "@/lib/tenant";
 
-// PATCH /api/{slug}/instructors/{id}  { specialty?, active?, hiddenFromBooking? }
+// PATCH /api/{slug}/instructors/{id}  { name?, specialty?, active?, hiddenFromBooking? }
 // Profile-level fields (as opposed to pricing, handled by the sibling
-// /pricing route) — specialty (the short tagline shown to players when
-// choosing who to book with) can be edited by the owner or by the
-// instructor themselves. Deactivating/reactivating a team member (active)
-// is owner-only - this is what "removing" someone who's left actually
-// means: it keeps every real booking, package, video, and message they
-// were ever part of fully intact, just takes them off the active
-// instructor list and booking page, and is fully reversible if they come
-// back. A hard delete was never the right tool for this - see the
-// temporary /api/admin/remove-duplicate-membership route for why that's
-// only safe for an account with zero real data attached.
+// /pricing route) — name and specialty (the short tagline shown to
+// players when choosing who to book with) can be edited by the owner or
+// by the instructor themselves. name lives on the User record, not
+// Membership, so it needs its own separate update call - mirrors the
+// same "fix up a name" pattern already used for customers in
+// /api/{slug}/players/{id}, most often needed for anyone who signed in
+// via the email magic link, which never collects a real name.
+// Deactivating/reactivating a team member (active) is owner-only - this
+// is what "removing" someone who's left actually means: it keeps every
+// real booking, package, video, and message they were ever part of fully
+// intact, just takes them off the active instructor list and booking
+// page, and is fully reversible if they come back. A hard delete was
+// never the right tool for this - see the temporary
+// /api/admin/remove-duplicate-membership route for why that's only safe
+// for an account with zero real data attached.
 // hiddenFromBooking is a different, narrower thing than active - it only
 // controls whether players see this person as bookable, without touching
 // their own access to the app at all (Settings, calendar connection,
@@ -41,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   });
   if (!target) return NextResponse.json({ error: "Instructor not found" }, { status: 404 });
 
-  const { specialty, active, hiddenFromBooking } = await req.json();
+  const { name, specialty, active, hiddenFromBooking } = await req.json();
   const data: Record<string, unknown> = {};
   if (typeof specialty === "string") data.specialty = specialty.slice(0, 120);
 
@@ -64,6 +69,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
     data.hiddenFromBooking = hiddenFromBooking;
   }
 
+  let updatedName: string | null | undefined;
+  if (typeof name === "string" && name.trim()) {
+    const updatedUser = await prisma.user.update({ where: { id: target.userId }, data: { name: name.trim() } });
+    updatedName = updatedUser.name;
+  }
+
   const updated = await prisma.membership.update({ where: { id: target.id }, data });
-  return NextResponse.json(updated);
+  return NextResponse.json({ ...updated, name: updatedName ?? undefined });
 }
