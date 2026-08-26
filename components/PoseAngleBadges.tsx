@@ -20,7 +20,7 @@ export default function PoseAngleBadges({ angles, dark }: { angles: PoseAngle[];
           }}
         >
           <span style={{ fontSize: 15, fontWeight: 800, color: dark ? "#FFF" : "var(--fairway)", lineHeight: 1.3 }}>
-            {a.uncertain ? "~" : ""}{a.degrees}&deg;
+            {a.uncertain ? "~" : ""}{a.value}{a.unit}
           </span>
           <span style={{ fontSize: 8.5, fontWeight: 600, color: dark ? "#D7DED9" : "var(--faint)", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center" }}>
             {a.label}

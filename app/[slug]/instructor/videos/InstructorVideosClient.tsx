@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
 import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles } from "@/lib/poseDetection";
-import type { PoseAngle } from "@/lib/poseDetection";
+import type { PoseAngle, Point } from "@/lib/poseDetection";
 import PoseAngleBadges from "@/components/PoseAngleBadges";
 
 type Comment = { id: string; timestampSeconds: number; text: string };
@@ -62,6 +62,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [showPoseOverlay, setShowPoseOverlay] = useState(false);
   const [reviewPoseAngles, setReviewPoseAngles] = useState<PoseAngle[]>([]);
   const reviewLastAngleUpdateRef = useRef(0);
+  const reviewHeadReferenceRef = useRef<Point | null>(null);
   const poseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const poseLoopRef = useRef<number | null>(null);
   const [selectedAiEnabled, setSelectedAiEnabled] = useState(false);
@@ -69,6 +70,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [selectedPoseError, setSelectedPoseError] = useState<string | null>(null);
   const [selectedPoseAngles, setSelectedPoseAngles] = useState<PoseAngle[]>([]);
   const selectedLastAngleUpdateRef = useRef(0);
+  const selectedHeadReferenceRef = useRef<Point | null>(null);
   const selectedPoseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const selectedPoseLoopRef = useRef<number | null>(null);
   // Checking Capacitor.isNativePlatform() directly during render caused a
@@ -96,6 +98,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   useEffect(() => {
     if (!showPoseOverlay) return;
     let cancelled = false;
+    reviewHeadReferenceRef.current = null; // fresh reference each time the overlay is turned on
 
     (async () => {
       const landmarker = await getVideoPoseLandmarker();
@@ -120,10 +123,17 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
             if (rawLandmarks) {
               const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
               drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+              // The first head position seen after turning the overlay on
+              // becomes the reference point everything else compares
+              // against - in practice, wherever playback happened to be
+              // when this was switched on.
+              if (!reviewHeadReferenceRef.current && points[12]) {
+                reviewHeadReferenceRef.current = points[12];
+              }
               const now = performance.now();
               if (now - reviewLastAngleUpdateRef.current > 200) {
                 reviewLastAngleUpdateRef.current = now;
-                setReviewPoseAngles(computePoseAngles(points, lowConfidenceIndices));
+                setReviewPoseAngles(computePoseAngles(points, lowConfidenceIndices, reviewHeadReferenceRef.current));
               }
             }
           }
@@ -257,6 +267,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   useEffect(() => {
     if (!selectedShowPoseOverlay) return;
     let cancelled = false;
+    selectedHeadReferenceRef.current = null; // fresh reference each time the overlay is turned on
 
     (async () => {
       const landmarker = await getVideoPoseLandmarker();
@@ -280,10 +291,13 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
               if (rawLandmarks) {
                 const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
                 drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+                if (!selectedHeadReferenceRef.current && points[12]) {
+                  selectedHeadReferenceRef.current = points[12];
+                }
                 const now = performance.now();
                 if (now - selectedLastAngleUpdateRef.current > 200) {
                   selectedLastAngleUpdateRef.current = now;
-                  setSelectedPoseAngles(computePoseAngles(points, lowConfidenceIndices));
+                  setSelectedPoseAngles(computePoseAngles(points, lowConfidenceIndices, selectedHeadReferenceRef.current));
                 }
               }
             } catch (err) {
@@ -427,6 +441,17 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                 </button>
               )}
               <PoseAngleBadges angles={reviewPoseAngles} dark />
+              {showPoseOverlay && (
+                <button
+                  onClick={() => { reviewHeadReferenceRef.current = null; }}
+                  style={{
+                    marginBottom: 12, background: "none", border: "1px solid rgba(255,255,255,0.3)", color: "#D7DED9",
+                    borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600,
+                  }}
+                >
+                  Reset reference point (pause at address, then tap this)
+                </button>
+              )}
               <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                 {[1, 0.5, 0.25].map((rate) => (
                   <button
@@ -616,6 +641,17 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   </p>
                 )}
                 <PoseAngleBadges angles={selectedPoseAngles} />
+                {selectedShowPoseOverlay && (
+                  <button
+                    onClick={() => { selectedHeadReferenceRef.current = null; }}
+                    style={{
+                      marginBottom: 10, background: "none", border: "1px solid var(--border)", color: "var(--faint)",
+                      borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600,
+                    }}
+                  >
+                    Reset reference point (pause at address, then tap this)
+                  </button>
+                )}
                 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                   <button
                     onClick={() => stepFrame(-1)}

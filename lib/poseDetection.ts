@@ -145,8 +145,8 @@ export function drawPoseSkeleton(
 // ---- Angle measurements -------------------------------------------------
 // Real geometry computed from the joint positions MediaPipe already gave
 // us - not a new detection step, just math on data that's already there.
-// Compact indices, per the layout above: 0/1 shoulders, 6/7 hips, 8/9
-// knees, 10/11 ankles (left/right each).
+// Compact indices, per the layout above: 0/1 shoulders, 2/3 elbows, 4/5
+// wrists, 6/7 hips, 8/9 knees, 10/11 ankles (left/right each), 12 nose.
 
 function tiltFromHorizontal(p1: Point, p2: Point): number {
   const rad = Math.atan2(Math.abs(p2.y - p1.y), Math.abs(p2.x - p1.x));
@@ -171,27 +171,40 @@ function interiorAngle(a: Point, vertex: Point, b: Point): number {
   return Math.acos(cos) * (180 / Math.PI);
 }
 
-export type PoseAngle = { label: string; degrees: number; uncertain: boolean };
+export type PoseAngle = { label: string; value: number; unit: "°" | "%"; uncertain: boolean };
 
-// Same "flag, don't hide" approach as the skeleton itself - an angle
+// Same "flag, don't hide" approach as the skeleton itself - a measurement
 // computed from a low-confidence joint is still shown, just marked
 // uncertain, so the UI can decide how to present that (e.g. dimmed, or a
 // "~" prefix) rather than silently omitting it.
-export function computePoseAngles(points: Point[], lowConfidenceIndices: number[]): PoseAngle[] {
+// headReference, when provided, is the head (nose) position captured at
+// some earlier reference moment - typically address position, the first
+// frame detected after turning the overlay on. Head movement is only
+// meaningful relative to that starting point, so this measurement simply
+// doesn't appear at all when no reference is given (e.g. Swing Sketch,
+// which only ever analyzes one still frame with no "over time" to
+// compare against).
+export function computePoseAngles(
+  points: Point[],
+  lowConfidenceIndices: number[],
+  headReference?: Point | null
+): PoseAngle[] {
   const lowConf = new Set(lowConfidenceIndices);
   const results: PoseAngle[] = [];
 
   if (points[0] && points[1]) {
     results.push({
       label: "Shoulder tilt",
-      degrees: Math.round(tiltFromHorizontal(points[0], points[1])),
+      value: Math.round(tiltFromHorizontal(points[0], points[1])),
+      unit: "°",
       uncertain: lowConf.has(0) || lowConf.has(1),
     });
   }
   if (points[6] && points[7]) {
     results.push({
       label: "Hip tilt",
-      degrees: Math.round(tiltFromHorizontal(points[6], points[7])),
+      value: Math.round(tiltFromHorizontal(points[6], points[7])),
+      unit: "°",
       uncertain: lowConf.has(6) || lowConf.has(7),
     });
   }
@@ -200,23 +213,84 @@ export function computePoseAngles(points: Point[], lowConfidenceIndices: number[
     const hipMid = { x: (points[6].x + points[7].x) / 2, y: (points[6].y + points[7].y) / 2 };
     results.push({
       label: "Spine angle",
-      degrees: Math.round(tiltFromVertical(hipMid, shoulderMid)),
+      value: Math.round(tiltFromVertical(hipMid, shoulderMid)),
+      unit: "°",
       uncertain: lowConf.has(0) || lowConf.has(1) || lowConf.has(6) || lowConf.has(7),
     });
   }
   if (points[6] && points[8] && points[10]) {
     results.push({
       label: "Left knee flex",
-      degrees: Math.round(interiorAngle(points[6], points[8], points[10])),
+      value: Math.round(interiorAngle(points[6], points[8], points[10])),
+      unit: "°",
       uncertain: lowConf.has(6) || lowConf.has(8) || lowConf.has(10),
     });
   }
   if (points[7] && points[9] && points[11]) {
     results.push({
       label: "Right knee flex",
-      degrees: Math.round(interiorAngle(points[7], points[9], points[11])),
+      value: Math.round(interiorAngle(points[7], points[9], points[11])),
+      unit: "°",
       uncertain: lowConf.has(7) || lowConf.has(9) || lowConf.has(11),
     });
+  }
+  if (points[0] && points[2] && points[4]) {
+    results.push({
+      label: "Left elbow flex",
+      value: Math.round(interiorAngle(points[0], points[2], points[4])),
+      unit: "°",
+      uncertain: lowConf.has(0) || lowConf.has(2) || lowConf.has(4),
+    });
+  }
+  if (points[1] && points[3] && points[5]) {
+    results.push({
+      label: "Right elbow flex",
+      value: Math.round(interiorAngle(points[1], points[3], points[5])),
+      unit: "°",
+      uncertain: lowConf.has(1) || lowConf.has(3) || lowConf.has(5),
+    });
+  }
+  // Ankle-to-ankle distance as a percentage of shoulder width - the
+  // standard, informal way instructors already talk about stance width
+  // ("about shoulder-width", "a bit wider than shoulders").
+  if (points[0] && points[1] && points[10] && points[11]) {
+    const shoulderDist = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+    const ankleDist = Math.hypot(points[11].x - points[10].x, points[11].y - points[10].y);
+    if (shoulderDist > 0) {
+      results.push({
+        label: "Stance width",
+        value: Math.round((ankleDist / shoulderDist) * 100),
+        unit: "%",
+        uncertain: lowConf.has(0) || lowConf.has(1) || lowConf.has(10) || lowConf.has(11),
+      });
+    }
+  }
+  // How far forward/back the head sits over the base of the feet -
+  // distinct from spine angle, which only looks at the hip-to-shoulder
+  // segment and says nothing about where the head itself ends up.
+  if (points[10] && points[11] && points[12]) {
+    const ankleMid = { x: (points[10].x + points[11].x) / 2, y: (points[10].y + points[11].y) / 2 };
+    results.push({
+      label: "Head lean",
+      value: Math.round(tiltFromVertical(ankleMid, points[12])),
+      unit: "°",
+      uncertain: lowConf.has(10) || lowConf.has(11) || lowConf.has(12),
+    });
+  }
+  // How far the head has drifted from the reference moment (typically
+  // address position) - scaled against shoulder width so "10%" means the
+  // same real amount of movement regardless of how close the camera is.
+  if (headReference && points[0] && points[1] && points[12]) {
+    const shoulderDist = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+    if (shoulderDist > 0) {
+      const drift = Math.hypot(points[12].x - headReference.x, points[12].y - headReference.y);
+      results.push({
+        label: "Head movement",
+        value: Math.round((drift / shoulderDist) * 100),
+        unit: "%",
+        uncertain: lowConf.has(12),
+      });
+    }
   }
 
   return results;

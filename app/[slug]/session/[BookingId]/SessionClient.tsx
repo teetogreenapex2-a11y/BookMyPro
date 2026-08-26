@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import SwingCanvas, { SwingCanvasHandle } from "@/components/SwingCanvas";
 import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles } from "@/lib/poseDetection";
-import type { PoseAngle } from "@/lib/poseDetection";
+import type { PoseAngle, Point } from "@/lib/poseDetection";
 import PoseAngleBadges from "@/components/PoseAngleBadges";
 
 declare global {
@@ -300,6 +300,7 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
   const poseLoopRef = useRef<number | null>(null);
   const [poseAngles, setPoseAngles] = useState<PoseAngle[]>([]);
   const lastAngleUpdateRef = useRef(0);
+  const headReferenceRef = useRef<Point | null>(null);
 
   useEffect(() => {
     const el = videoElRef.current;
@@ -313,6 +314,7 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
   useEffect(() => {
     if (!showOverlay) return;
     let cancelled = false;
+    headReferenceRef.current = null; // fresh reference each time the overlay is turned on
 
     (async () => {
       const landmarker = await getVideoPoseLandmarker();
@@ -335,10 +337,13 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
             if (rawLandmarks) {
               const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
               drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+              if (!headReferenceRef.current && points[12]) {
+                headReferenceRef.current = points[12];
+              }
               const now = performance.now();
               if (now - lastAngleUpdateRef.current > 200) {
                 lastAngleUpdateRef.current = now;
-                setPoseAngles(computePoseAngles(points, lowConfidenceIndices));
+                setPoseAngles(computePoseAngles(points, lowConfidenceIndices, headReferenceRef.current));
               }
             }
           }
@@ -368,6 +373,15 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
       {showOverlay && poseAngles.length > 0 && (
         <div style={{ position: "absolute", bottom: 6, left: 6, right: 6 }}>
           <PoseAngleBadges angles={poseAngles} dark />
+          <button
+            onClick={() => { headReferenceRef.current = null; }}
+            style={{
+              background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.3)", color: "#D7DED9",
+              borderRadius: 6, padding: "3px 8px", fontSize: 10, fontWeight: 600,
+            }}
+          >
+            Reset reference
+          </button>
         </div>
       )}
       {!participant.videoTrack && (
