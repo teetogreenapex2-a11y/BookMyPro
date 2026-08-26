@@ -26,7 +26,7 @@ export default function PrivacyPolicyPage() {
           <img src="/logo.jpg" alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", marginBottom: 8 }} />
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: gold, marginBottom: 10 }}>BOOKMYPRO</div>
           <h1 style={{ fontSize: 26, margin: "0 0 8px" }}>Privacy Policy</h1>
-          <p style={{ fontSize: 13, color: "#D7DED9", margin: 0 }}>Last updated August 21, 2026</p>
+          <p style={{ fontSize: 13, color: "#D7DED9", margin: 0 }}>Last updated August 26, 2026</p>
         </div>
       </header>
 
@@ -84,6 +84,20 @@ export default function PrivacyPolicyPage() {
               to complete a transaction, and with service providers (like our hosting and email providers)
               who help us operate BookMyPro under agreements that limit their use of your data.
             </p>
+          </Section>
+
+          <Section title="How we protect your data">
+            <p>
+              Security procedures are in place to protect the confidentiality of your data, including data
+              accessed through Google APIs:
+            </p>
+            <ul style={{ margin: "8px 0", paddingLeft: 20 }}>
+              <li>All data is encrypted in transit using HTTPS/TLS, both between your device and BookMyPro and between BookMyPro and Google's APIs</li>
+              <li>Data is encrypted at rest in our database provider's infrastructure</li>
+              <li>Access to your account and data requires authentication, and is limited by role - a player only sees their own bookings and information, while instructor and owner access is limited to their own business</li>
+              <li>Google access tokens are stored securely and are never shared with any third party or used for any purpose beyond the scheduling features described above</li>
+              <li>You can revoke BookMyPro's access to your Google Calendar at any time from Settings, or directly from your Google Account's security settings</li>
+            </ul>
           </Section>
 
           <Section title="Data retention">
