@@ -8,7 +8,7 @@ import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton } from "
 type Comment = { id: string; timestampSeconds: number; text: string };
 type Submission = {
   id: string; videoUrl: string; title: string | null; playerNote: string | null;
-  status: string; submittedAt: string; playerName: string; comments: Comment[];
+  status: string; submittedAt: string; playerName: string; playerId: string; comments: Comment[];
 };
 
 function formatTimestamp(seconds: number) {
@@ -60,6 +60,11 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [showPoseOverlay, setShowPoseOverlay] = useState(false);
   const poseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const poseLoopRef = useRef<number | null>(null);
+  const [selectedAiEnabled, setSelectedAiEnabled] = useState(false);
+  const [selectedShowPoseOverlay, setSelectedShowPoseOverlay] = useState(false);
+  const [selectedPoseError, setSelectedPoseError] = useState<string | null>(null);
+  const selectedPoseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const selectedPoseLoopRef = useRef<number | null>(null);
   // Checking Capacitor.isNativePlatform() directly during render caused a
   // hydration mismatch (the server always renders as if it's not native,
   // since it has no way to know) - starting this state at false to match
@@ -225,6 +230,70 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const selected = submissions.find((s) => s.id === selectedId) || null;
   const pending = submissions.filter((s) => s.status === "pending");
   const reviewed = submissions.filter((s) => s.status === "reviewed");
+
+  useEffect(() => {
+    if (!selected) { setSelectedAiEnabled(false); return; }
+    fetch(`${apiBase}/players/${selected.playerId}/ai-analysis`)
+      .then((r) => r.json())
+      .then((data) => setSelectedAiEnabled(!!data.enabled))
+      .catch(() => setSelectedAiEnabled(false));
+    setSelectedShowPoseOverlay(false); // reset when switching to a different submission
+    setSelectedPoseError(null);
+  }, [selected?.playerId, apiBase]);
+
+  useEffect(() => {
+    if (!selectedShowPoseOverlay) return;
+    let cancelled = false;
+
+    (async () => {
+      const landmarker = await getVideoPoseLandmarker();
+      if (cancelled) return;
+
+      function loop() {
+        if (cancelled) return;
+        const video = videoRef.current;
+        const canvas = selectedPoseOverlayCanvasRef.current;
+        if (video && canvas && !video.paused && !video.ended && video.readyState >= 2) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            if (canvas.width !== video.clientWidth || canvas.height !== video.clientHeight) {
+              canvas.width = video.clientWidth;
+              canvas.height = video.clientHeight;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            try {
+              const result = landmarker.detectForVideo(video, performance.now());
+              const rawLandmarks = result?.landmarks?.[0];
+              if (rawLandmarks) {
+                const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
+                drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+              }
+            } catch (err) {
+              // A failure here (e.g. the video's source blocking the
+              // pixel read) will fail identically on every single frame -
+              // stop immediately and show it, rather than silently
+              // retrying forever with nothing ever appearing.
+              console.error("Pose detection on this video failed:", err);
+              setSelectedPoseError(err instanceof Error ? err.message : String(err));
+              cancelled = true;
+              return;
+            }
+          }
+        }
+        selectedPoseLoopRef.current = requestAnimationFrame(loop);
+      }
+      selectedPoseLoopRef.current = requestAnimationFrame(loop);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (selectedPoseLoopRef.current) cancelAnimationFrame(selectedPoseLoopRef.current);
+      selectedPoseLoopRef.current = null;
+      const canvas = selectedPoseOverlayCanvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+  }, [selectedShowPoseOverlay]);
 
   async function deleteVideo() {
     if (!selected) return;
@@ -503,7 +572,30 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                     "{selected.playerNote}"
                   </p>
                 )}
-                <video ref={videoRef} src={selected.videoUrl} controls style={{ width: "100%", borderRadius: 8, background: "#000", marginBottom: 6 }} />
+                <div style={{ position: "relative", marginBottom: 6 }}>
+                  <video ref={videoRef} src={selected.videoUrl} crossOrigin="anonymous" controls style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }} />
+                  <canvas
+                    ref={selectedPoseOverlayCanvasRef}
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}
+                  />
+                </div>
+                {selectedAiEnabled && (
+                  <button
+                    onClick={() => { setSelectedPoseError(null); setSelectedShowPoseOverlay((v) => !v); }}
+                    style={{
+                      width: "100%", marginBottom: 10, background: selectedShowPoseOverlay ? "var(--gold)" : "var(--card)",
+                      color: selectedShowPoseOverlay ? "var(--fairway)" : "var(--fairway)", border: "1px solid var(--border)",
+                      borderRadius: 8, padding: "8px 0", fontSize: 12, fontWeight: 700,
+                    }}
+                  >
+                    {selectedShowPoseOverlay ? "🤖 Body position: on" : "🤖 Show body position"}
+                  </button>
+                )}
+                {selectedPoseError && (
+                  <p style={{ fontSize: 11.5, color: "#B23A3A", margin: "-4px 0 10px" }}>
+                    Couldn't analyze this video: {selectedPoseError}
+                  </p>
+                )}
                 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                   <button
                     onClick={() => stepFrame(-1)}
