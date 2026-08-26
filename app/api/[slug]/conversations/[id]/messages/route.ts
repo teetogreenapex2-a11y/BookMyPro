@@ -1,32 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, requireMembership, getBusinessInstructors } from "@/lib/tenant";
+import { getBusinessInstructors } from "@/lib/tenant";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
-
-export async function authorizedMembershipFor(req: NextRequest, slug: string, conversationId: string) {
-  const session = await getServerSession(authOptions);
-  if (!session) return null;
-
-  const business = await getBusinessBySlug(slug);
-  if (!business) return null;
-
-  const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor", "player"]);
-  if (!membership) return null;
-
-  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
-  if (!conversation || conversation.businessId !== business.id) return null;
-
-  // A player can only ever be in their own conversation - an
-  // instructor/owner can see any conversation at this business, since
-  // the whole point of one shared thread per player is that anyone on
-  // staff can pick it up.
-  if (membership.role === "player" && conversation.playerMembershipId !== membership.id) return null;
-
-  return { business, membership, conversation };
-}
+import { authorizedMembershipFor } from "./auth";
 
 // GET /api/{slug}/conversations/{id}/messages
 // Also marks the other side's messages as read the moment this is

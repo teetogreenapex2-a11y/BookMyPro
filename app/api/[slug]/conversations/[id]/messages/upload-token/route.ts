@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getBusinessInstructors } from "@/lib/tenant";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { businessDestination } from "@/lib/businessUrl";
-import { authorizedMembershipFor } from "../route";
+import { authorizedMembershipFor } from "../auth";
 
 // POST /api/{slug}/conversations/{id}/messages/upload-token
 //
