@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import SwingCanvas, { SwingCanvasHandle } from "@/components/SwingCanvas";
-import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton } from "@/lib/poseDetection";
+import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles } from "@/lib/poseDetection";
+import type { PoseAngle } from "@/lib/poseDetection";
+import PoseAngleBadges from "@/components/PoseAngleBadges";
 
 declare global {
   interface Window {
@@ -296,6 +298,8 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const poseLoopRef = useRef<number | null>(null);
+  const [poseAngles, setPoseAngles] = useState<PoseAngle[]>([]);
+  const lastAngleUpdateRef = useRef(0);
 
   useEffect(() => {
     const el = videoElRef.current;
@@ -331,6 +335,11 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
             if (rawLandmarks) {
               const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
               drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+              const now = performance.now();
+              if (now - lastAngleUpdateRef.current > 200) {
+                lastAngleUpdateRef.current = now;
+                setPoseAngles(computePoseAngles(points, lowConfidenceIndices));
+              }
             }
           }
         }
@@ -346,6 +355,7 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
       const canvas = overlayCanvasRef.current;
       const ctx = canvas?.getContext("2d");
       if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      setPoseAngles([]);
     };
   }, [showOverlay]);
 
@@ -354,6 +364,11 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
       <video ref={videoElRef} autoPlay playsInline muted={muted} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       {showOverlay && (
         <canvas ref={overlayCanvasRef} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
+      )}
+      {showOverlay && poseAngles.length > 0 && (
+        <div style={{ position: "absolute", bottom: 6, left: 6, right: 6 }}>
+          <PoseAngleBadges angles={poseAngles} dark />
+        </div>
       )}
       {!participant.videoTrack && (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#888", fontSize: 12 }}>

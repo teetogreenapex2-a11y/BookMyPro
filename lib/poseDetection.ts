@@ -7,15 +7,19 @@
 
 export type Point = { x: number; y: number };
 
-// MediaPipe's pose model returns 33 landmarks in a fixed order, but only
-// these 12 (shoulders/elbows/wrists/hips/knees/ankles) matter for a golf
-// swing - face and hand detail landmarks exist in the raw data but aren't
-// useful here. POSE_LANDMARK_INDICES is the map from "compact" position
-// (what's actually stored and drawn) back to MediaPipe's own original
-// index; POSE_CONNECTIONS below already refers to the compact positions,
-// not MediaPipe's raw indices.
-export const POSE_LANDMARK_INDICES = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
-// Compact positions: 0/1 shoulders, 2/3 elbows, 4/5 wrists, 6/7 hips, 8/9 knees, 10/11 ankles (L/R each).
+// MediaPipe's pose model returns 33 landmarks in a fixed order. These 17
+// are the ones worth showing for a golf swing: shoulders/elbows/wrists,
+// hips/knees/ankles, the nose (as a head/neck reference point), and
+// heels/toes (so the feet read as actual feet, not lines that just stop
+// at the ankle). Detailed face and hand landmarks exist in the raw data
+// too, but add visual clutter without adding anything useful here.
+// POSE_LANDMARK_INDICES is the map from "compact" position (what's
+// actually stored and drawn) back to MediaPipe's own original index;
+// POSE_CONNECTIONS below already refers to the compact positions, not
+// MediaPipe's raw indices.
+export const POSE_LANDMARK_INDICES = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 0, 29, 30, 31, 32];
+// Compact positions: 0/1 shoulders, 2/3 elbows, 4/5 wrists, 6/7 hips,
+// 8/9 knees, 10/11 ankles (L/R each), 12 nose, 13/14 heels, 15/16 toes (L/R each).
 export const POSE_CONNECTIONS: [number, number][] = [
   [0, 1], // shoulder to shoulder
   [0, 2], [2, 4], // left arm
@@ -24,6 +28,9 @@ export const POSE_CONNECTIONS: [number, number][] = [
   [6, 7], // hip to hip
   [6, 8], [8, 10], // left leg
   [7, 9], [9, 11], // right leg
+  [12, 0], [12, 1], // nose to each shoulder (neck)
+  [10, 13], [10, 15], [13, 15], // left foot (ankle-heel-toe triangle)
+  [11, 14], [11, 16], [14, 16], // right foot
 ];
 
 // Below this, MediaPipe's own confidence score means genuinely more guess
@@ -133,4 +140,84 @@ export function drawPoseSkeleton(
     ctx.restore();
   });
   ctx.restore();
+}
+
+// ---- Angle measurements -------------------------------------------------
+// Real geometry computed from the joint positions MediaPipe already gave
+// us - not a new detection step, just math on data that's already there.
+// Compact indices, per the layout above: 0/1 shoulders, 6/7 hips, 8/9
+// knees, 10/11 ankles (left/right each).
+
+function tiltFromHorizontal(p1: Point, p2: Point): number {
+  const rad = Math.atan2(Math.abs(p2.y - p1.y), Math.abs(p2.x - p1.x));
+  return rad * (180 / Math.PI);
+}
+
+function tiltFromVertical(p1: Point, p2: Point): number {
+  const rad = Math.atan2(Math.abs(p2.x - p1.x), Math.abs(p2.y - p1.y));
+  return rad * (180 / Math.PI);
+}
+
+// The interior angle at `vertex`, between the rays to `a` and `b` - e.g.
+// for a knee, a=hip, vertex=knee, b=ankle. A straight leg reads close to
+// 180 degrees; a deeply flexed knee reads much lower.
+function interiorAngle(a: Point, vertex: Point, b: Point): number {
+  const v1 = { x: a.x - vertex.x, y: a.y - vertex.y };
+  const v2 = { x: b.x - vertex.x, y: b.y - vertex.y };
+  const mag1 = Math.hypot(v1.x, v1.y);
+  const mag2 = Math.hypot(v2.x, v2.y);
+  if (mag1 === 0 || mag2 === 0) return NaN;
+  const cos = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y) / (mag1 * mag2)));
+  return Math.acos(cos) * (180 / Math.PI);
+}
+
+export type PoseAngle = { label: string; degrees: number; uncertain: boolean };
+
+// Same "flag, don't hide" approach as the skeleton itself - an angle
+// computed from a low-confidence joint is still shown, just marked
+// uncertain, so the UI can decide how to present that (e.g. dimmed, or a
+// "~" prefix) rather than silently omitting it.
+export function computePoseAngles(points: Point[], lowConfidenceIndices: number[]): PoseAngle[] {
+  const lowConf = new Set(lowConfidenceIndices);
+  const results: PoseAngle[] = [];
+
+  if (points[0] && points[1]) {
+    results.push({
+      label: "Shoulder tilt",
+      degrees: Math.round(tiltFromHorizontal(points[0], points[1])),
+      uncertain: lowConf.has(0) || lowConf.has(1),
+    });
+  }
+  if (points[6] && points[7]) {
+    results.push({
+      label: "Hip tilt",
+      degrees: Math.round(tiltFromHorizontal(points[6], points[7])),
+      uncertain: lowConf.has(6) || lowConf.has(7),
+    });
+  }
+  if (points[0] && points[1] && points[6] && points[7]) {
+    const shoulderMid = { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 };
+    const hipMid = { x: (points[6].x + points[7].x) / 2, y: (points[6].y + points[7].y) / 2 };
+    results.push({
+      label: "Spine angle",
+      degrees: Math.round(tiltFromVertical(hipMid, shoulderMid)),
+      uncertain: lowConf.has(0) || lowConf.has(1) || lowConf.has(6) || lowConf.has(7),
+    });
+  }
+  if (points[6] && points[8] && points[10]) {
+    results.push({
+      label: "Left knee flex",
+      degrees: Math.round(interiorAngle(points[6], points[8], points[10])),
+      uncertain: lowConf.has(6) || lowConf.has(8) || lowConf.has(10),
+    });
+  }
+  if (points[7] && points[9] && points[11]) {
+    results.push({
+      label: "Right knee flex",
+      degrees: Math.round(interiorAngle(points[7], points[9], points[11])),
+      uncertain: lowConf.has(7) || lowConf.has(9) || lowConf.has(11),
+    });
+  }
+
+  return results;
 }

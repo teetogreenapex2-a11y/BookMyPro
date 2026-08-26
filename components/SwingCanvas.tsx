@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { getImagePoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, POSE_CONNECTIONS } from "@/lib/poseDetection";
+import { getImagePoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles, POSE_CONNECTIONS } from "@/lib/poseDetection";
+import type { PoseAngle } from "@/lib/poseDetection";
+import PoseAngleBadges from "@/components/PoseAngleBadges";
 
 // ---- Drawing math -----------------------------------------------------
 
@@ -196,6 +198,7 @@ export default function SwingCanvas({
   const [angleClicks, setAngleClicks] = useState<Point[]>([]);
   const [hasImage, setHasImage] = useState(false);
   const [detectingPose, setDetectingPose] = useState(false);
+  const [lastPoseAngles, setLastPoseAngles] = useState<PoseAngle[]>([]);
   const [pendingVideoUrl, setPendingVideoUrl] = useState<string | null>(null); // set while scrubbing a video, before a frame is captured
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const traceImgRef = useRef<HTMLImageElement | null>(null);
@@ -627,6 +630,8 @@ export default function SwingCanvas({
         if (!proceed) return;
       }
 
+      setLastPoseAngles(computePoseAngles(points, lowConfidenceIndices));
+
       setShapes((s) => [...s, { type: "pose", color, width: lineWidth, points, lowConfidenceIndices }]);
     } catch (err) {
       console.error("Pose detection failed:", err);
@@ -812,6 +817,8 @@ export default function SwingCanvas({
           {detectingPose ? "Detecting…" : "🤖 Detect body pose"}
         </button>
       )}
+
+      <PoseAngleBadges angles={lastPoseAngles} />
 
       <canvas
         ref={canvasRef}

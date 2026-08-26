@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
-import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton } from "@/lib/poseDetection";
+import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles } from "@/lib/poseDetection";
+import type { PoseAngle } from "@/lib/poseDetection";
+import PoseAngleBadges from "@/components/PoseAngleBadges";
 
 type Comment = { id: string; timestampSeconds: number; text: string };
 type Submission = {
@@ -58,11 +60,15 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const reviewVideoRef = useRef<HTMLVideoElement | null>(null);
   const [aiAnalysisEnabled, setAiAnalysisEnabled] = useState(false);
   const [showPoseOverlay, setShowPoseOverlay] = useState(false);
+  const [reviewPoseAngles, setReviewPoseAngles] = useState<PoseAngle[]>([]);
+  const reviewLastAngleUpdateRef = useRef(0);
   const poseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const poseLoopRef = useRef<number | null>(null);
   const [selectedAiEnabled, setSelectedAiEnabled] = useState(false);
   const [selectedShowPoseOverlay, setSelectedShowPoseOverlay] = useState(false);
   const [selectedPoseError, setSelectedPoseError] = useState<string | null>(null);
+  const [selectedPoseAngles, setSelectedPoseAngles] = useState<PoseAngle[]>([]);
+  const selectedLastAngleUpdateRef = useRef(0);
   const selectedPoseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const selectedPoseLoopRef = useRef<number | null>(null);
   // Checking Capacitor.isNativePlatform() directly during render caused a
@@ -114,6 +120,11 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
             if (rawLandmarks) {
               const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
               drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+              const now = performance.now();
+              if (now - reviewLastAngleUpdateRef.current > 200) {
+                reviewLastAngleUpdateRef.current = now;
+                setReviewPoseAngles(computePoseAngles(points, lowConfidenceIndices));
+              }
             }
           }
         }
@@ -159,6 +170,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
     setReviewFile(null);
     setReviewUrl(null);
     setShowPoseOverlay(false);
+    setReviewPoseAngles([]);
   }
 
   async function saveReview() {
@@ -239,6 +251,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
       .catch(() => setSelectedAiEnabled(false));
     setSelectedShowPoseOverlay(false); // reset when switching to a different submission
     setSelectedPoseError(null);
+    setSelectedPoseAngles([]);
   }, [selected?.playerId, apiBase]);
 
   useEffect(() => {
@@ -267,6 +280,11 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
               if (rawLandmarks) {
                 const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
                 drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+                const now = performance.now();
+                if (now - selectedLastAngleUpdateRef.current > 200) {
+                  selectedLastAngleUpdateRef.current = now;
+                  setSelectedPoseAngles(computePoseAngles(points, lowConfidenceIndices));
+                }
               }
             } catch (err) {
               // A failure here (e.g. the video's source blocking the
@@ -408,6 +426,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   {showPoseOverlay ? "🤖 Body position: on" : "🤖 Show body position"}
                 </button>
               )}
+              <PoseAngleBadges angles={reviewPoseAngles} dark />
               <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                 {[1, 0.5, 0.25].map((rate) => (
                   <button
@@ -596,6 +615,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                     Couldn't analyze this video: {selectedPoseError}
                   </p>
                 )}
+                <PoseAngleBadges angles={selectedPoseAngles} />
                 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                   <button
                     onClick={() => stepFrame(-1)}
