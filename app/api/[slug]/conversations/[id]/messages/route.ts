@@ -6,7 +6,7 @@ import { getBusinessBySlug, requireMembership, getBusinessInstructors } from "@/
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
 
-async function authorizedMembershipFor(req: NextRequest, slug: string, conversationId: string) {
+export async function authorizedMembershipFor(req: NextRequest, slug: string, conversationId: string) {
   const session = await getServerSession(authOptions);
   if (!session) return null;
 
@@ -51,6 +51,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     messages.map((m) => ({
       id: m.id,
       body: m.body,
+      imageUrl: m.imageUrl,
       createdAt: m.createdAt,
       isMine: m.senderMembershipId === auth.membership.id,
       senderName: m.sender.user.name || m.sender.user.email,
@@ -87,5 +88,5 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     await sendPushToMembership(auth.conversation.playerMembershipId, { title: `Message from ${auth.business.name}`, body: preview, url });
   }
 
-  return NextResponse.json({ id: message.id, body: message.body, createdAt: message.createdAt, isMine: true });
+  return NextResponse.json({ id: message.id, body: message.body, imageUrl: null, createdAt: message.createdAt, isMine: true });
 }

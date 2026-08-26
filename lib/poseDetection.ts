@@ -132,6 +132,7 @@ export function drawPoseSkeleton(
     ctx.restore();
   });
   points.forEach((p, i) => {
+    if (i === 12) return; // head drawn separately below, as a proportional circle rather than a tiny dot
     ctx.save();
     if (lowConf.has(i)) ctx.globalAlpha = 0.45;
     ctx.beginPath();
@@ -139,6 +140,22 @@ export function drawPoseSkeleton(
     ctx.fill();
     ctx.restore();
   });
+  // The head - a proportional circle outline rather than a tiny dot the
+  // same size as every other joint, so the skeleton actually reads as a
+  // head. Scaled to shoulder width so it looks right regardless of how
+  // close the camera is; falls back to a fixed, reasonable size on the
+  // rare case shoulders weren't detected but the nose was.
+  if (points[12]) {
+    const shoulderWidth = points[0] && points[1] ? Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) : null;
+    const headRadius = shoulderWidth ? shoulderWidth * 0.3 : Math.max(8, width * 2);
+    ctx.save();
+    if (lowConf.has(12)) ctx.globalAlpha = 0.45;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.arc(points[12].x, points[12].y, headRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.restore();
 }
 

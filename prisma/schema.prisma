@@ -758,7 +758,8 @@ model Message {
   conversationId String
   sender         Membership   @relation(fields: [senderMembershipId], references: [id])
   senderMembershipId String
-  body           String
+  body           String?
+  imageUrl       String? // set for an image message, alongside or instead of body text
   readAt         DateTime? // null until the recipient actually opens the thread - drives the unread indicator
   createdAt      DateTime     @default(now())
 }
