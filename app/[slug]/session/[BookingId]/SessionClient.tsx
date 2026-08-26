@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import SwingCanvas, { SwingCanvasHandle } from "@/components/SwingCanvas";
-import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles } from "@/lib/poseDetection";
+import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles, getShoulderWidth } from "@/lib/poseDetection";
 import type { PoseAngle, Point } from "@/lib/poseDetection";
 import PoseAngleBadges from "@/components/PoseAngleBadges";
 
@@ -301,6 +301,7 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
   const [poseAngles, setPoseAngles] = useState<PoseAngle[]>([]);
   const lastAngleUpdateRef = useRef(0);
   const headReferenceRef = useRef<Point | null>(null);
+  const maxShoulderWidthRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = videoElRef.current;
@@ -315,6 +316,7 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
     if (!showOverlay) return;
     let cancelled = false;
     headReferenceRef.current = null; // fresh reference each time the overlay is turned on
+    maxShoulderWidthRef.current = null;
 
     (async () => {
       const landmarker = await getVideoPoseLandmarker();
@@ -336,7 +338,12 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
             const rawLandmarks = result?.landmarks?.[0];
             if (rawLandmarks) {
               const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
-              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+              const sw = getShoulderWidth(points);
+              if (sw && (!maxShoulderWidthRef.current || sw > maxShoulderWidthRef.current)) {
+                maxShoulderWidthRef.current = sw;
+              }
+              const headRadiusOverride = maxShoulderWidthRef.current ? maxShoulderWidthRef.current * 0.3 : null;
+              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3, headRadiusOverride);
               if (!headReferenceRef.current && points[12]) {
                 headReferenceRef.current = points[12];
               }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
-import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles } from "@/lib/poseDetection";
+import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles, getShoulderWidth } from "@/lib/poseDetection";
 import type { PoseAngle, Point } from "@/lib/poseDetection";
 import PoseAngleBadges from "@/components/PoseAngleBadges";
 
@@ -63,6 +63,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [reviewPoseAngles, setReviewPoseAngles] = useState<PoseAngle[]>([]);
   const reviewLastAngleUpdateRef = useRef(0);
   const reviewHeadReferenceRef = useRef<Point | null>(null);
+  const reviewMaxShoulderWidthRef = useRef<number | null>(null);
   const poseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const poseLoopRef = useRef<number | null>(null);
   const [selectedAiEnabled, setSelectedAiEnabled] = useState(false);
@@ -71,6 +72,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [selectedPoseAngles, setSelectedPoseAngles] = useState<PoseAngle[]>([]);
   const selectedLastAngleUpdateRef = useRef(0);
   const selectedHeadReferenceRef = useRef<Point | null>(null);
+  const selectedMaxShoulderWidthRef = useRef<number | null>(null);
   const selectedPoseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const selectedPoseLoopRef = useRef<number | null>(null);
   // Checking Capacitor.isNativePlatform() directly during render caused a
@@ -99,6 +101,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
     if (!showPoseOverlay) return;
     let cancelled = false;
     reviewHeadReferenceRef.current = null; // fresh reference each time the overlay is turned on
+    reviewMaxShoulderWidthRef.current = null;
 
     (async () => {
       const landmarker = await getVideoPoseLandmarker();
@@ -122,7 +125,12 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
             const rawLandmarks = result?.landmarks?.[0];
             if (rawLandmarks) {
               const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
-              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+              const sw = getShoulderWidth(points);
+              if (sw && (!reviewMaxShoulderWidthRef.current || sw > reviewMaxShoulderWidthRef.current)) {
+                reviewMaxShoulderWidthRef.current = sw;
+              }
+              const headRadiusOverride = reviewMaxShoulderWidthRef.current ? reviewMaxShoulderWidthRef.current * 0.3 : null;
+              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3, headRadiusOverride);
               // The first head position seen after turning the overlay on
               // becomes the reference point everything else compares
               // against - in practice, wherever playback happened to be
@@ -268,6 +276,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
     if (!selectedShowPoseOverlay) return;
     let cancelled = false;
     selectedHeadReferenceRef.current = null; // fresh reference each time the overlay is turned on
+    selectedMaxShoulderWidthRef.current = null;
 
     (async () => {
       const landmarker = await getVideoPoseLandmarker();
@@ -290,7 +299,12 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
               const rawLandmarks = result?.landmarks?.[0];
               if (rawLandmarks) {
                 const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
-                drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3);
+                const sw = getShoulderWidth(points);
+                if (sw && (!selectedMaxShoulderWidthRef.current || sw > selectedMaxShoulderWidthRef.current)) {
+                  selectedMaxShoulderWidthRef.current = sw;
+                }
+                const headRadiusOverride = selectedMaxShoulderWidthRef.current ? selectedMaxShoulderWidthRef.current * 0.3 : null;
+                drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3, headRadiusOverride);
                 if (!selectedHeadReferenceRef.current && points[12]) {
                   selectedHeadReferenceRef.current = points[12];
                 }

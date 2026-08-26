@@ -103,21 +103,64 @@ export function extractPoseLandmarks(
 // render dashed and faded rather than looking just as certain as
 // everything else - the whole point of tracking confidence separately in
 // the first place.
+// Exported so callers doing continuous video can compute this themselves
+// each frame, to track a running maximum for a stable head size (see
+// headRadiusOverride on drawPoseSkeleton below) - null if shoulders
+// weren't both detected.
+export function getShoulderWidth(points: Point[]): number | null {
+  if (!points[0] || !points[1]) return null;
+  return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+}
+
 export function drawPoseSkeleton(
   ctx: CanvasRenderingContext2D,
   points: Point[],
   lowConfidenceIndices: number[],
   color: string,
-  width: number
+  width: number,
+  // Only meaningful for continuous video - see the callers in
+  // InstructorVideosClient/SessionClient, which track the largest
+  // shoulder width ever observed in the session (typically address,
+  // where the golfer is most square to the camera) and lock the head
+  // size to that, rather than letting it visibly grow and shrink as the
+  // body rotates through the swing and the shoulders foreshorten toward
+  // the camera. Swing Sketch's single-frame use never passes this, since
+  // there's no "over time" for the size to fluctuate across in the first place.
+  headRadiusOverride?: number | null
 ) {
   const lowConf = new Set(lowConfidenceIndices);
+  let shoulderWidth: number | null = null;
+  // The nose is a much harder landmark to detect confidently than the
+  // shoulders/hips - most obviously right at address, where the golfer's
+  // head is down looking at the ball rather than facing the camera. When
+  // its position isn't trustworthy, estimate the head as sitting just
+  // above the shoulder midpoint instead, using a corrected copy of the
+  // points array so the neck connection lines (drawn generically below,
+  // same as every other connection) and the head circle both end up
+  // using this same, consistent position - rather than the nose quietly
+  // failing to draw at all while everything connected to it goes missing
+  // right along with it.
+  let effectivePoints = points;
+  let effectiveHeadRadius: number | null = headRadiusOverride ?? null;
+  if (points[0] && points[1]) {
+    shoulderWidth = getShoulderWidth(points);
+    if (effectiveHeadRadius == null && shoulderWidth) effectiveHeadRadius = shoulderWidth * 0.3;
+    const noseValid = points[12] && Number.isFinite(points[12].x) && Number.isFinite(points[12].y) && !lowConf.has(12);
+    if (!noseValid && effectiveHeadRadius != null) {
+      const shoulderMid = { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 };
+      effectivePoints = points.slice();
+      effectivePoints[12] = { x: shoulderMid.x, y: shoulderMid.y - effectiveHeadRadius * 1.5 };
+      lowConf.add(12); // an estimate, not a real detection - still shown faded like any other uncertain point
+    }
+  }
+
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
   ctx.lineWidth = width;
   ctx.lineCap = "round";
   POSE_CONNECTIONS.forEach(([a, b]) => {
-    const pa = points[a], pb = points[b];
+    const pa = effectivePoints[a], pb = effectivePoints[b];
     if (!pa || !pb) return;
     const uncertain = lowConf.has(a) || lowConf.has(b);
     ctx.save();
@@ -131,7 +174,7 @@ export function drawPoseSkeleton(
     ctx.stroke();
     ctx.restore();
   });
-  points.forEach((p, i) => {
+  effectivePoints.forEach((p, i) => {
     if (i === 12) return; // head drawn separately below, as a proportional circle rather than a tiny dot
     ctx.save();
     if (lowConf.has(i)) ctx.globalAlpha = 0.45;
@@ -144,15 +187,14 @@ export function drawPoseSkeleton(
   // same size as every other joint, so the skeleton actually reads as a
   // head. Scaled to shoulder width so it looks right regardless of how
   // close the camera is; falls back to a fixed, reasonable size on the
-  // rare case shoulders weren't detected but the nose was.
-  if (points[12]) {
-    const shoulderWidth = points[0] && points[1] ? Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) : null;
-    const headRadius = shoulderWidth ? shoulderWidth * 0.3 : Math.max(8, width * 2);
+  // rare case shoulders weren't detected at all.
+  if (effectivePoints[12]) {
+    const headRadius = effectiveHeadRadius ?? Math.max(8, width * 2);
     ctx.save();
     if (lowConf.has(12)) ctx.globalAlpha = 0.45;
     ctx.lineWidth = width;
     ctx.beginPath();
-    ctx.arc(points[12].x, points[12].y, headRadius, 0, Math.PI * 2);
+    ctx.arc(effectivePoints[12].x, effectivePoints[12].y, headRadius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
