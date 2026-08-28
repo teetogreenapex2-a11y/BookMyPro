@@ -56,6 +56,15 @@ class MainViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMes
     override func capacitorDidLoad() {
         guard let webView = self.bridge?.webView else { return }
 
+        // Stops the native "rubber-band" bounce past the true top/bottom
+        // of the page - a CSS-only fix (overscroll-behavior) doesn't
+        // actually work inside WKWebView specifically, since iOS ignores
+        // it at this native rendering level regardless of what the
+        // stylesheet says. Setting both properties together is the
+        // combination that's actually reliable here.
+        webView.scrollView.bounces = false
+        webView.scrollView.alwaysBounceVertical = false
+
         let bridgeScript = """
         window.AndroidTabBar = {
           setRole: function(role, slug, pageKey) {
