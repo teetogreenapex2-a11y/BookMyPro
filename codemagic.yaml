@@ -273,10 +273,13 @@ workflows:
           # --delete-stale-profiles is exactly the documented fix for
           # this. Harmless to leave in permanently - it only ever touches
           # profiles that are already stale/orphaned, never a valid one
-          # actually in use.
+          # actually in use. Deliberately no --create here: a valid
+          # certificate already exists from every prior successful build
+          # tonight, and --create can attempt to generate a brand new one
+          # without the private key that would require, which is exactly
+          # what caused the immediately preceding failure.
           app-store-connect fetch-signing-files "$(xcode-project detect-bundle-id)" \
             --type IOS_APP_STORE \
-            --create \
             --delete-stale-profiles
       - name: Set up code signing settings on Xcode project
         script: |
