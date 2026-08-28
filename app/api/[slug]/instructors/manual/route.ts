@@ -38,8 +38,23 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const existing = await prisma.membership.findUnique({
     where: { userId_businessId: { userId: user.id, businessId: business.id } },
   });
+
   if (existing) {
-    return NextResponse.json({ error: "This person is already part of this business" }, { status: 400 });
+    // Someone who booked as a player before joining the team is common
+    // enough to handle directly - promote their existing membership in
+    // place (keeping their history intact) rather than erroring, since
+    // that's the only sensible direction a promotion like this goes.
+    // Already-staff is the one case this genuinely can't do anything
+    // useful with.
+    if (existing.role !== "player") {
+      return NextResponse.json({ error: "This person is already part of this business" }, { status: 400 });
+    }
+    const promoted = await prisma.membership.update({
+      where: { id: existing.id },
+      data: { role: "instructor", specialty: typeof specialty === "string" ? specialty.trim().slice(0, 120) : null },
+    });
+    await seedInstructorAvailability(business.id, promoted.id, business.bookingWindowDays);
+    return NextResponse.json({ id: promoted.id, name: user.name, email: user.email, specialty: promoted.specialty }, { status: 200 });
   }
 
   const newMembership = await prisma.membership.create({
