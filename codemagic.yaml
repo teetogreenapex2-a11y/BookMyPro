@@ -262,6 +262,22 @@ workflows:
           # calling xcodebuild directly here shows Xcode's own, real
           # error text instead, which should tell us the genuine reason.
           xcodebuild -project ios/App/App.xcodeproj -scheme App -showBuildSettings || true
+      - name: Fetch signing files and clear any stale profile
+        script: |
+          # Deleting a profile directly in Apple's Developer Portal (done
+          # just now, to pick up the newly-added Associated Domains
+          # capability) doesn't necessarily clear it from every path
+          # Codemagic itself uses to look profiles up - a stale one can
+          # still be found and reused via a different, non-standard-listing
+          # API route even after it's genuinely gone from the portal.
+          # --delete-stale-profiles is exactly the documented fix for
+          # this. Harmless to leave in permanently - it only ever touches
+          # profiles that are already stale/orphaned, never a valid one
+          # actually in use.
+          app-store-connect fetch-signing-files "$(xcode-project detect-bundle-id)" \
+            --type IOS_APP_STORE \
+            --create \
+            --delete-stale-profiles
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
