@@ -631,7 +631,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   </p>
                 )}
                 <div style={{ position: "relative", marginBottom: 6 }}>
-                  <video ref={videoRef} src={selected.videoUrl} crossOrigin="anonymous" controls style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }} />
+                  <video ref={videoRef} src={selected.videoUrl} crossOrigin="anonymous" controls playsInline style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }} />
                   <canvas
                     ref={selectedPoseOverlayCanvasRef}
                     style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}
