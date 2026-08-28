@@ -726,6 +726,29 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// A short-lived, one-time handoff for the native app's Apple sign-in flow.
+// The web-based OAuth flow (Apple's own sign-in screen, then NextAuth's
+// callback) runs entirely in the system browser, where a real session
+// already gets created normally - but that session cookie lives in the
+// system browser's own cookie jar, not the app's separate embedded one.
+// This row is the bridge: a random, single-use token pointing at that
+// real session, created right after sign-in succeeds and redeemed once
+// the native app (reached via a Universal Link) makes its own request to
+// /api/auth/redeem-native-token from inside its own web view - only then
+// does the session cookie actually land where the app can see it. Expires
+// in minutes, and is deleted the moment it's redeemed, so it's only ever
+// usable for the single handoff it exists for.
+model NativeAuthHandoff {
+  token        String   @id @default(cuid())
+  sessionToken String
+  // Where the person was actually trying to go before landing on /login
+  // in the first place - carried through here rather than threaded
+  // across several URL-encoded query params over multiple redirect hops.
+  callbackUrl  String   @default("/")
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+}
+
 model VerificationToken {
   identifier String
   token      String   @unique

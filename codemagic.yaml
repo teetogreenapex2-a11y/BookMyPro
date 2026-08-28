@@ -210,7 +210,7 @@ workflows:
           cd ios/App
           agvtool new-version -all $BUILD_NUMBER
           cd ../..
-      - name: Add push notification entitlement
+      - name: Add push notification and Universal Links entitlements
         script: |
           # Enabling the capability on the App ID over in Apple's own
           # developer portal is only half of what's needed - the app
@@ -220,6 +220,13 @@ workflows:
           # writes that request directly, then wires it into the
           # Xcode project so it's actually included when the app is
           # signed and built.
+          #
+          # com.apple.developer.associated-domains is the second real
+          # requirement for Apple sign-in's Universal Link handoff (see
+          # app/.well-known/apple-app-site-association/route.ts for the
+          # other half) - without this specific entitlement, iOS will
+          # never even attempt to check that file for this app at all,
+          # regardless of how correct the file itself is.
           cat > ios/App/App/App.entitlements << 'ENTITLEMENTS'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -230,6 +237,10 @@ workflows:
             <key>com.apple.developer.applesignin</key>
             <array>
               <string>Default</string>
+            </array>
+            <key>com.apple.developer.associated-domains</key>
+            <array>
+              <string>applinks:bookmypro.app</string>
             </array>
           </dict>
           </plist>

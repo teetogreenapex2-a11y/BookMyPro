@@ -720,17 +720,28 @@ export default function InstructorClient({
                   <a href={`${basePath}/instructor/swing-sketch`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Swing Sketch</a>
                 </>
               )}
-              <a href={`${basePath}/instructor/shop`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Shop</a>
-              <a href={`${basePath}/instructor/messages`} style={{ position: "relative", fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
+              <a href={`${basePath}/instructor/shop`} style={{
+                fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+              }}>
+                Shop
+              </a>
+              <a href={`${basePath}/instructor/messages`} style={{
+                position: "relative", fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+              }}>
                 Messages
                 {unreadMessages > 0 && (
-                  <span style={{ position: "absolute", top: -4, right: -8, width: 8, height: 8, borderRadius: "50%", background: "#B8862B" }} />
+                  <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#B8862B", border: "1px solid var(--fairway)" }} />
                 )}
               </a>
               {!isNative && (
                 <a href={`${basePath}/settings`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Settings</a>
               )}
-              <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>
+              <button onClick={() => signOut({ callbackUrl: "/login" })} style={{
+                background: "none", color: "#D7DED9", fontSize: 12.5, fontWeight: 600,
+                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+              }}>
                 Sign out
               </button>
             </div>

@@ -24,9 +24,64 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <TabBarSync />
+      <NativeAuthListener />
       {children}
     </SessionProvider>
   );
+}
+
+// Catches the Universal Link that brings a person back into the app
+// after Apple sign-in finishes in the system browser (see the full
+// explanation on the NativeAuthHandoff model in schema.prisma, and
+// handleAppleSignIn in app/login/page.tsx, which is what sends them
+// there in the first place). iOS hands the app the URL it was opened
+// with via this same event whether the app was already running or is
+// being cold-started by the link itself, so this needs to be mounted
+// globally rather than on any one specific page.
+function NativeAuthListener() {
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let removeListener: (() => void) | undefined;
+    let cancelled = false;
+
+    (async () => {
+      const { App } = await import("@capacitor/app");
+      const handle = await App.addListener("appUrlOpen", async (event) => {
+        const url = new URL(event.url);
+        if (url.pathname !== "/native-auth-redeem") return;
+        const token = url.searchParams.get("token");
+        if (!token) return;
+
+        try {
+          const res = await fetch("https://bookmypro.app/api/auth/redeem-native-token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+          });
+          const data = await res.json();
+          // A full navigation (not client-side routing) so the freshly-set
+          // session cookie is actually picked up by the next page's own
+          // server-side session check, rather than relying on client-side
+          // state that has no way to know a cookie just changed underneath it.
+          window.location.href = res.ok ? (data.callbackUrl || "/") : "/login?error=native_signin_failed";
+        } catch {
+          window.location.href = "/login?error=native_signin_failed";
+        }
+      });
+      if (cancelled) {
+        handle.remove();
+      } else {
+        removeListener = () => handle.remove();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      removeListener?.();
+    };
+  }, []);
+
+  return null;
 }
 
 // The native app's own bottom tab bar lives entirely outside the website
