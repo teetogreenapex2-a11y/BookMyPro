@@ -16,6 +16,9 @@ type User = {
   commonIssues: string | null;
 };
 
+type LessonPackageOption = { id: string; lessonsCount: number; priceCents: number };
+type LessonDuration = { id: string; minutes: number; singlePriceCents: number; remoteEnabled: boolean; packages: LessonPackageOption[] };
+
 type Business = {
   name: string;
   logoUrl: string | null;
@@ -41,6 +44,14 @@ type Business = {
   fittingDriverPriceCents: number;
   fittingIronPriceCents: number;
   fittingFullPriceCents: number;
+  customOffering1Name: string | null;
+  customOffering1PriceCents: number | null;
+  customOffering2Name: string | null;
+  customOffering2PriceCents: number | null;
+  customOffering3Name: string | null;
+  customOffering3PriceCents: number | null;
+  customOffering4Name: string | null;
+  customOffering4PriceCents: number | null;
   allowPayLater: boolean;
   allowClubBilling: boolean;
   requireBookingApproval: boolean;
@@ -178,6 +189,13 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   const [instructorPricing, setInstructorPricing] = useState<Record<string, any> | null>(null);
   const [pricingSaved, setPricingSaved] = useState(false);
   const [savingPricing, setSavingPricing] = useState(false);
+  const [durations, setDurations] = useState<LessonDuration[]>([]);
+  const [loadingDurations, setLoadingDurations] = useState(false);
+  const [newDurationMinutes, setNewDurationMinutes] = useState("");
+  const [newDurationPrice, setNewDurationPrice] = useState("");
+  const [addingDuration, setAddingDuration] = useState(false);
+  const [newPackageInputs, setNewPackageInputs] = useState<Record<string, { count: string; price: string }>>({});
+  const [savingPackageFor, setSavingPackageFor] = useState<string | null>(null);
 
   async function loadTeam() {
     const res = await fetch(`${apiBase}/instructors${isOwner ? "?includeInactive=true" : ""}`);
@@ -249,6 +267,90 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
     const found = team.find((t) => t.id === pricingInstructorId);
     setInstructorPricing(found || null);
   }, [pricingInstructorId, team]);
+
+  async function loadDurations() {
+    if (!pricingInstructorId) { setDurations([]); return; }
+    setLoadingDurations(true);
+    try {
+      const res = await fetch(`${apiBase}/instructors/${pricingInstructorId}/durations`);
+      if (res.ok) setDurations(await res.json());
+    } finally {
+      setLoadingDurations(false);
+    }
+  }
+  useEffect(() => { loadDurations(); }, [pricingInstructorId]);
+
+  async function addDuration() {
+    if (!pricingInstructorId) return;
+    const minutes = parseInt(newDurationMinutes, 10);
+    const priceDollars = parseFloat(newDurationPrice);
+    if (!Number.isInteger(minutes) || minutes <= 0) { alert("Enter a valid number of minutes."); return; }
+    if (isNaN(priceDollars) || priceDollars < 0) { alert("Enter a valid price."); return; }
+    setAddingDuration(true);
+    try {
+      const res = await fetch(`${apiBase}/instructors/${pricingInstructorId}/durations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ minutes, singlePriceCents: Math.round(priceDollars * 100) }),
+      });
+      if (res.ok) {
+        setNewDurationMinutes("");
+        setNewDurationPrice("");
+        loadDurations();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Couldn't add that duration.");
+      }
+    } finally {
+      setAddingDuration(false);
+    }
+  }
+
+  async function updateDurationPrice(durationId: string, priceDollars: number) {
+    if (isNaN(priceDollars) || priceDollars < 0) return;
+    setDurations((prev) => prev.map((d) => (d.id === durationId ? { ...d, singlePriceCents: Math.round(priceDollars * 100) } : d)));
+    await fetch(`${apiBase}/durations/${durationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ singlePriceCents: Math.round(priceDollars * 100) }),
+    });
+  }
+
+  async function deleteDuration(durationId: string) {
+    if (!confirm("Remove this lesson length? Its package options go with it. This won't affect lessons already booked.")) return;
+    await fetch(`${apiBase}/durations/${durationId}`, { method: "DELETE" });
+    loadDurations();
+  }
+
+  async function addPackageToDuration(durationId: string) {
+    const input = newPackageInputs[durationId];
+    const lessonsCount = parseInt(input?.count || "", 10);
+    const priceDollars = parseFloat(input?.price || "");
+    if (!Number.isInteger(lessonsCount) || lessonsCount < 2) { alert("Enter a valid number of lessons (2 or more)."); return; }
+    if (isNaN(priceDollars) || priceDollars < 0) { alert("Enter a valid price."); return; }
+    setSavingPackageFor(durationId);
+    try {
+      const res = await fetch(`${apiBase}/durations/${durationId}/packages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lessonsCount, priceCents: Math.round(priceDollars * 100) }),
+      });
+      if (res.ok) {
+        setNewPackageInputs((prev) => ({ ...prev, [durationId]: { count: "", price: "" } }));
+        loadDurations();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Couldn't add that package.");
+      }
+    } finally {
+      setSavingPackageFor(null);
+    }
+  }
+
+  async function deletePackageOption(packageOptionId: string) {
+    await fetch(`${apiBase}/lesson-packages/${packageOptionId}`, { method: "DELETE" });
+    loadDurations();
+  }
 
   async function savePricing() {
     if (!pricingInstructorId || !instructorPricing) return;
@@ -1222,6 +1324,108 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               ) : (
                 <>
                   <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 8 }}>
+                    LESSON LENGTHS
+                  </div>
+                  <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 10px" }}>
+                    Each lesson length gets its own price, and its own package sizes if you offer any - e.g. a 5-pack of 45-minute lessons, priced separately from a 5-pack of 60-minute ones.
+                  </p>
+
+                  {loadingDurations ? (
+                    <p style={{ fontSize: 13, color: "var(--faint)" }}>Loading…</p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
+                      {durations.map((d) => (
+                        <div key={d.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, background: "var(--card)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: d.packages.length > 0 ? 10 : 8 }}>
+                            <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{d.minutes} min</span>
+                            <span style={{ fontSize: 13, color: "var(--faint)" }}>$</span>
+                            <input
+                              defaultValue={(d.singlePriceCents / 100).toFixed(2)}
+                              onBlur={(e) => updateDurationPrice(d.id, Number(e.target.value))}
+                              inputMode="numeric"
+                              style={{ width: 70, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 13 }}
+                            />
+                            <span style={{ fontSize: 11.5, color: "var(--faint)" }}>/ lesson</span>
+                            <button
+                              onClick={() => deleteDuration(d.id)}
+                              style={{ background: "none", border: "none", color: "#B23A3A", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+
+                          {d.packages.length > 0 && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8, paddingLeft: 4 }}>
+                              {d.packages.map((p) => (
+                                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                                  <span style={{ flex: 1, color: "var(--muted)" }}>{p.lessonsCount}-pack</span>
+                                  <span style={{ color: "var(--faint)" }}>${(p.priceCents / 100).toFixed(2)}</span>
+                                  <button
+                                    onClick={() => deletePackageOption(p.id)}
+                                    style={{ background: "none", border: "none", color: "#B23A3A", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
+                            <input
+                              value={newPackageInputs[d.id]?.count || ""}
+                              onChange={(e) => setNewPackageInputs((prev) => ({ ...prev, [d.id]: { count: e.target.value, price: prev[d.id]?.price || "" } }))}
+                              placeholder="# lessons"
+                              inputMode="numeric"
+                              style={{ width: 74, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 12 }}
+                            />
+                            <span style={{ fontSize: 12, color: "var(--faint)" }}>for $</span>
+                            <input
+                              value={newPackageInputs[d.id]?.price || ""}
+                              onChange={(e) => setNewPackageInputs((prev) => ({ ...prev, [d.id]: { count: prev[d.id]?.count || "", price: e.target.value } }))}
+                              placeholder="total"
+                              inputMode="numeric"
+                              style={{ width: 70, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 12 }}
+                            />
+                            <button
+                              onClick={() => addPackageToDuration(d.id)}
+                              disabled={savingPackageFor === d.id}
+                              style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 700, color: "var(--fairway)" }}
+                            >
+                              {savingPackageFor === d.id ? "Adding…" : "+ Add package"}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22 }}>
+                    <input
+                      value={newDurationMinutes}
+                      onChange={(e) => setNewDurationMinutes(e.target.value)}
+                      placeholder="Minutes"
+                      inputMode="numeric"
+                      style={{ width: 90, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
+                    />
+                    <span style={{ fontSize: 13, color: "var(--faint)" }}>min, $</span>
+                    <input
+                      value={newDurationPrice}
+                      onChange={(e) => setNewDurationPrice(e.target.value)}
+                      placeholder="Price"
+                      inputMode="numeric"
+                      style={{ width: 80, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
+                    />
+                    <button
+                      onClick={addDuration}
+                      disabled={addingDuration}
+                      style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700 }}
+                    >
+                      {addingDuration ? "Adding…" : "+ Add lesson length"}
+                    </button>
+                  </div>
+
+                  <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 8 }}>
                     LESSON PACKAGES
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
@@ -1311,6 +1515,47 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                             }}
                           />
                           <span className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{row.duration}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 8 }}>
+                    CUSTOM OFFERINGS
+                  </div>
+                  <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 10px" }}>
+                    Anything that doesn't fit the categories above - a specific lesson length, an annual option, your own bundle. Leave a name blank to leave that slot unused.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+                    {[1, 2, 3, 4].map((slot) => {
+                      const nameKey = `customOffering${slot}Name`;
+                      const priceKey = `customOffering${slot}PriceCents`;
+                      const name = instructorPricing[nameKey] || "";
+                      const priceCents = instructorPricing[priceKey] || 0;
+                      return (
+                        <div key={slot} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <input
+                            value={name}
+                            onChange={(e) => setInstructorPricing((p) => p && ({ ...p, [nameKey]: e.target.value }))}
+                            placeholder={`e.g. 45-min lesson`}
+                            style={{
+                              flex: 2, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px",
+                              fontFamily: "inherit", fontSize: 13,
+                            }}
+                          />
+                          <span style={{ fontSize: 13, color: "var(--faint)" }}>$</span>
+                          <input
+                            value={priceCents / 100}
+                            onChange={(e) => {
+                              const dollars = Number(e.target.value);
+                              setInstructorPricing((p) => p && ({ ...p, [priceKey]: Number.isFinite(dollars) ? Math.round(dollars * 100) : 0 }));
+                            }}
+                            inputMode="numeric"
+                            style={{
+                              flex: 1, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px",
+                              fontFamily: "inherit", fontSize: 14,
+                            }}
+                          />
                         </div>
                       );
                     })}
