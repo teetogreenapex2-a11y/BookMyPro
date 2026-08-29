@@ -218,6 +218,7 @@ model Membership {
   conversationsAsPlayer Conversation[]
   sentMessages          Message[]
   aiAnalysisPreferences AiAnalysisPreference[]
+  lessonDurations       LessonDuration[]
 
   // Per-instructor pricing — each instructor on staff sets their own rates,
   // rather than one shared business-wide price. Mirrors the exact same
@@ -249,7 +250,53 @@ model Membership {
   fittingIronPriceCents   Int @default(10000)
   fittingFullPriceCents   Int @default(20000)
 
+  // Four open, instructor-defined pricing slots - anything that doesn't
+  // fit the fixed package/fitting categories above (a specific lesson
+  // length, an annual option, a bundle they invented themselves). A slot
+  // is considered active whenever it has a name - no separate enabled
+  // flag needed, since an empty name already means "not using this one."
+  customOffering1Name       String?
+  customOffering1PriceCents Int?
+  customOffering2Name       String?
+  customOffering2PriceCents Int?
+  customOffering3Name       String?
+  customOffering3PriceCents Int?
+  customOffering4Name       String?
+  customOffering4PriceCents Int?
+
   @@unique([userId, businessId])
+}
+
+// A lesson length an instructor offers - e.g. "30 min", "45 min", "60
+// min" - fully instructor-defined rather than a fixed platform tier,
+// since different instructors run genuinely different lesson lengths.
+// Deliberately doesn't affect the calendar/availability system at all -
+// every lesson, regardless of which duration was purchased, still books
+// into the same standard hourly slot. This is purely a pricing and
+// labeling dimension layered on top of that, not a scheduling one.
+model LessonDuration {
+  id           String     @id @default(cuid())
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membershipId String
+  minutes      Int
+  singlePriceCents Int
+  remoteEnabled Boolean   @default(true) // can a lesson at this duration be booked as a remote/video lesson too
+  sortOrder    Int        @default(0)
+  packages     LessonPackageOption[]
+  createdAt    DateTime   @default(now())
+}
+
+// A package size nested under one specific duration - e.g. a "5-pack"
+// of 45-minute lessons. lessonsCount is fully custom per instructor
+// (not a fixed 3/5/10), and priced independently from the duration's
+// own single-lesson rate.
+model LessonPackageOption {
+  id           String         @id @default(cuid())
+  duration     LessonDuration @relation(fields: [durationId], references: [id], onDelete: Cascade)
+  durationId   String
+  lessonsCount Int
+  priceCents   Int
+  sortOrder    Int            @default(0)
 }
 
 // --- Identity (global — not tenant-scoped) ---
