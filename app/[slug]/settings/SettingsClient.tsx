@@ -44,14 +44,6 @@ type Business = {
   fittingDriverPriceCents: number;
   fittingIronPriceCents: number;
   fittingFullPriceCents: number;
-  customOffering1Name: string | null;
-  customOffering1PriceCents: number | null;
-  customOffering2Name: string | null;
-  customOffering2PriceCents: number | null;
-  customOffering3Name: string | null;
-  customOffering3PriceCents: number | null;
-  customOffering4Name: string | null;
-  customOffering4PriceCents: number | null;
   allowPayLater: boolean;
   allowClubBilling: boolean;
   requireBookingApproval: boolean;
