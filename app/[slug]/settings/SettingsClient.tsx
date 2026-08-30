@@ -61,6 +61,16 @@ type Business = {
   timezone: string;
 };
 
+// Prefab options for the Lesson Builder - covers the common cases so an
+// instructor can pick instead of typing the same names out repeatedly.
+// "__custom__" is a sentinel value (never sent to the server) meaning
+// "show a free-text input instead."
+const LESSON_LABEL_PRESETS = [
+  "Single Lesson", "Playing Lesson/9", "Playing Lesson/18", "Video Lesson",
+  "Chipping Lesson", "Putting Lesson", "Junior Lesson", "Remote Lesson",
+];
+const PACKAGE_SIZE_PRESETS = [3, 4, 5, 8, 10, 12];
+
 const PACKAGE_ROWS = [
   { id: "single", label: "Single lesson", lessons: 1, enabledKey: "packageSingleEnabled", priceKey: "packageSinglePriceCents" },
   { id: "playing", label: "Playing lesson", lessons: 1, enabledKey: "packagePlayingEnabled", priceKey: "packagePlayingPriceCents" },
@@ -186,9 +196,12 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   const [durationDropdownValue, setDurationDropdownValue] = useState("");
   const [newDurationMinutes, setNewDurationMinutes] = useState("");
   const [newDurationLabel, setNewDurationLabel] = useState("");
+  const [newDurationLabelCustom, setNewDurationLabelCustom] = useState(false);
   const [newDurationPrice, setNewDurationPrice] = useState("");
   const [addingDuration, setAddingDuration] = useState(false);
   const [newPackageInputs, setNewPackageInputs] = useState<Record<string, { count: string; price: string }>>({});
+  const [packageCountCustomFor, setPackageCountCustomFor] = useState<Record<string, boolean>>({});
+  const [editLabelCustomFor, setEditLabelCustomFor] = useState<Record<string, boolean>>({});
   const [savingPackageFor, setSavingPackageFor] = useState<string | null>(null);
 
   async function loadTeam() {
@@ -290,6 +303,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       if (res.ok) {
         setNewDurationMinutes("");
         setNewDurationLabel("");
+        setNewDurationLabelCustom(false);
         setNewDurationPrice("");
         loadDurations();
       } else {
@@ -341,6 +355,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       });
       if (res.ok) {
         setNewPackageInputs((prev) => ({ ...prev, [durationId]: { count: "", price: "" } }));
+        setPackageCountCustomFor((prev) => ({ ...prev, [durationId]: false }));
         loadDurations();
       } else {
         const data = await res.json().catch(() => ({}));
@@ -1328,7 +1343,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               ) : (
                 <>
                   <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 8 }}>
-                    LESSON LENGTHS
+                    LESSON BUILDER
                   </div>
                   <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 10px" }}>
                     Each lesson length gets its own price, and its own package sizes if you offer any - e.g. a 5-pack of 45-minute lessons, priced separately from a 5-pack of 60-minute ones.
@@ -1357,12 +1372,33 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         if (!d) {
                           return (
                             <div>
-                              <input
-                                value={newDurationLabel}
-                                onChange={(e) => setNewDurationLabel(e.target.value)}
-                                placeholder="Name this lesson (optional) - e.g. Putting Lesson"
-                                style={{ width: "100%", maxWidth: 320, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8, display: "block" }}
-                              />
+                              <select
+                                value={newDurationLabelCustom ? "__custom__" : newDurationLabel}
+                                onChange={(e) => {
+                                  if (e.target.value === "__custom__") {
+                                    setNewDurationLabelCustom(true);
+                                    setNewDurationLabel("");
+                                  } else {
+                                    setNewDurationLabelCustom(false);
+                                    setNewDurationLabel(e.target.value);
+                                  }
+                                }}
+                                style={{ width: "100%", maxWidth: 320, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8, display: "block", background: "#FFF" }}
+                              >
+                                <option value="">No name (just a generic lesson)</option>
+                                {LESSON_LABEL_PRESETS.map((l) => (
+                                  <option key={l} value={l}>{l}</option>
+                                ))}
+                                <option value="__custom__">Other - type my own…</option>
+                              </select>
+                              {newDurationLabelCustom && (
+                                <input
+                                  value={newDurationLabel}
+                                  onChange={(e) => setNewDurationLabel(e.target.value)}
+                                  placeholder="Name this lesson"
+                                  style={{ width: "100%", maxWidth: 320, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8, display: "block" }}
+                                />
+                              )}
                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                               <input
                                 value={newDurationMinutes}
@@ -1395,12 +1431,40 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         }
                         return (
                           <div key={d.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, background: "var(--card)" }}>
-                            <input
-                              defaultValue={d.label || ""}
-                              onBlur={(e) => updateDurationLabel(d.id, e.target.value)}
-                              placeholder="Name this lesson (optional) - e.g. Putting Lesson"
-                              style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 13, marginBottom: 10, display: "block" }}
-                            />
+                            {(() => {
+                              const isCustom = editLabelCustomFor[d.id] ?? (!!d.label && !LESSON_LABEL_PRESETS.includes(d.label));
+                              return (
+                                <>
+                                  <select
+                                    value={isCustom ? "__custom__" : (d.label || "")}
+                                    onChange={(e) => {
+                                      if (e.target.value === "__custom__") {
+                                        setEditLabelCustomFor((prev) => ({ ...prev, [d.id]: true }));
+                                      } else {
+                                        setEditLabelCustomFor((prev) => ({ ...prev, [d.id]: false }));
+                                        updateDurationLabel(d.id, e.target.value);
+                                      }
+                                    }}
+                                    style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 13, marginBottom: isCustom ? 8 : 10, display: "block", background: "#FFF" }}
+                                  >
+                                    <option value="">No name (just a generic lesson)</option>
+                                    {LESSON_LABEL_PRESETS.map((l) => (
+                                      <option key={l} value={l}>{l}</option>
+                                    ))}
+                                    <option value="__custom__">Other - type my own…</option>
+                                  </select>
+                                  {isCustom && (
+                                    <input
+                                      key={d.id}
+                                      defaultValue={d.label || ""}
+                                      onBlur={(e) => updateDurationLabel(d.id, e.target.value)}
+                                      placeholder="Name this lesson"
+                                      style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 13, marginBottom: 10, display: "block" }}
+                                    />
+                                  )}
+                                </>
+                              );
+                            })()}
                             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: d.packages.length > 0 ? 10 : 8 }}>
                               <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{d.minutes} min</span>
                               <span style={{ fontSize: 13, color: "var(--faint)" }}>$</span>
@@ -1436,14 +1500,35 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                               </div>
                             )}
 
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
-                              <input
-                                value={newPackageInputs[d.id]?.count || ""}
-                                onChange={(e) => setNewPackageInputs((prev) => ({ ...prev, [d.id]: { count: e.target.value, price: prev[d.id]?.price || "" } }))}
-                                placeholder="# lessons"
-                                inputMode="numeric"
-                                style={{ width: 74, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 12 }}
-                              />
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4, flexWrap: "wrap" }}>
+                              <select
+                                value={packageCountCustomFor[d.id] ? "__custom__" : (newPackageInputs[d.id]?.count || "")}
+                                onChange={(e) => {
+                                  if (e.target.value === "__custom__") {
+                                    setPackageCountCustomFor((prev) => ({ ...prev, [d.id]: true }));
+                                    setNewPackageInputs((prev) => ({ ...prev, [d.id]: { count: "", price: prev[d.id]?.price || "" } }));
+                                  } else {
+                                    setPackageCountCustomFor((prev) => ({ ...prev, [d.id]: false }));
+                                    setNewPackageInputs((prev) => ({ ...prev, [d.id]: { count: e.target.value, price: prev[d.id]?.price || "" } }));
+                                  }
+                                }}
+                                style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 12, background: "#FFF" }}
+                              >
+                                <option value="" disabled>Pack size…</option>
+                                {PACKAGE_SIZE_PRESETS.map((n) => (
+                                  <option key={n} value={n}>{n}-pack</option>
+                                ))}
+                                <option value="__custom__">Other…</option>
+                              </select>
+                              {packageCountCustomFor[d.id] && (
+                                <input
+                                  value={newPackageInputs[d.id]?.count || ""}
+                                  onChange={(e) => setNewPackageInputs((prev) => ({ ...prev, [d.id]: { count: e.target.value, price: prev[d.id]?.price || "" } }))}
+                                  placeholder="# lessons"
+                                  inputMode="numeric"
+                                  style={{ width: 74, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 12 }}
+                                />
+                              )}
                               <span style={{ fontSize: 12, color: "var(--faint)" }}>for $</span>
                               <input
                                 value={newPackageInputs[d.id]?.price || ""}
