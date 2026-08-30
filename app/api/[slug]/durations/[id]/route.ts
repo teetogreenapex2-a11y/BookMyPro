@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   const auth = await authorize(req, params.slug, params.id);
   if (auth.error) return auth.error;
 
-  const { minutes, singlePriceCents, remoteEnabled, sortOrder } = await req.json();
+  const { minutes, singlePriceCents, remoteEnabled, sortOrder, label } = await req.json();
   const data: Record<string, unknown> = {};
   if (minutes !== undefined) {
     if (!Number.isInteger(minutes) || minutes <= 0) return NextResponse.json({ error: "Enter a valid number of minutes" }, { status: 400 });
@@ -44,6 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   }
   if (remoteEnabled !== undefined) data.remoteEnabled = !!remoteEnabled;
   if (sortOrder !== undefined) data.sortOrder = sortOrder;
+  if (label !== undefined) data.label = typeof label === "string" && label.trim() ? label.trim().slice(0, 60) : null;
 
   const updated = await prisma.lessonDuration.update({
     where: { id: params.id },
