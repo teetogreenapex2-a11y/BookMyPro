@@ -183,6 +183,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   const [savingPricing, setSavingPricing] = useState(false);
   const [durations, setDurations] = useState<LessonDuration[]>([]);
   const [loadingDurations, setLoadingDurations] = useState(false);
+  const [durationDropdownValue, setDurationDropdownValue] = useState("");
   const [newDurationMinutes, setNewDurationMinutes] = useState("");
   const [newDurationPrice, setNewDurationPrice] = useState("");
   const [addingDuration, setAddingDuration] = useState(false);
@@ -1325,97 +1326,122 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                   {loadingDurations ? (
                     <p style={{ fontSize: 13, color: "var(--faint)" }}>Loading…</p>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
-                      {durations.map((d) => (
-                        <div key={d.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, background: "var(--card)" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: d.packages.length > 0 ? 10 : 8 }}>
-                            <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{d.minutes} min</span>
-                            <span style={{ fontSize: 13, color: "var(--faint)" }}>$</span>
-                            <input
-                              defaultValue={(d.singlePriceCents / 100).toFixed(2)}
-                              onBlur={(e) => updateDurationPrice(d.id, Number(e.target.value))}
-                              inputMode="numeric"
-                              style={{ width: 70, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 13 }}
-                            />
-                            <span style={{ fontSize: 11.5, color: "var(--faint)" }}>/ lesson</span>
-                            <button
-                              onClick={() => deleteDuration(d.id)}
-                              style={{ background: "none", border: "none", color: "#B23A3A", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}
-                            >
-                              Remove
-                            </button>
-                          </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <select
+                        value={durations.some((d) => d.id === durationDropdownValue) ? durationDropdownValue : "new"}
+                        onChange={(e) => setDurationDropdownValue(e.target.value)}
+                        style={{
+                          width: "100%", maxWidth: 320, border: "1px solid var(--border)", borderRadius: 8,
+                          padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 12, background: "#FFF",
+                        }}
+                      >
+                        {durations.map((d) => (
+                          <option key={d.id} value={d.id}>{d.minutes} min - ${(d.singlePriceCents / 100).toFixed(2)}/lesson</option>
+                        ))}
+                        <option value="new">+ Add a new lesson length</option>
+                      </select>
 
-                          {d.packages.length > 0 && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8, paddingLeft: 4 }}>
-                              {d.packages.map((p) => (
-                                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
-                                  <span style={{ flex: 1, color: "var(--muted)" }}>{p.lessonsCount}-pack</span>
-                                  <span style={{ color: "var(--faint)" }}>${(p.priceCents / 100).toFixed(2)}</span>
-                                  <button
-                                    onClick={() => deletePackageOption(p.id)}
-                                    style={{ background: "none", border: "none", color: "#B23A3A", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              ))}
+                      {(() => {
+                        const d = durations.find((x) => x.id === durationDropdownValue);
+                        if (!d) {
+                          return (
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <input
+                                value={newDurationMinutes}
+                                onChange={(e) => setNewDurationMinutes(e.target.value)}
+                                placeholder="Minutes"
+                                inputMode="numeric"
+                                style={{ width: 90, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
+                              />
+                              <span style={{ fontSize: 13, color: "var(--faint)" }}>min, $</span>
+                              <input
+                                value={newDurationPrice}
+                                onChange={(e) => setNewDurationPrice(e.target.value)}
+                                placeholder="Price"
+                                inputMode="numeric"
+                                style={{ width: 80, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
+                              />
+                              <button
+                                onClick={async () => {
+                                  await addDuration();
+                                  setDurationDropdownValue("");
+                                }}
+                                disabled={addingDuration}
+                                style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700 }}
+                              >
+                                {addingDuration ? "Adding…" : "+ Add lesson length"}
+                              </button>
                             </div>
-                          )}
+                          );
+                        }
+                        return (
+                          <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, background: "var(--card)" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: d.packages.length > 0 ? 10 : 8 }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{d.minutes} min</span>
+                              <span style={{ fontSize: 13, color: "var(--faint)" }}>$</span>
+                              <input
+                                defaultValue={(d.singlePriceCents / 100).toFixed(2)}
+                                onBlur={(e) => updateDurationPrice(d.id, Number(e.target.value))}
+                                inputMode="numeric"
+                                style={{ width: 70, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 13 }}
+                              />
+                              <span style={{ fontSize: 11.5, color: "var(--faint)" }}>/ lesson</span>
+                              <button
+                                onClick={() => { deleteDuration(d.id); setDurationDropdownValue(""); }}
+                                style={{ background: "none", border: "none", color: "#B23A3A", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}
+                              >
+                                Remove
+                              </button>
+                            </div>
 
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
-                            <input
-                              value={newPackageInputs[d.id]?.count || ""}
-                              onChange={(e) => setNewPackageInputs((prev) => ({ ...prev, [d.id]: { count: e.target.value, price: prev[d.id]?.price || "" } }))}
-                              placeholder="# lessons"
-                              inputMode="numeric"
-                              style={{ width: 74, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 12 }}
-                            />
-                            <span style={{ fontSize: 12, color: "var(--faint)" }}>for $</span>
-                            <input
-                              value={newPackageInputs[d.id]?.price || ""}
-                              onChange={(e) => setNewPackageInputs((prev) => ({ ...prev, [d.id]: { count: prev[d.id]?.count || "", price: e.target.value } }))}
-                              placeholder="total"
-                              inputMode="numeric"
-                              style={{ width: 70, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 12 }}
-                            />
-                            <button
-                              onClick={() => addPackageToDuration(d.id)}
-                              disabled={savingPackageFor === d.id}
-                              style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 700, color: "var(--fairway)" }}
-                            >
-                              {savingPackageFor === d.id ? "Adding…" : "+ Add package"}
-                            </button>
+                            {d.packages.length > 0 && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8, paddingLeft: 4 }}>
+                                {d.packages.map((p) => (
+                                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                                    <span style={{ flex: 1, color: "var(--muted)" }}>{p.lessonsCount}-pack</span>
+                                    <span style={{ color: "var(--faint)" }}>${(p.priceCents / 100).toFixed(2)}</span>
+                                    <button
+                                      onClick={() => deletePackageOption(p.id)}
+                                      style={{ background: "none", border: "none", color: "#B23A3A", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
+                              <input
+                                value={newPackageInputs[d.id]?.count || ""}
+                                onChange={(e) => setNewPackageInputs((prev) => ({ ...prev, [d.id]: { count: e.target.value, price: prev[d.id]?.price || "" } }))}
+                                placeholder="# lessons"
+                                inputMode="numeric"
+                                style={{ width: 74, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 12 }}
+                              />
+                              <span style={{ fontSize: 12, color: "var(--faint)" }}>for $</span>
+                              <input
+                                value={newPackageInputs[d.id]?.price || ""}
+                                onChange={(e) => setNewPackageInputs((prev) => ({ ...prev, [d.id]: { count: prev[d.id]?.count || "", price: e.target.value } }))}
+                                placeholder="total"
+                                inputMode="numeric"
+                                style={{ width: 70, border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 12 }}
+                              />
+                              <button
+                                onClick={() => addPackageToDuration(d.id)}
+                                disabled={savingPackageFor === d.id}
+                                style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 700, color: "var(--fairway)" }}
+                              >
+                                {savingPackageFor === d.id ? "Adding…" : "+ Add package"}
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })()}
                     </div>
                   )}
 
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22 }}>
-                    <input
-                      value={newDurationMinutes}
-                      onChange={(e) => setNewDurationMinutes(e.target.value)}
-                      placeholder="Minutes"
-                      inputMode="numeric"
-                      style={{ width: 90, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
-                    />
-                    <span style={{ fontSize: 13, color: "var(--faint)" }}>min, $</span>
-                    <input
-                      value={newDurationPrice}
-                      onChange={(e) => setNewDurationPrice(e.target.value)}
-                      placeholder="Price"
-                      inputMode="numeric"
-                      style={{ width: 80, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13 }}
-                    />
-                    <button
-                      onClick={addDuration}
-                      disabled={addingDuration}
-                      style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700 }}
-                    >
-                      {addingDuration ? "Adding…" : "+ Add lesson length"}
-                    </button>
-                  </div>
+                  <div style={{ marginBottom: 22 }} />
 
                   <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 8 }}>
                     LESSON PACKAGES

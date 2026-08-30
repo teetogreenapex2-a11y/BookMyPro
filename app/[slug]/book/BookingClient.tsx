@@ -832,42 +832,39 @@ export default function BookingClient({
                   <div className="mono" style={{ fontSize: 11, color: "#9DB8A9", marginBottom: 8, letterSpacing: "0.04em" }}>
                     {pendingDurationInfo ? "SWITCH LESSON LENGTH" : "CHOOSE A LESSON LENGTH"}
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {durations.map((d) => (
-                      <div key={d.id}>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button
-                            onClick={() => chooseDurationOption(d.id, null)}
-                            style={{
-                              background: pendingDurationId === d.id && !pendingDurationPackageId ? "var(--gold)" : "var(--chalk)",
-                              color: "var(--fairway)", border: "none", borderRadius: 10,
-                              padding: "10px 14px", textAlign: "left", minWidth: 108,
-                            }}
-                          >
-                            <div style={{ fontSize: 13, fontWeight: 700 }}>{d.minutes} min</div>
-                            <div className="mono" style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600 }}>
-                              {centsToDollars(d.singlePriceCents)}
-                            </div>
-                          </button>
-                          {d.packages.map((p) => (
-                            <button
-                              key={p.id}
-                              onClick={() => chooseDurationOption(d.id, p.id)}
-                              style={{
-                                background: pendingDurationId === d.id && pendingDurationPackageId === p.id ? "var(--gold)" : "var(--chalk)",
-                                color: "var(--fairway)", border: "none", borderRadius: 10,
-                                padding: "10px 14px", textAlign: "left", minWidth: 108,
-                              }}
-                            >
-                              <div style={{ fontSize: 13, fontWeight: 700 }}>{p.lessonsCount}-pack</div>
-                              <div className="mono" style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600 }}>
-                                {centsToDollars(p.priceCents)}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 320 }}>
+                    <select
+                      value={pendingDurationId || ""}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (id) chooseDurationOption(id, null);
+                      }}
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px",
+                        fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)",
+                      }}
+                    >
+                      <option value="" disabled>Choose a lesson length…</option>
+                      {durations.map((d) => (
+                        <option key={d.id} value={d.id}>{d.minutes} min - {centsToDollars(d.singlePriceCents)}</option>
+                      ))}
+                    </select>
+
+                    {selectedDuration && selectedDuration.packages.length > 0 && (
+                      <select
+                        value={pendingDurationPackageId || ""}
+                        onChange={(e) => chooseDurationOption(selectedDuration.id, e.target.value || null)}
+                        style={{
+                          border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px",
+                          fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)",
+                        }}
+                      >
+                        <option value="">Single lesson - {centsToDollars(selectedDuration.singlePriceCents)}</option>
+                        {selectedDuration.packages.map((p) => (
+                          <option key={p.id} value={p.id}>{p.lessonsCount}-pack - {centsToDollars(p.priceCents)}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
               ) : (
