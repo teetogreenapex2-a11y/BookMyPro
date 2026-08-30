@@ -61,14 +61,8 @@ type Business = {
   timezone: string;
 };
 
-// Prefab options for the Lesson Builder - covers the common cases so an
-// instructor can pick instead of typing the same names out repeatedly.
-// "__custom__" is a sentinel value (never sent to the server) meaning
-// "show a free-text input instead."
-const LESSON_LABEL_PRESETS = [
-  "Single Lesson", "Video Lesson",
-  "Chipping Lesson", "Putting Lesson", "Junior Lesson", "Remote Lesson",
-];
+// Prefab package sizes for the Lesson Builder - covers the common cases
+// so an instructor can pick instead of typing a number out repeatedly.
 const PACKAGE_SIZE_PRESETS = [3, 4, 5, 8, 10, 12];
 
 const PACKAGE_ROWS = [
@@ -200,13 +194,10 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   const [loadingDurations, setLoadingDurations] = useState(false);
   const [durationDropdownValue, setDurationDropdownValue] = useState("");
   const [newDurationMinutes, setNewDurationMinutes] = useState("");
-  const [newDurationLabel, setNewDurationLabel] = useState("");
-  const [newDurationLabelCustom, setNewDurationLabelCustom] = useState(false);
   const [newDurationPrice, setNewDurationPrice] = useState("");
   const [addingDuration, setAddingDuration] = useState(false);
   const [newPackageInputs, setNewPackageInputs] = useState<Record<string, { count: string; price: string }>>({});
   const [packageCountCustomFor, setPackageCountCustomFor] = useState<Record<string, boolean>>({});
-  const [editLabelCustomFor, setEditLabelCustomFor] = useState<Record<string, boolean>>({});
   const [savingPackageFor, setSavingPackageFor] = useState<string | null>(null);
 
   async function loadTeam() {
@@ -292,6 +283,15 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   }
   useEffect(() => { loadDurations(); }, [pricingInstructorId]);
 
+  // The name/label feature on a duration has been removed entirely -
+  // this quietly clears out any that were set before that decision, so
+  // an old name (like a duration someone had named "Single Lesson")
+  // doesn't keep confusingly showing up on the booking page.
+  useEffect(() => {
+    durations.filter((d) => d.label).forEach((d) => updateDurationLabel(d.id, ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [durations]);
+
   async function addDuration(): Promise<string | null> {
     if (!pricingInstructorId) return null;
     const minutes = parseInt(newDurationMinutes, 10);
@@ -303,13 +303,11 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       const res = await fetch(`${apiBase}/instructors/${pricingInstructorId}/durations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ minutes, label: newDurationLabel.trim() || null, singlePriceCents: Math.round(priceDollars * 100) }),
+        body: JSON.stringify({ minutes, singlePriceCents: Math.round(priceDollars * 100) }),
       });
       if (res.ok) {
         const created = await res.json();
         setNewDurationMinutes("");
-        setNewDurationLabel("");
-        setNewDurationLabelCustom(false);
         setNewDurationPrice("");
         await loadDurations();
         return created.id as string;
@@ -343,7 +341,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   }
 
   async function deleteDuration(durationId: string) {
-    if (!confirm("Remove this lesson length? Its package options go with it. This won't affect lessons already booked.")) return;
+    if (!confirm("Remove this lesson type? Its package options go with it. This won't affect lessons already booked.")) return;
     await fetch(`${apiBase}/durations/${durationId}`, { method: "DELETE" });
     loadDurations();
   }
@@ -1354,7 +1352,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                     LESSON BUILDER
                   </div>
                   <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 10px" }}>
-                    Each lesson length gets its own price, and its own package sizes if you offer any - e.g. a 5-pack of 45-minute lessons, priced separately from a 5-pack of 60-minute ones.
+                    Each lesson type gets its own price, and its own package sizes if you offer any - e.g. a 5-pack of 45-minute lessons, priced separately from a 5-pack of 60-minute ones.
                   </p>
 
                   {loadingDurations ? (
@@ -1372,7 +1370,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         {durations.map((d) => (
                           <option key={d.id} value={d.id}>{d.label ? `${d.label} - ` : ""}{d.minutes} min - ${(d.singlePriceCents / 100).toFixed(2)}/lesson</option>
                         ))}
-                        <option value="new">+ Add a new lesson length</option>
+                        <option value="new">+ Add a new lesson type</option>
                       </select>
 
                       {(() => {
@@ -1380,33 +1378,6 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         if (!d) {
                           return (
                             <div>
-                              <select
-                                value={newDurationLabelCustom ? "__custom__" : newDurationLabel}
-                                onChange={(e) => {
-                                  if (e.target.value === "__custom__") {
-                                    setNewDurationLabelCustom(true);
-                                    setNewDurationLabel("");
-                                  } else {
-                                    setNewDurationLabelCustom(false);
-                                    setNewDurationLabel(e.target.value);
-                                  }
-                                }}
-                                style={{ width: "100%", maxWidth: 320, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8, display: "block", background: "#FFF" }}
-                              >
-                                <option value="">No name (just a generic lesson)</option>
-                                {LESSON_LABEL_PRESETS.map((l) => (
-                                  <option key={l} value={l}>{l}</option>
-                                ))}
-                                <option value="__custom__">Other - type my own…</option>
-                              </select>
-                              {newDurationLabelCustom && (
-                                <input
-                                  value={newDurationLabel}
-                                  onChange={(e) => setNewDurationLabel(e.target.value)}
-                                  placeholder="Name this lesson"
-                                  style={{ width: "100%", maxWidth: 320, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8, display: "block" }}
-                                />
-                              )}
                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                               <input
                                 value={newDurationMinutes}
@@ -1431,7 +1402,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                                 disabled={addingDuration}
                                 style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700 }}
                               >
-                                {addingDuration ? "Adding…" : "+ Add lesson length"}
+                                {addingDuration ? "Adding…" : "+ Add lesson type"}
                               </button>
                               </div>
                             </div>
@@ -1439,40 +1410,6 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         }
                         return (
                           <div key={d.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, background: "var(--card)" }}>
-                            {(() => {
-                              const isCustom = editLabelCustomFor[d.id] ?? (!!d.label && !LESSON_LABEL_PRESETS.includes(d.label));
-                              return (
-                                <>
-                                  <select
-                                    value={isCustom ? "__custom__" : (d.label || "")}
-                                    onChange={(e) => {
-                                      if (e.target.value === "__custom__") {
-                                        setEditLabelCustomFor((prev) => ({ ...prev, [d.id]: true }));
-                                      } else {
-                                        setEditLabelCustomFor((prev) => ({ ...prev, [d.id]: false }));
-                                        updateDurationLabel(d.id, e.target.value);
-                                      }
-                                    }}
-                                    style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 13, marginBottom: isCustom ? 8 : 10, display: "block", background: "#FFF" }}
-                                  >
-                                    <option value="">No name (just a generic lesson)</option>
-                                    {LESSON_LABEL_PRESETS.map((l) => (
-                                      <option key={l} value={l}>{l}</option>
-                                    ))}
-                                    <option value="__custom__">Other - type my own…</option>
-                                  </select>
-                                  {isCustom && (
-                                    <input
-                                      key={d.id}
-                                      defaultValue={d.label || ""}
-                                      onBlur={(e) => updateDurationLabel(d.id, e.target.value)}
-                                      placeholder="Name this lesson"
-                                      style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 13, marginBottom: 10, display: "block" }}
-                                    />
-                                  )}
-                                </>
-                              );
-                            })()}
                             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: d.packages.length > 0 ? 10 : 8 }}>
                               <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{d.minutes} min</span>
                               <span style={{ fontSize: 13, color: "var(--faint)" }}>$</span>
@@ -1561,7 +1498,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
 
                   <div style={{ marginBottom: 22 }} />
 
-                  {/* Superseded by the Lesson Lengths section above - kept
+                  {/* Superseded by the Lesson Builder section above - kept
                       here, intentionally never rendered, as a dormant
                       fallback rather than deleted outright. */}
                   {false && (
@@ -1715,7 +1652,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                     CUSTOM OFFERINGS
                   </div>
                   <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 10px" }}>
-                    Anything that doesn't fit the categories above - a specific lesson length, an annual option, your own bundle. Leave a name blank to leave that slot unused.
+                    Anything that doesn't fit the categories above - a specific lesson type, an annual option, your own bundle. Leave a name blank to leave that slot unused.
                   </p>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
                     {[1, 2, 3, 4].map((slot) => {

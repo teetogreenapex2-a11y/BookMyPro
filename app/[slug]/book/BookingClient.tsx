@@ -87,7 +87,7 @@ export default function BookingClient({
   // reserved for them at the moment they pay, not before and not after.
   const [pendingPackageType, setPendingPackageType] = useState<string | null>(null);
   const [fittingType, setFittingType] = useState<string | null>(null);
-  type Duration = { id: string; minutes: number; label: string | null; singlePriceCents: number; remoteEnabled: boolean; packages: { id: string; lessonsCount: number; priceCents: number }[] };
+  type Duration = { id: string; minutes: number; singlePriceCents: number; remoteEnabled: boolean; packages: { id: string; lessonsCount: number; priceCents: number }[] };
   const [durations, setDurations] = useState<Duration[]>([]);
   const [pendingDurationId, setPendingDurationId] = useState<string | null>(null);
   const [pendingLessonsCount, setPendingLessonsCount] = useState<number | null>(null);
@@ -641,14 +641,14 @@ export default function BookingClient({
   const pendingDurationInfo = selectedDuration
     ? {
         label: (() => {
-          const base = selectedDuration.label ? `${selectedDuration.label} (${selectedDuration.minutes} min)` : `${selectedDuration.minutes} min lesson`;
+          const base = `${selectedDuration.minutes} min lesson`;
           return selectedDurationPackage ? `${base} - ${selectedDurationPackage.lessonsCount}-pack` : base;
         })(),
         priceCents: selectedDurationPackage ? selectedDurationPackage.priceCents : selectedDuration.singlePriceCents,
       }
     : null;
 
-  // Every lesson length has a single-lesson price, so "1" (single lesson)
+  // Every lesson type has a single-lesson price, so "1" (single lesson)
   // is always a real option once any duration exists at all. Beyond
   // that, only package sizes some duration actually offers show up here
   // - deduplicated, since more than one duration can share the same
@@ -929,13 +929,14 @@ export default function BookingClient({
                           fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)",
                         }}
                       >
-                        <option value="" disabled>Choose a lesson length…</option>
+                        <option value="" disabled>Choose a lesson type…</option>
                         {durationsForLessonsCount.map((d) => {
                           const priceCents = pendingLessonsCount === 1
                             ? d.singlePriceCents
                             : d.packages.find((p) => p.lessonsCount === pendingLessonsCount)!.priceCents;
+                          const packSuffix = pendingLessonsCount !== 1 ? ` (${pendingLessonsCount}-pack)` : "";
                           return (
-                            <option key={d.id} value={d.id}>{d.label ? `${d.label} - ` : ""}{d.minutes} min - {centsToDollars(priceCents)}</option>
+                            <option key={d.id} value={d.id}>{d.minutes} min - {centsToDollars(priceCents)}{packSuffix}</option>
                           );
                         })}
                       </select>

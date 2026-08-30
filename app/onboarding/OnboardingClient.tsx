@@ -10,11 +10,6 @@ const FITTING_ROWS = [
   { id: "full", label: "Full bag fitting", duration: "90 min", enabledKey: "fittingFullEnabled", priceKey: "fittingFullPriceCents" },
 ] as const;
 
-const LESSON_LABEL_PRESETS = [
-  "Single Lesson", "Video Lesson",
-  "Chipping Lesson", "Putting Lesson", "Junior Lesson", "Remote Lesson",
-];
-
 function slugifyPreview(input: string) {
   return input
     .toLowerCase()
@@ -103,8 +98,6 @@ export default function OnboardingClient() {
   // Step 2: pricing
   const [pricing, setPricing] = useState<Record<string, any> | null>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
-  const [firstLessonLabel, setFirstLessonLabel] = useState("");
-  const [firstLessonLabelCustom, setFirstLessonLabelCustom] = useState(false);
   const [firstLessonMinutes, setFirstLessonMinutes] = useState("");
   const [firstLessonPrice, setFirstLessonPrice] = useState("");
 
@@ -241,7 +234,7 @@ export default function OnboardingClient() {
         await fetch(`${apiBase}/instructors/${ownerMembershipId}/durations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ minutes, label: firstLessonLabel.trim() || null, singlePriceCents: Math.round(priceDollars * 100) }),
+          body: JSON.stringify({ minutes, singlePriceCents: Math.round(priceDollars * 100) }),
         }).catch(() => {});
       }
 
@@ -366,33 +359,6 @@ export default function OnboardingClient() {
                   Just enough to get your booking page working - add more lesson types, lengths, and packages anytime in Settings.
                 </p>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 22 }}>
-                  <select
-                    value={firstLessonLabelCustom ? "__custom__" : firstLessonLabel}
-                    onChange={(e) => {
-                      if (e.target.value === "__custom__") {
-                        setFirstLessonLabelCustom(true);
-                        setFirstLessonLabel("");
-                      } else {
-                        setFirstLessonLabelCustom(false);
-                        setFirstLessonLabel(e.target.value);
-                      }
-                    }}
-                    style={{ border: "1px solid #DDD8C8", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, background: "#FFF" }}
-                  >
-                    <option value="">No name (just a generic lesson)</option>
-                    {LESSON_LABEL_PRESETS.map((l) => (
-                      <option key={l} value={l}>{l}</option>
-                    ))}
-                    <option value="__custom__">Other - type my own…</option>
-                  </select>
-                  {firstLessonLabelCustom && (
-                    <input
-                      value={firstLessonLabel}
-                      onChange={(e) => setFirstLessonLabel(e.target.value)}
-                      placeholder="Name this lesson"
-                      style={{ border: "1px solid #DDD8C8", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14 }}
-                    />
-                  )}
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <input
                       value={firstLessonMinutes}
