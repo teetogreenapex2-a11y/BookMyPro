@@ -90,6 +90,8 @@ export default function InstructorClient({
   const [noteSlot, setNoteSlot] = useState<Slot | null>(null);
   const [lastMinuteSlot, setLastMinuteSlot] = useState<Slot | null>(null);
   const [rosterSlot, setRosterSlot] = useState<Slot | null>(null);
+  const [addToGroupPlayerId, setAddToGroupPlayerId] = useState("");
+  const [addingToGroup, setAddingToGroup] = useState(false);
   const [roster, setRoster] = useState<{ bookingId: string; name: string; phone: string | null; email: string }[] | null>(null);
   const [rosterCapacityInput, setRosterCapacityInput] = useState("");
   const [savingCapacity, setSavingCapacity] = useState(false);
@@ -544,6 +546,45 @@ export default function InstructorClient({
     loadSlots();
   }
 
+  // "Day off" - closes every open slot on this one day in a single
+  // action instead of tapping each one. Deliberately leaves booked,
+  // pending, full, and group slots untouched (both here and, as a second
+  // layer of protection, on the server) since those represent a real
+  // player commitment a bulk action has no business overriding - the
+  // instructor is warned about those rather than having them silently
+  // skipped with no explanation.
+  async function closeDayOff(dayDate: Date) {
+    const daySlots: Slot[] = [];
+    for (const time of TIMES) {
+      const [h, m] = time.split(":").map(Number);
+      const dt = wallClockToUTC(dayDate, h, m);
+      const slot = slotsByKey[dt.toISOString()];
+      if (slot) daySlots.push(slot);
+    }
+    const openSlots = daySlots.filter((s) => s.status === "open" && !s.isGroup);
+    const committedCount = daySlots.length - openSlots.length;
+    const dayLabel = dayDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+
+    if (openSlots.length === 0) {
+      alert(committedCount > 0
+        ? "Every slot this day is already booked, pending, or a group lesson - nothing open left to close."
+        : "No open slots this day to close.");
+      return;
+    }
+
+    const message = committedCount > 0
+      ? `This closes ${openSlots.length} open slot${openSlots.length === 1 ? "" : "s"} on ${dayLabel}. ${committedCount} other slot${committedCount === 1 ? " is" : "s are"} already booked, pending, or a group lesson and won't be touched. Continue?`
+      : `Close all ${openSlots.length} open slot${openSlots.length === 1 ? "" : "s"} on ${dayLabel}?`;
+    if (!confirm(message)) return;
+
+    await fetch(`${apiBase}/availability/close-day`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotIds: openSlots.map((s) => s.id), instructorMembershipId: viewingInstructorId }),
+    });
+    loadSlots();
+  }
+
   async function closeNearTermSlot() {
     if (!lastMinuteSlot) return;
     await fetch(`${apiBase}/availability`, {
@@ -580,6 +621,26 @@ export default function InstructorClient({
   }
 
   const [cancellingGroup, setCancellingGroup] = useState(false);
+
+  async function addPlayerToGroup() {
+    if (!rosterSlot || !addToGroupPlayerId) return;
+    setAddingToGroup(true);
+    const res = await fetch(`${apiBase}/availability/${rosterSlot.id}/add-to-group`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId: addToGroupPlayerId }),
+    });
+    setAddingToGroup(false);
+    if (res.ok) {
+      setAddToGroupPlayerId("");
+      const rosterRes = await fetch(`${apiBase}/availability/${rosterSlot.id}/roster`);
+      if (rosterRes.ok) setRoster((await rosterRes.json()).roster);
+      loadSlots();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Couldn't add this player.");
+    }
+  }
 
   async function cancelGroupLesson() {
     if (!rosterSlot) return;
@@ -715,9 +776,24 @@ export default function InstructorClient({
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               {!isNative && (
                 <>
-                  <a href={`${basePath}/customers`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Customers</a>
-                  <a href={`${basePath}/instructor/videos`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Swing videos</a>
-                  <a href={`${basePath}/instructor/swing-sketch`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Swing Sketch</a>
+                  <a href={`${basePath}/customers`} style={{
+                    fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                    border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                  }}>
+                    Customers
+                  </a>
+                  <a href={`${basePath}/instructor/videos`} style={{
+                    fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                    border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                  }}>
+                    Swing videos
+                  </a>
+                  <a href={`${basePath}/instructor/swing-sketch`} style={{
+                    fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                    border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                  }}>
+                    Swing Sketch
+                  </a>
                 </>
               )}
               <a href={`${basePath}/instructor/shop`} style={{
@@ -736,7 +812,12 @@ export default function InstructorClient({
                 )}
               </a>
               {!isNative && (
-                <a href={`${basePath}/settings`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Settings</a>
+                <a href={`${basePath}/settings`} style={{
+                  fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                  border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                }}>
+                  Settings
+                </a>
               )}
               <button onClick={() => signOut({ callbackUrl: "/login" })} style={{
                 background: "none", color: "#D7DED9", fontSize: 12.5, fontWeight: 600,
@@ -1213,8 +1294,21 @@ export default function InstructorClient({
               const dayDate = new Date(weekStart.getTime() + dayIdx * DAY_MS);
               return (
                 <div key={dayIdx} style={{ borderTop: dayIdx === 0 ? "none" : "1px solid #EFEBDD", padding: "10px 14px" }}>
-                  <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
-                    {dayDate.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>
+                      {dayDate.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                    </span>
+                    <button
+                      onClick={() => closeDayOff(dayDate)}
+                      title="Block the whole day off"
+                      style={{
+                        background: "none", border: "1px solid var(--border)", borderRadius: 6,
+                        width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 12, color: "var(--muted)", lineHeight: 1, padding: 0,
+                      }}
+                    >
+                      🚫
+                    </button>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {TIMES.map((time) => {
@@ -1357,6 +1451,35 @@ export default function InstructorClient({
                   </div>
                 ))}
               </div>
+            )}
+
+            {rosterSlot.status !== "full" ? (
+              <div className="no-print" style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                <select
+                  value={addToGroupPlayerId}
+                  onChange={(e) => setAddToGroupPlayerId(e.target.value)}
+                  style={{ flex: 1, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, background: "#FFF" }}
+                >
+                  <option value="">Add a player to this session...</option>
+                  {players.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name || p.email}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={addPlayerToGroup}
+                  disabled={!addToGroupPlayerId || addingToGroup}
+                  style={{
+                    background: "#5A4FCF", color: "#FFF", border: "none", borderRadius: 8, padding: "9px 14px",
+                    fontSize: 13, fontWeight: 700, opacity: !addToGroupPlayerId || addingToGroup ? 0.6 : 1,
+                  }}
+                >
+                  {addingToGroup ? "Adding..." : "Add"}
+                </button>
+              </div>
+            ) : (
+              <p className="no-print" style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 14 }}>
+                This session is full - raise the total spots below to add anyone else.
+              </p>
             )}
 
             <div className="no-print" style={{ display: "flex", alignItems: "flex-end", gap: 8, borderTop: "1px solid var(--border)", paddingTop: 12 }}>

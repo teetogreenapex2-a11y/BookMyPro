@@ -655,10 +655,16 @@ export default function BookingClient({
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {!isNative && (
                 <>
-                  <a href={`${basePath}/videos`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
+                  <a href={`${basePath}/videos`} style={{
+                    fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                    border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                  }}>
                     Swing videos
                   </a>
-                  <a href={`${basePath}/swing-sketches`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
+                  <a href={`${basePath}/swing-sketches`} style={{
+                    fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                    border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                  }}>
                     Swing Sketches
                   </a>
                 </>
@@ -685,7 +691,10 @@ export default function BookingClient({
                 )}
               </a>
               {!isNative && (
-                <a href={`${basePath}/settings`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>
+                <a href={`${basePath}/settings`} style={{
+                  fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                  border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                }}>
                   Settings
                 </a>
               )}
