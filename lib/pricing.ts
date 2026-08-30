@@ -1,52 +1,112 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, getMembership } from "@/lib/tenant";
+export const PACKAGES = [
+  { id: "single", label: "Single lesson", lessons: 1 },
+  { id: "playing", label: "Playing lesson", lessons: 1 },
+  { id: "video", label: "Video lesson", lessons: 1 },
+  { id: "three", label: "3-pack", lessons: 3 },
+  { id: "five", label: "5-pack", lessons: 5 },
+  { id: "ten", label: "10-pack", lessons: 10 },
+] as const;
 
-const EDITABLE_FIELDS = [
-  "packageSingleEnabled", "packagePlayingEnabled", "packageVideoEnabled", "packageThreeEnabled", "packageFiveEnabled", "packageTenEnabled",
-  "packageSinglePriceCents", "packagePlayingPriceCents", "packageVideoPriceCents", "packageThreePriceCents", "packageFivePriceCents", "packageTenPriceCents",
-  "fittingDriverEnabled", "fittingIronEnabled", "fittingFullEnabled",
-  "fittingDriverPriceCents", "fittingIronPriceCents", "fittingFullPriceCents",
-  "customOffering1Name", "customOffering1PriceCents",
-  "customOffering2Name", "customOffering2PriceCents",
-  "customOffering3Name", "customOffering3PriceCents",
-  "customOffering4Name", "customOffering4PriceCents",
-  "customOffering5Name", "customOffering5PriceCents",
-  "customOffering6Name", "customOffering6PriceCents",
-  "playingLesson9Enabled", "playingLesson9PriceCents",
-  "playingLesson18Enabled", "playingLesson18PriceCents",
-];
+export const FITTING_TYPES = [
+  { id: "driver", label: "Driver fitting", durationMin: 45 },
+  { id: "iron", label: "Iron fitting", durationMin: 60 },
+  { id: "full", label: "Full bag fitting", durationMin: 90 },
+] as const;
 
-// PATCH /api/{slug}/instructors/{id}/pricing
-// The owner can edit anyone's pricing; an instructor can edit their own.
-// (id here is the target instructor's Membership id, same id used
-// everywhere else — bookings, the player picker, etc.)
-export async function PATCH(req: NextRequest, { params }: { params: { slug: string; id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+export function centsToDollars(cents: number) {
+  return `$${(cents / 100).toFixed(0)}`;
+}
 
-  const business = await getBusinessBySlug(params.slug);
-  if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
+export function findPackage(id: string) {
+  return PACKAGES.find((p) => p.id === id);
+}
 
-  const requesterMembership = await getMembership((session.user as any).id, business.id);
-  const isOwner = requesterMembership?.role === "owner";
-  const isSelf = requesterMembership?.id === params.id;
-  if (!isOwner && !isSelf) {
-    return NextResponse.json({ error: "You can only edit your own pricing" }, { status: 403 });
+export function findFitting(id: string) {
+  return FITTING_TYPES.find((f) => f.id === id);
+}
+
+// Resolves a specific duration + optional package size into what's
+// actually being purchased - takes the already-fetched list of
+// durations (with their packages nested inside), since these are live,
+// per-instructor database rows an instructor can add/edit/remove at
+// any time, not a fixed set of platform constants the way the old
+// single/three/five/ten packages are. Returns null if the ids given
+// don't actually resolve to anything real for this instructor - the
+// caller should treat that as a rejected purchase attempt, never fall
+// back to a default price.
+export function resolveDurationPurchase(
+  durations: { id: string; minutes: number; label?: string | null; singlePriceCents: number; packages: { id: string; lessonsCount: number; priceCents: number }[] }[],
+  durationId: string,
+  packageOptionId?: string | null
+) {
+  const duration = durations.find((d) => d.id === durationId);
+  if (!duration) return null;
+
+  if (!packageOptionId) {
+    return { minutes: duration.minutes, label: duration.label || null, lessonsTotal: 1, priceCents: duration.singlePriceCents, packageOptionId: null as string | null };
   }
+  const option = duration.packages.find((p) => p.id === packageOptionId);
+  if (!option) return null;
+  return { minutes: duration.minutes, label: duration.label || null, lessonsTotal: option.lessonsCount, priceCents: option.priceCents, packageOptionId: option.id };
+}
 
-  // Scoped by businessId so an id from a different business can never match here.
-  const target = await prisma.membership.findFirst({
-    where: { id: params.id, businessId: business.id, role: { in: ["owner", "instructor"] } },
-  });
-  if (!target) return NextResponse.json({ error: "Instructor not found" }, { status: 404 });
+// BusinessSettings stores per-item price + enabled state under fields like
+// packageThreePriceCents / packageThreeEnabled or fittingDriverPriceCents /
+// fittingDriverEnabled. These helpers read the right field for a given id so
+// pricing is always driven by the database, never trusted from the client.
+type BusinessSettingsLike = Record<string, any>;
 
-  const body = await req.json();
-  const data: Record<string, unknown> = {};
-  for (const key of EDITABLE_FIELDS) if (key in body) data[key] = body[key];
+function fieldPrefix(kind: "package" | "fitting", id: string) {
+  return kind + id.charAt(0).toUpperCase() + id.slice(1);
+}
 
-  const updated = await prisma.membership.update({ where: { id: target.id }, data });
-  return NextResponse.json(updated);
+export function getPackagePriceCents(business: BusinessSettingsLike, packageId: string): number {
+  return business[`${fieldPrefix("package", packageId)}PriceCents`] ?? 0;
+}
+
+// A package priced at $0 isn't "free" — it means the instructor hasn't set
+// a real price yet (defaults to 0 cents until they do). Used to show "TBD"
+// to players and to block checkout until a real price is configured.
+export function isPackagePriceSet(business: BusinessSettingsLike, packageId: string): boolean {
+  return getPackagePriceCents(business, packageId) > 0;
+}
+
+export function isPackageEnabled(business: BusinessSettingsLike, packageId: string): boolean {
+  return business[`${fieldPrefix("package", packageId)}Enabled`] ?? false;
+}
+
+export function enabledPackages(business: BusinessSettingsLike) {
+  return PACKAGES.filter((p) => isPackageEnabled(business, p.id)).map((p) => ({
+    ...p,
+    priceCents: getPackagePriceCents(business, p.id),
+  }));
+}
+
+export function getFittingPriceCents(business: BusinessSettingsLike, fittingId: string): number {
+  return business[`${fieldPrefix("fitting", fittingId)}PriceCents`] ?? 0;
+}
+
+export function isFittingEnabled(business: BusinessSettingsLike, fittingId: string): boolean {
+  return business[`${fieldPrefix("fitting", fittingId)}Enabled`] ?? false;
+}
+
+export function enabledFittings(business: BusinessSettingsLike) {
+  return FITTING_TYPES.filter((f) => isFittingEnabled(business, f.id)).map((f) => ({
+    ...f,
+    priceCents: getFittingPriceCents(business, f.id),
+  }));
+}
+
+// Custom offerings don't have a fixed id/label the way packages and
+// fittings do - each instructor names their own, so a slot is simply
+// "in use" whenever it has a name at all, with no separate enabled flag.
+export function customOfferings(membership: BusinessSettingsLike) {
+  const slots: { slot: number; name: string; priceCents: number }[] = [];
+  for (let i = 1; i <= 4; i++) {
+    const name = membership[`customOffering${i}Name`];
+    if (typeof name === "string" && name.trim()) {
+      slots.push({ slot: i, name: name.trim(), priceCents: membership[`customOffering${i}PriceCents`] ?? 0 });
+    }
+  }
+  return slots;
 }
