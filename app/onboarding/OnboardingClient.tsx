@@ -4,20 +4,16 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import "./onboarding.css";
 
-const PACKAGE_ROWS = [
-  { id: "single", label: "Single lesson", lessons: 1, enabledKey: "packageSingleEnabled", priceKey: "packageSinglePriceCents" },
-  { id: "playing", label: "Playing lesson", lessons: 1, enabledKey: "packagePlayingEnabled", priceKey: "packagePlayingPriceCents" },
-  { id: "video", label: "Video lesson", lessons: 1, enabledKey: "packageVideoEnabled", priceKey: "packageVideoPriceCents" },
-  { id: "three", label: "3-pack", lessons: 3, enabledKey: "packageThreeEnabled", priceKey: "packageThreePriceCents" },
-  { id: "five", label: "5-pack", lessons: 5, enabledKey: "packageFiveEnabled", priceKey: "packageFivePriceCents" },
-  { id: "ten", label: "10-pack", lessons: 10, enabledKey: "packageTenEnabled", priceKey: "packageTenPriceCents" },
-] as const;
-
 const FITTING_ROWS = [
   { id: "driver", label: "Driver fitting", duration: "45 min", enabledKey: "fittingDriverEnabled", priceKey: "fittingDriverPriceCents" },
   { id: "iron", label: "Iron fitting", duration: "60 min", enabledKey: "fittingIronEnabled", priceKey: "fittingIronPriceCents" },
   { id: "full", label: "Full bag fitting", duration: "90 min", enabledKey: "fittingFullEnabled", priceKey: "fittingFullPriceCents" },
 ] as const;
+
+const LESSON_LABEL_PRESETS = [
+  "Single Lesson", "Playing Lesson/9", "Playing Lesson/18", "Video Lesson",
+  "Chipping Lesson", "Putting Lesson", "Junior Lesson", "Remote Lesson",
+];
 
 function slugifyPreview(input: string) {
   return input
@@ -107,6 +103,10 @@ export default function OnboardingClient() {
   // Step 2: pricing
   const [pricing, setPricing] = useState<Record<string, any> | null>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
+  const [firstLessonLabel, setFirstLessonLabel] = useState("");
+  const [firstLessonLabelCustom, setFirstLessonLabelCustom] = useState(false);
+  const [firstLessonMinutes, setFirstLessonMinutes] = useState("");
+  const [firstLessonPrice, setFirstLessonPrice] = useState("");
 
   // Step 3: team
   const [team, setTeam] = useState<{ id: string; name: string; email: string }[]>([]);
@@ -234,6 +234,17 @@ export default function OnboardingClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pricing),
       }).catch(() => {});
+
+      const minutes = parseInt(firstLessonMinutes, 10);
+      const priceDollars = parseFloat(firstLessonPrice);
+      if (Number.isInteger(minutes) && minutes > 0 && !isNaN(priceDollars) && priceDollars >= 0) {
+        await fetch(`${apiBase}/instructors/${ownerMembershipId}/durations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ minutes, label: firstLessonLabel.trim() || null, singlePriceCents: Math.round(priceDollars * 100) }),
+        }).catch(() => {});
+      }
+
       setSubmitting(false);
     }
     setStep(3);
@@ -350,19 +361,55 @@ export default function OnboardingClient() {
               <p style={{ fontSize: 13, color: "#8A8571" }}>Loading…</p>
             ) : (
               <>
-                <div className="ob-mono" style={{ fontSize: 10, fontWeight: 700, color: "#8A8571", letterSpacing: "0.04em", marginBottom: 8 }}>LESSON PACKAGES</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
-                  {PACKAGE_ROWS.map((row) => (
-                    <ToggleRow
-                      key={row.id}
-                      label={row.label}
-                      sub={`${row.lessons} lessons`}
-                      enabled={pricing[row.enabledKey]}
-                      onToggle={() => setPricing((p) => p && ({ ...p, [row.enabledKey]: !p[row.enabledKey] }))}
-                      priceCents={pricing[row.priceKey]}
-                      onPrice={(cents) => setPricing((p) => p && ({ ...p, [row.priceKey]: cents }))}
+                <div className="ob-mono" style={{ fontSize: 10, fontWeight: 700, color: "#8A8571", letterSpacing: "0.04em", marginBottom: 8 }}>YOUR FIRST LESSON</div>
+                <p style={{ fontSize: 12.5, color: "#8A8571", margin: "0 0 12px" }}>
+                  Just enough to get your booking page working - add more lesson types, lengths, and packages anytime in Settings.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 22 }}>
+                  <select
+                    value={firstLessonLabelCustom ? "__custom__" : firstLessonLabel}
+                    onChange={(e) => {
+                      if (e.target.value === "__custom__") {
+                        setFirstLessonLabelCustom(true);
+                        setFirstLessonLabel("");
+                      } else {
+                        setFirstLessonLabelCustom(false);
+                        setFirstLessonLabel(e.target.value);
+                      }
+                    }}
+                    style={{ border: "1px solid #DDD8C8", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, background: "#FFF" }}
+                  >
+                    <option value="">No name (just a generic lesson)</option>
+                    {LESSON_LABEL_PRESETS.map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                    <option value="__custom__">Other - type my own…</option>
+                  </select>
+                  {firstLessonLabelCustom && (
+                    <input
+                      value={firstLessonLabel}
+                      onChange={(e) => setFirstLessonLabel(e.target.value)}
+                      placeholder="Name this lesson"
+                      style={{ border: "1px solid #DDD8C8", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14 }}
                     />
-                  ))}
+                  )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      value={firstLessonMinutes}
+                      onChange={(e) => setFirstLessonMinutes(e.target.value)}
+                      placeholder="Minutes"
+                      inputMode="numeric"
+                      style={{ width: 100, border: "1px solid #DDD8C8", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14 }}
+                    />
+                    <span style={{ fontSize: 13, color: "#8A8571" }}>min, $</span>
+                    <input
+                      value={firstLessonPrice}
+                      onChange={(e) => setFirstLessonPrice(e.target.value)}
+                      placeholder="Price"
+                      inputMode="numeric"
+                      style={{ width: 90, border: "1px solid #DDD8C8", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14 }}
+                    />
+                  </div>
                 </div>
 
                 <div className="ob-mono" style={{ fontSize: 10, fontWeight: 700, color: "#8A8571", letterSpacing: "0.04em", marginBottom: 8 }}>CLUB FITTINGS</div>
