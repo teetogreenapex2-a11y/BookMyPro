@@ -91,6 +91,7 @@ export default function BookingClient({
   const [durations, setDurations] = useState<Duration[]>([]);
   const [pendingDurationId, setPendingDurationId] = useState<string | null>(null);
   const [pendingLessonsCount, setPendingLessonsCount] = useState<number | null>(null);
+  const [pendingCustomOfferingSlot, setPendingCustomOfferingSlot] = useState<number | null>(null);
   const [pendingPlayingLessonHoles, setPendingPlayingLessonHoles] = useState<9 | 18 | null>(null);
   const [playingLessonMode, setPlayingLessonMode] = useState(false);
   const [playingLessonPreferredDate, setPlayingLessonPreferredDate] = useState("");
@@ -550,14 +551,16 @@ export default function BookingClient({
 
   async function buyPackageAndBookSlot() {
     if (!selected || !selectedInstructorId || !contactValid()) return;
-    if (!pendingPackageType && !pendingDurationId) return;
+    if (!pendingPackageType && !pendingDurationId && !pendingCustomOfferingSlot) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
     const res = await fetch(`${apiBase}/packages/checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...(pendingDurationId
+        ...(pendingCustomOfferingSlot
+          ? { customOfferingSlot: pendingCustomOfferingSlot }
+          : pendingDurationId
           ? { durationId: pendingDurationId, packageOptionId: pendingDurationPackageId }
           : { packageType: pendingPackageType }),
         availabilityId: selected.id,
@@ -665,6 +668,23 @@ export default function BookingClient({
     ? durations
     : durations.filter((d) => d.packages.some((p) => p.lessonsCount === pendingLessonsCount));
 
+  // An instructor's custom offerings (see Membership.customOffering1-6 in
+  // schema.prisma) - standalone, flat-priced items with no duration or
+  // package nesting, so picking one completes the selection directly
+  // rather than needing a second dropdown the way a lesson length does.
+  const activeCustomOfferings = selectedInstructor
+    ? [1, 2, 3, 4, 5, 6]
+        .map((slot) => ({
+          slot,
+          name: selectedInstructor[`customOffering${slot}Name`] as string | null,
+          priceCents: selectedInstructor[`customOffering${slot}PriceCents`] as number | null,
+        }))
+        .filter((o) => !!o.name)
+    : [];
+  const selectedCustomOffering = pendingCustomOfferingSlot
+    ? activeCustomOfferings.find((o) => o.slot === pendingCustomOfferingSlot) || null
+    : null;
+
   // The "Video lesson" package is inherently remote - no need to also flip
   // a separate toggle for it. Any other package still goes through the
   // toggle normally (a player can take a regular lesson remotely too).
@@ -676,9 +696,12 @@ export default function BookingClient({
     ? { ...FITTING_TYPES.find((f) => f.id === fittingType)!, priceCents: getFittingPriceCents(selectedInstructor, fittingType) }
     : null;
   // Either an owned package with credits, or a tier chosen to buy - either is enough to pick a slot, but only once an instructor is chosen too.
-  const canPickLessonSlot = !!selectedInstructorId && ((!!selectedPackage && (selectedPackage.rawLessonsRemaining ?? selectedPackage.lessonsRemaining) > 0) || !!pendingPackageType || !!pendingDurationId);
-  const isBuyingPackage = !selectedPackage && (!!pendingPackageType || !!pendingDurationId);
-  const pendingPurchaseInfo = pendingPackageInfo || pendingDurationInfo;
+  const canPickLessonSlot = !!selectedInstructorId && ((!!selectedPackage && (selectedPackage.rawLessonsRemaining ?? selectedPackage.lessonsRemaining) > 0) || !!pendingPackageType || !!pendingDurationId || !!pendingCustomOfferingSlot);
+  const isBuyingPackage = !selectedPackage && (!!pendingPackageType || !!pendingDurationId || !!pendingCustomOfferingSlot);
+  const pendingCustomOfferingInfo = selectedCustomOffering
+    ? { label: selectedCustomOffering.name!, priceCents: selectedCustomOffering.priceCents ?? 0 }
+    : null;
+  const pendingPurchaseInfo = pendingPackageInfo || pendingDurationInfo || pendingCustomOfferingInfo;
 
   useEffect(() => {
     if (fittingType && selectedInstructor) {
@@ -893,12 +916,20 @@ export default function BookingClient({
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 320 }}>
                     <select
-                      value={pendingLessonsCount ?? ""}
+                      value={pendingCustomOfferingSlot ? `custom-${pendingCustomOfferingSlot}` : (pendingLessonsCount ?? "")}
                       onChange={(e) => {
-                        const count = Number(e.target.value);
-                        setPendingLessonsCount(count);
-                        setPendingDurationId(null);
-                        setPendingDurationPackageId(null);
+                        const value = e.target.value;
+                        if (value.startsWith("custom-")) {
+                          setPendingCustomOfferingSlot(Number(value.replace("custom-", "")));
+                          setPendingLessonsCount(null);
+                          setPendingDurationId(null);
+                          setPendingDurationPackageId(null);
+                        } else {
+                          setPendingLessonsCount(Number(value));
+                          setPendingCustomOfferingSlot(null);
+                          setPendingDurationId(null);
+                          setPendingDurationPackageId(null);
+                        }
                       }}
                       style={{
                         border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px",
@@ -908,6 +939,9 @@ export default function BookingClient({
                       <option value="" disabled>Choose an option…</option>
                       {availableLessonsCounts.map((count) => (
                         <option key={count} value={count}>{count === 1 ? "Single lesson" : `${count}-pack`}</option>
+                      ))}
+                      {activeCustomOfferings.map((o) => (
+                        <option key={`custom-${o.slot}`} value={`custom-${o.slot}`}>{o.name} - {centsToDollars(o.priceCents ?? 0)}</option>
                       ))}
                     </select>
 

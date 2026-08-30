@@ -275,6 +275,10 @@ model Membership {
   customOffering3PriceCents Int?
   customOffering4Name       String?
   customOffering4PriceCents Int?
+  customOffering5Name       String?
+  customOffering5PriceCents Int?
+  customOffering6Name       String?
+  customOffering6PriceCents Int?
 
   @@unique([userId, businessId])
 }

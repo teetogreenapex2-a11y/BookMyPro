@@ -59,20 +59,21 @@ export async function POST(req: NextRequest) {
   const businessId = pending.businessId;
 
   if (pending.kind === "package" && pending.packageType) {
+    const isCustomPurchase = pending.packageType === "custom";
     const isDurationPurchase = pending.packageType === "duration";
-    const pkg = isDurationPurchase ? null : findPackage(pending.packageType);
-    if (isDurationPurchase || pkg) {
+    const pkg = (isCustomPurchase || isDurationPurchase) ? null : findPackage(pending.packageType);
+    if (isCustomPurchase || isDurationPurchase || pkg) {
       await ensureMembership(pending.userId, businessId, "player");
       const createdPackage = await prisma.package.create({
         data: {
           businessId,
           userId: pending.userId,
           instructorMembershipId: pending.instructorMembershipId,
-          type: isDurationPurchase ? "duration" : pkg!.id,
+          type: isCustomPurchase ? "custom" : isDurationPurchase ? "duration" : pkg!.id,
           durationMinutes: isDurationPurchase ? pending.durationMinutes : null,
-          durationLabel: isDurationPurchase ? pending.durationLabel : null,
-          lessonsTotal: isDurationPurchase ? (pending.lessonsTotal ?? 1) : pkg!.lessons,
-          lessonsRemaining: isDurationPurchase ? (pending.lessonsTotal ?? 1) : pkg!.lessons,
+          durationLabel: (isDurationPurchase || isCustomPurchase) ? pending.durationLabel : null,
+          lessonsTotal: (isDurationPurchase || isCustomPurchase) ? (pending.lessonsTotal ?? 1) : pkg!.lessons,
+          lessonsRemaining: (isDurationPurchase || isCustomPurchase) ? (pending.lessonsTotal ?? 1) : pkg!.lessons,
           pricePaidCents: payment.amount_money?.amount ?? 0,
           squareOrderId: orderId,
         },

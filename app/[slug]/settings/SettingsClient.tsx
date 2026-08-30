@@ -1655,7 +1655,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                     Anything that doesn't fit the categories above - a specific lesson type, an annual option, your own bundle. Leave a name blank to leave that slot unused.
                   </p>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
-                    {[1, 2, 3, 4].map((slot) => {
+                    {[1, 2, 3, 4, 5, 6].map((slot) => {
                       const nameKey = `customOffering${slot}Name`;
                       const priceKey = `customOffering${slot}PriceCents`;
                       const name = instructorPricing[nameKey] || "";

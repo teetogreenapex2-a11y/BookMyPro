@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
-  const { packageType, durationId, packageOptionId, availabilityId, instructorMembershipId, contactName, contactPhone, contactEmail, isRemote: submittedIsRemote } = await req.json();
+  const { packageType, durationId, packageOptionId, customOfferingSlot, availabilityId, instructorMembershipId, contactName, contactPhone, contactEmail, isRemote: submittedIsRemote } = await req.json();
 
   // Pricing is per-instructor now, not business-wide — every package
   // purchase needs to know who it's with in order to know what to charge,
@@ -40,7 +40,33 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // creation) doesn't need to know or care which path produced it.
   let purchase: { label: string; priceCents: number; lessonsTotal: number; packageTypeForDb: string; packageOptionIdForDb: string | null; durationMinutesForDb: number | null; durationLabelForDb: string | null; isRemote: boolean };
 
-  if (durationId) {
+  if (customOfferingSlot) {
+    // A standalone, flat-priced item an instructor defined themselves
+    // (see Membership.customOffering1-6 in schema.prisma) - always
+    // trust only the instructor's own current name/price for this slot,
+    // never anything the client claims, the same way every other path
+    // here re-derives price server-side rather than accepting it from
+    // the request.
+    const slot = Number(customOfferingSlot);
+    if (!Number.isInteger(slot) || slot < 1 || slot > 6) {
+      return NextResponse.json({ error: "Invalid offering" }, { status: 400 });
+    }
+    const name = (instructorMembership as any)[`customOffering${slot}Name`] as string | null;
+    const priceCents = (instructorMembership as any)[`customOffering${slot}PriceCents`] as number | null;
+    if (!name) {
+      return NextResponse.json({ error: "That offering is no longer available" }, { status: 400 });
+    }
+    purchase = {
+      label: name,
+      priceCents: priceCents ?? 0,
+      lessonsTotal: 1,
+      packageTypeForDb: "custom",
+      packageOptionIdForDb: null,
+      durationMinutesForDb: null,
+      durationLabelForDb: name,
+      isRemote: !!submittedIsRemote,
+    };
+  } else if (durationId) {
     // The new, instructor-defined lesson-length system (see
     // LessonDuration/LessonPackageOption in schema.prisma) - only used
     // once an instructor has actually set up durations of their own;
