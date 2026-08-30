@@ -57,7 +57,7 @@ export default async function BookPage({ params }: { params: { slug: string } })
   let instructorDisplayName = business.instructorName;
   if (!instructorDisplayName) {
     const instructorMembership = await prisma.membership.findFirst({
-      where: { businessId: business.id, role: { in: ["owner", "instructor"] } },
+      where: { businessId: business.id, role: { in: ["owner", "instructor"] }, hiddenFromBooking: false, status: "active" },
       include: { user: { select: { name: true } } },
     });
     instructorDisplayName = instructorMembership?.user.name || null;

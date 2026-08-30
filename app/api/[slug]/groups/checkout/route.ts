@@ -17,6 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       isGroup: true,
       status: "open", // excludes full and closed - only genuinely joinable sessions show here
       startTime: { gte: new Date() },
+      instructor: { hiddenFromBooking: false },
     },
     include: {
       instructor: { include: { user: { select: { name: true } } } },

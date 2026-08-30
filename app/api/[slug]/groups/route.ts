@@ -17,6 +17,11 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       isGroup: true,
       status: "open", // excludes full and closed - only genuinely joinable sessions show here
       startTime: { gte: new Date() },
+      // A hidden instructor's individual lesson slots are already kept
+      // out of the player-facing instructor list (see /instructors) -
+      // this route was the one place that same rule wasn't being applied,
+      // letting a hidden instructor's group lesson slip through anyway.
+      instructor: { hiddenFromBooking: false },
     },
     include: {
       instructor: { include: { user: { select: { name: true } } } },
