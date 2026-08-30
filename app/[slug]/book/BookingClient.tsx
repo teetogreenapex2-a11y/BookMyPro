@@ -709,9 +709,15 @@ export default function BookingClient({
           <h1 className="display" style={{ fontSize: 26, margin: "0 0 4px" }}>
             {service === "lesson" ? "Book a lesson" : "Book a club fitting"}
           </h1>
-          {business.instructorName && instructors.length <= 1 && (
+          {business.instructorName && instructors.length === 1 && (
             <p style={{ fontSize: 16, fontWeight: 600, color: "#D7DED9", margin: "0 0 14px" }}>
               with {business.instructorName}
+            </p>
+          )}
+
+          {instructors.length === 0 && (
+            <p style={{ fontSize: 14, color: "#D7DED9", margin: "0 0 14px" }}>
+              This business doesn't have anyone available for booking right now.
             </p>
           )}
 
