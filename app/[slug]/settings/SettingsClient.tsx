@@ -1468,6 +1468,11 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
 
                   <div style={{ marginBottom: 22 }} />
 
+                  {/* Superseded by the Lesson Lengths section above - kept
+                      here, intentionally never rendered, as a dormant
+                      fallback rather than deleted outright. */}
+                  {false && (
+                  <>
                   <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 8 }}>
                     LESSON PACKAGES
                   </div>
@@ -1518,6 +1523,8 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                       );
                     })}
                   </div>
+                  </>
+                  )}
 
                   <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 8 }}>
                     CLUB FITTINGS
