@@ -63,7 +63,7 @@ export default function BookingClient({
     return times;
   }, [business.openHour, business.closeHour]);
 
-  const [service, setService] = useState<"lesson" | "fitting">("lesson");
+  const [service, setService] = useState<"lesson" | "fitting" | "group">("lesson");
   // Checking Capacitor.isNativePlatform() directly during render caused a
   // hydration mismatch elsewhere tonight (the server always renders as if
   // it's not native, since it has no way to know) - starting this state
@@ -703,8 +703,8 @@ export default function BookingClient({
             </p>
           ) : (
             <>
-          <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-            {(["lesson", "fitting"] as const).map((s) => (
+          <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+            {(["lesson", "fitting", ...(upcomingGroups.length > 0 ? ["group"] : [])] as ("lesson" | "fitting" | "group")[]).map((s) => (
               <button
                 key={s}
                 onClick={() => { setService(s); setSelected(null); }}
@@ -715,7 +715,7 @@ export default function BookingClient({
                   color: "var(--chalk)",
                 }}
               >
-                {s === "lesson" ? "Lesson" : "Club fitting"}
+                {s === "lesson" ? "Lesson" : s === "fitting" ? "Club fitting" : "Group lessons"}
               </button>
             ))}
           </div>
@@ -846,7 +846,7 @@ export default function BookingClient({
           </div>
         )}
 
-        {upcomingGroups.length > 0 && (() => {
+        {service === "group" && upcomingGroups.length > 0 && (() => {
           const filteredGroups = upcomingGroups.filter((g) => {
             if (groupFilter === "all") return true;
             if (groupFilter === "junior") return g.groupCategory === "junior_younger" || g.groupCategory === "junior_older";
