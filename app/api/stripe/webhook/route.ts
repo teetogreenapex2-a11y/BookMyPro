@@ -57,17 +57,30 @@ export async function POST(req: NextRequest) {
     }
 
     if (meta.kind === "package") {
-      const pkg = findPackage(meta.packageType);
-      if (pkg) {
+      // "duration" is the new, instructor-defined lesson-length system
+      // (see LessonDuration/LessonPackageOption in schema.prisma) - the
+      // pkg-lookup path below it is the original, fixed-tier system,
+      // completely unchanged, and still the only path for any instructor
+      // who hasn't set up their own durations.
+      const isDurationPurchase = meta.packageType === "duration";
+      const pkg = isDurationPurchase ? null : findPackage(meta.packageType);
+      if (isDurationPurchase || pkg) {
         await ensureMembership(meta.userId, businessId, "player");
         const createdPackage = await prisma.package.create({
           data: {
             businessId,
             userId: meta.userId,
             instructorMembershipId: meta.instructorMembershipId || null,
-            type: pkg.id,
-            lessonsTotal: pkg.lessons,
-            lessonsRemaining: pkg.lessons,
+            type: isDurationPurchase ? "duration" : pkg!.id,
+            durationMinutes: isDurationPurchase && meta.durationMinutes ? parseInt(meta.durationMinutes, 10) : null,
+            // For a duration purchase, lessonsTotal has to come from
+            // Stripe's own line item quantity/amount rather than a
+            // static lookup - the actual count was already validated
+            // server-side when the checkout session was created, so the
+            // amount actually charged is what's trusted here, same as
+            // the existing system already does via session.amount_total.
+            lessonsTotal: isDurationPurchase ? (meta.lessonsTotal ? parseInt(meta.lessonsTotal, 10) : 1) : pkg!.lessons,
+            lessonsRemaining: isDurationPurchase ? (meta.lessonsTotal ? parseInt(meta.lessonsTotal, 10) : 1) : pkg!.lessons,
             pricePaidCents: session.amount_total ?? 0,
             stripeSessionId: session.id,
           },

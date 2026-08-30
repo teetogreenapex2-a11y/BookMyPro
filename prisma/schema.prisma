@@ -344,7 +344,11 @@ model Package {
   // Nullable for backward compatibility with packages that predate this field.
   instructor       Membership? @relation(fields: [instructorMembershipId], references: [id])
   instructorMembershipId String?
-  type             String    // single | three | five | ten
+  type             String    // single | three | five | ten | duration (this last one is the new, instructor-defined lesson-length system)
+  // A snapshot of the lesson length purchased, only set for type "duration" -
+  // captured at purchase time so it stays accurate even if the instructor
+  // later edits or removes the LessonDuration it came from.
+  durationMinutes  Int?
   lessonsTotal     Int
   lessonsRemaining Int
   pricePaidCents   Int       // the full listed price of this package, before any credit
@@ -730,6 +734,12 @@ model PendingSquarePayment {
   userId        String
   kind          String   // "package" | "fitting" | "group"
   packageType   String?
+  // Only set for the new, instructor-defined lesson-length system (see
+  // LessonDuration/LessonPackageOption) - packageType is "duration" in
+  // that case, and these two carry the rest of what's actually needed.
+  packageOptionId String?
+  durationMinutes Int?
+  lessonsTotal    Int?
   availabilityId String?
   fittingType   String?
   contactName   String?

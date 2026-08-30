@@ -25,6 +25,31 @@ export function findFitting(id: string) {
   return FITTING_TYPES.find((f) => f.id === id);
 }
 
+// Resolves a specific duration + optional package size into what's
+// actually being purchased - takes the already-fetched list of
+// durations (with their packages nested inside), since these are live,
+// per-instructor database rows an instructor can add/edit/remove at
+// any time, not a fixed set of platform constants the way the old
+// single/three/five/ten packages are. Returns null if the ids given
+// don't actually resolve to anything real for this instructor - the
+// caller should treat that as a rejected purchase attempt, never fall
+// back to a default price.
+export function resolveDurationPurchase(
+  durations: { id: string; minutes: number; singlePriceCents: number; packages: { id: string; lessonsCount: number; priceCents: number }[] }[],
+  durationId: string,
+  packageOptionId?: string | null
+) {
+  const duration = durations.find((d) => d.id === durationId);
+  if (!duration) return null;
+
+  if (!packageOptionId) {
+    return { minutes: duration.minutes, lessonsTotal: 1, priceCents: duration.singlePriceCents, packageOptionId: null as string | null };
+  }
+  const option = duration.packages.find((p) => p.id === packageOptionId);
+  if (!option) return null;
+  return { minutes: duration.minutes, lessonsTotal: option.lessonsCount, priceCents: option.priceCents, packageOptionId: option.id };
+}
+
 // BusinessSettings stores per-item price + enabled state under fields like
 // packageThreePriceCents / packageThreeEnabled or fittingDriverPriceCents /
 // fittingDriverEnabled. These helpers read the right field for a given id so
@@ -70,4 +95,18 @@ export function enabledFittings(business: BusinessSettingsLike) {
     ...f,
     priceCents: getFittingPriceCents(business, f.id),
   }));
+}
+
+// Custom offerings don't have a fixed id/label the way packages and
+// fittings do - each instructor names their own, so a slot is simply
+// "in use" whenever it has a name at all, with no separate enabled flag.
+export function customOfferings(membership: BusinessSettingsLike) {
+  const slots: { slot: number; name: string; priceCents: number }[] = [];
+  for (let i = 1; i <= 4; i++) {
+    const name = membership[`customOffering${i}Name`];
+    if (typeof name === "string" && name.trim()) {
+      slots.push({ slot: i, name: name.trim(), priceCents: membership[`customOffering${i}PriceCents`] ?? 0 });
+    }
+  }
+  return slots;
 }

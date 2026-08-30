@@ -6,7 +6,7 @@ import { createSquarePaymentLink } from "@/lib/square";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getInstructorById } from "@/lib/tenant";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
-import { findPackage, getPackagePriceCents, isPackageEnabled, isPackagePriceSet } from "@/lib/pricing";
+import { findPackage, getPackagePriceCents, isPackageEnabled, isPackagePriceSet, resolveDurationPurchase } from "@/lib/pricing";
 
 // POST /api/{slug}/packages/checkout  { packageType, availabilityId?, contactName?, contactPhone?, contactEmail? }
 // Routes to Stripe or Square depending on which payment provider the
@@ -22,18 +22,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
-  const { packageType, availabilityId, instructorMembershipId, contactName, contactPhone, contactEmail, isRemote: submittedIsRemote } = await req.json();
-  const pkg = findPackage(packageType);
-  if (!pkg) return NextResponse.json({ error: "Unknown package type" }, { status: 400 });
-  if (pkg.id === "video" && !business.dailyApiKey) {
-    return NextResponse.json({ error: "This business hasn't set up remote lessons yet" }, { status: 400 });
-  }
-  // The "video" package is inherently remote regardless of what the client
-  // sent — derived server-side so this can't be spoofed or forgotten.
-  const isRemote = pkg.id === "video" || !!submittedIsRemote;
+  const { packageType, durationId, packageOptionId, availabilityId, instructorMembershipId, contactName, contactPhone, contactEmail, isRemote: submittedIsRemote } = await req.json();
 
   // Pricing is per-instructor now, not business-wide — every package
-  // purchase needs to know who it's with in order to know what to charge.
+  // purchase needs to know who it's with in order to know what to charge,
+  // for either path below.
   if (!instructorMembershipId) {
     return NextResponse.json({ error: "Choose which instructor you're booking with" }, { status: 400 });
   }
@@ -42,12 +35,59 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "That instructor isn't available at this business" }, { status: 400 });
   }
 
-  if (!isPackageEnabled(instructorMembership, pkg.id)) {
-    return NextResponse.json({ error: "This package isn't currently offered by this instructor" }, { status: 400 });
+  // What's actually being purchased - resolved into one common shape
+  // either way, so everything below (slot check, Stripe/Square session
+  // creation) doesn't need to know or care which path produced it.
+  let purchase: { label: string; priceCents: number; lessonsTotal: number; packageTypeForDb: string; packageOptionIdForDb: string | null; durationMinutesForDb: number | null; isRemote: boolean };
+
+  if (durationId) {
+    // The new, instructor-defined lesson-length system (see
+    // LessonDuration/LessonPackageOption in schema.prisma) - only used
+    // once an instructor has actually set up durations of their own;
+    // the packageType path below is untouched and remains the fallback
+    // for every instructor who hasn't.
+    const durations = await prisma.lessonDuration.findMany({
+      where: { membershipId: instructorMembershipId },
+      include: { packages: true },
+    });
+    const resolved = resolveDurationPurchase(durations, durationId, packageOptionId || null);
+    if (!resolved) {
+      return NextResponse.json({ error: "That lesson option is no longer available" }, { status: 400 });
+    }
+    purchase = {
+      label: resolved.lessonsTotal > 1 ? `${resolved.minutes}-min lesson (${resolved.lessonsTotal}-pack)` : `${resolved.minutes}-min lesson`,
+      priceCents: resolved.priceCents,
+      lessonsTotal: resolved.lessonsTotal,
+      packageTypeForDb: "duration",
+      packageOptionIdForDb: resolved.packageOptionId,
+      durationMinutesForDb: resolved.minutes,
+      isRemote: !!submittedIsRemote,
+    };
+  } else {
+    const pkg = findPackage(packageType);
+    if (!pkg) return NextResponse.json({ error: "Unknown package type" }, { status: 400 });
+    if (pkg.id === "video" && !business.dailyApiKey) {
+      return NextResponse.json({ error: "This business hasn't set up remote lessons yet" }, { status: 400 });
+    }
+    if (!isPackageEnabled(instructorMembership, pkg.id)) {
+      return NextResponse.json({ error: "This package isn't currently offered by this instructor" }, { status: 400 });
+    }
+    if (!isPackagePriceSet(instructorMembership, pkg.id)) {
+      return NextResponse.json({ error: "This package doesn't have a price set yet — contact the business" }, { status: 400 });
+    }
+    purchase = {
+      label: pkg.label,
+      priceCents: getPackagePriceCents(instructorMembership, pkg.id),
+      lessonsTotal: pkg.lessons,
+      packageTypeForDb: pkg.id,
+      packageOptionIdForDb: null,
+      durationMinutesForDb: null,
+      // The "video" package is inherently remote regardless of what the
+      // client sent — derived server-side so this can't be spoofed or forgotten.
+      isRemote: pkg.id === "video" || !!submittedIsRemote,
+    };
   }
-  if (!isPackagePriceSet(instructorMembership, pkg.id)) {
-    return NextResponse.json({ error: "This package doesn't have a price set yet — contact the business" }, { status: 400 });
-  }
+  const isRemote = purchase.isRemote;
 
   // If a slot was picked, confirm it's still real and open before sending
   // the player to pay — scoped by businessId so an id from a different
@@ -62,7 +102,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
   }
 
-  const priceCents = getPackagePriceCents(instructorMembership, pkg.id);
+  const priceCents = purchase.priceCents;
   const userId = (session.user as any).id;
 
   if (business.paymentProvider === "square") {
@@ -75,7 +115,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         businessId: business.id,
         userId,
         kind: "package",
-        packageType: pkg.id,
+        packageType: purchase.packageTypeForDb,
+        packageOptionId: purchase.packageOptionIdForDb,
+        durationMinutes: purchase.durationMinutesForDb,
+        lessonsTotal: purchase.lessonsTotal,
         availabilityId: availabilityId || null,
         instructorMembershipId: instructorMembershipId || null,
         contactName: contactName?.trim() || null,
@@ -88,7 +131,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     try {
       const url = await createSquarePaymentLink(business.squareAccessToken, {
         amountCents: priceCents,
-        name: `${pkg.label} — ${business.name}`,
+        name: `${purchase.label} — ${business.name}`,
         referenceId: pending.id,
         redirectUrl: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=success"),
       });
@@ -121,7 +164,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         {
           price_data: {
             currency: "usd",
-            product_data: { name: `${pkg.label} — ${business.name}` },
+            product_data: { name: `${purchase.label} — ${business.name}` },
             unit_amount: priceCents,
           },
           quantity: 1,
@@ -131,7 +174,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         kind: "package",
         userId,
         businessId: business.id,
-        packageType: pkg.id,
+        packageType: purchase.packageTypeForDb,
+        packageOptionId: purchase.packageOptionIdForDb || "",
+        durationMinutes: purchase.durationMinutesForDb ? String(purchase.durationMinutesForDb) : "",
+        lessonsTotal: String(purchase.lessonsTotal),
         availabilityId: availabilityId || "",
         instructorMembershipId: instructorMembershipId || "",
         contactName: contactName?.trim() || "",

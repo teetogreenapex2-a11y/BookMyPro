@@ -87,6 +87,10 @@ export default function BookingClient({
   // reserved for them at the moment they pay, not before and not after.
   const [pendingPackageType, setPendingPackageType] = useState<string | null>(null);
   const [fittingType, setFittingType] = useState<string | null>(null);
+  type Duration = { id: string; minutes: number; singlePriceCents: number; remoteEnabled: boolean; packages: { id: string; lessonsCount: number; priceCents: number }[] };
+  const [durations, setDurations] = useState<Duration[]>([]);
+  const [pendingDurationId, setPendingDurationId] = useState<string | null>(null);
+  const [pendingDurationPackageId, setPendingDurationPackageId] = useState<string | null>(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
@@ -300,6 +304,16 @@ export default function BookingClient({
   }, []);
 
   useEffect(() => {
+    if (!selectedInstructorId) { setDurations([]); return; }
+    setPendingDurationId(null);
+    setPendingDurationPackageId(null);
+    fetch(`${apiBase}/instructors/${selectedInstructorId}/durations`)
+      .then((r) => r.json())
+      .then((list) => setDurations(Array.isArray(list) ? list : []))
+      .catch(() => setDurations([]));
+  }, [selectedInstructorId, apiBase]);
+
+  useEffect(() => {
     fetch(`${apiBase}/instructors`)
       .then((r) => r.json())
       .then((list: Instructor[]) => {
@@ -369,10 +383,23 @@ export default function BookingClient({
   function choosePackageToBuy(packageType: string) {
     setPendingPackageType(packageType);
     setSelectedPackageId(null);
+    setPendingDurationId(null);
+    setPendingDurationPackageId(null);
   }
 
   function chooseOwnedPackage(packageId: string) {
     setSelectedPackageId(packageId);
+    setPendingPackageType(null);
+    setPendingDurationId(null);
+    setPendingDurationPackageId(null);
+  }
+
+  // packageOptionId null means "just a single lesson at this duration,"
+  // not a multi-lesson pack.
+  function chooseDurationOption(durationId: string, packageOptionId: string | null) {
+    setPendingDurationId(durationId);
+    setPendingDurationPackageId(packageOptionId);
+    setSelectedPackageId(null);
     setPendingPackageType(null);
   }
 
@@ -489,14 +516,17 @@ export default function BookingClient({
   // checkout metadata, so paying both purchases the package AND books that
   // slot with the first credit, all in one step (see the webhook).
   async function buyPackageAndBookSlot() {
-    if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
+    if (!selected || !selectedInstructorId || !contactValid()) return;
+    if (!pendingPackageType && !pendingDurationId) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
     const res = await fetch(`${apiBase}/packages/checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        packageType: pendingPackageType,
+        ...(pendingDurationId
+          ? { durationId: pendingDurationId, packageOptionId: pendingDurationPackageId }
+          : { packageType: pendingPackageType }),
         availabilityId: selected.id,
         instructorMembershipId: selectedInstructorId,
         contactName: contact.name,
@@ -571,6 +601,18 @@ export default function BookingClient({
   }
 
   const pendingPackageInfo = pendingPackageType && selectedInstructor ? visiblePackages(selectedInstructor).find((p) => p.id === pendingPackageType) || null : null;
+  const selectedDuration = pendingDurationId ? durations.find((d) => d.id === pendingDurationId) || null : null;
+  const selectedDurationPackage = selectedDuration && pendingDurationPackageId
+    ? selectedDuration.packages.find((p) => p.id === pendingDurationPackageId) || null
+    : null;
+  const pendingDurationInfo = selectedDuration
+    ? {
+        label: selectedDurationPackage
+          ? `${selectedDuration.minutes} min (${selectedDurationPackage.lessonsCount}-pack)`
+          : `${selectedDuration.minutes} min lesson`,
+        priceCents: selectedDurationPackage ? selectedDurationPackage.priceCents : selectedDuration.singlePriceCents,
+      }
+    : null;
 
   // The "Video lesson" package is inherently remote - no need to also flip
   // a separate toggle for it. Any other package still goes through the
@@ -583,8 +625,9 @@ export default function BookingClient({
     ? { ...FITTING_TYPES.find((f) => f.id === fittingType)!, priceCents: getFittingPriceCents(selectedInstructor, fittingType) }
     : null;
   // Either an owned package with credits, or a tier chosen to buy - either is enough to pick a slot, but only once an instructor is chosen too.
-  const canPickLessonSlot = !!selectedInstructorId && ((!!selectedPackage && (selectedPackage.rawLessonsRemaining ?? selectedPackage.lessonsRemaining) > 0) || !!pendingPackageType);
-  const isBuyingPackage = !selectedPackage && !!pendingPackageType;
+  const canPickLessonSlot = !!selectedInstructorId && ((!!selectedPackage && (selectedPackage.rawLessonsRemaining ?? selectedPackage.lessonsRemaining) > 0) || !!pendingPackageType || !!pendingDurationId);
+  const isBuyingPackage = !selectedPackage && (!!pendingPackageType || !!pendingDurationId);
+  const pendingPurchaseInfo = pendingPackageInfo || pendingDurationInfo;
 
   useEffect(() => {
     if (fittingType && selectedInstructor) {
@@ -746,12 +789,14 @@ export default function BookingClient({
 
           {service === "lesson" && (
             <div>
-              {(selectedPackage || pendingPackageInfo) && (
+              {(selectedPackage || pendingPackageInfo || pendingDurationInfo) && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
                   <button
                     onClick={() => {
                       setSelectedPackageId(null);
                       setPendingPackageType(null);
+                      setPendingDurationId(null);
+                      setPendingDurationPackageId(null);
                       setSelected(null);
                     }}
                     style={{
@@ -760,16 +805,63 @@ export default function BookingClient({
                     }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 700 }}>
-                      {selectedPackage ? selectedPackage.type : pendingPackageInfo!.label}
+                      {selectedPackage ? selectedPackage.type : pendingPackageInfo ? pendingPackageInfo.label : pendingDurationInfo!.label}
                     </div>
                     <div className="mono" style={{ fontSize: 11, fontWeight: 600 }}>
                       {selectedPackage
                         ? `${selectedPackage.lessonsRemaining} of ${selectedPackage.lessonsTotal} left${selectedPackage.paymentStatus === "pending" ? " - pay at lesson" : selectedPackage.paymentStatus === "deposit_paid" && !!selectedPackage.balanceDueCents ? ` - ${centsToDollars(selectedPackage.balanceDueCents)} due at lesson` : selectedPackage.paymentStatus === "club_billed" ? ` - billed by ${business.name}` : ""}`
-                        : `${centsToDollars(pendingPackageInfo!.priceCents)} - pick a time, then pay`}
+                        : pendingPackageInfo
+                        ? `${centsToDollars(pendingPackageInfo.priceCents)} - pick a time, then pay`
+                        : `${centsToDollars(pendingDurationInfo!.priceCents)} - pick a time, then pay`}
                     </div>
                   </button>
                 </div>
               )}
+
+              {durations.length > 0 ? (
+                <div>
+                  <div className="mono" style={{ fontSize: 11, color: "#9DB8A9", marginBottom: 8, letterSpacing: "0.04em" }}>
+                    {pendingDurationInfo ? "SWITCH LESSON LENGTH" : "CHOOSE A LESSON LENGTH"}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {durations.map((d) => (
+                      <div key={d.id}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            onClick={() => chooseDurationOption(d.id, null)}
+                            style={{
+                              background: pendingDurationId === d.id && !pendingDurationPackageId ? "var(--gold)" : "var(--chalk)",
+                              color: "var(--fairway)", border: "none", borderRadius: 10,
+                              padding: "10px 14px", textAlign: "left", minWidth: 108,
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>{d.minutes} min</div>
+                            <div className="mono" style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600 }}>
+                              {centsToDollars(d.singlePriceCents)}
+                            </div>
+                          </button>
+                          {d.packages.map((p) => (
+                            <button
+                              key={p.id}
+                              onClick={() => chooseDurationOption(d.id, p.id)}
+                              style={{
+                                background: pendingDurationId === d.id && pendingDurationPackageId === p.id ? "var(--gold)" : "var(--chalk)",
+                                color: "var(--fairway)", border: "none", borderRadius: 10,
+                                padding: "10px 14px", textAlign: "left", minWidth: 108,
+                              }}
+                            >
+                              <div style={{ fontSize: 13, fontWeight: 700 }}>{p.lessonsCount}-pack</div>
+                              <div className="mono" style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600 }}>
+                                {centsToDollars(p.priceCents)}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
               <div>
                 <div className="mono" style={{ fontSize: 11, color: "#9DB8A9", marginBottom: 8, letterSpacing: "0.04em" }}>
                   {selectedPackage || pendingPackageInfo ? "SWITCH PACKAGE" : packages.some((p) => (p.rawLessonsRemaining ?? p.lessonsRemaining) > 0) ? "SELECT A PACKAGE" : "CHOOSE A PACKAGE TO GET STARTED"}
@@ -804,6 +896,7 @@ export default function BookingClient({
                   )}
                 </div>
               </div>
+              )}
             </div>
           )}
 
@@ -1030,7 +1123,7 @@ export default function BookingClient({
         </div>
 
         {service === "lesson" ? (
-          (selectedPackage || pendingPackageInfo) && (
+          (selectedPackage || pendingPurchaseInfo) && (
             <div style={{
               display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10,
               background: selectedPackage?.paymentStatus === "pending" || (selectedPackage?.paymentStatus === "deposit_paid" && !!selectedPackage?.balanceDueCents) || selectedPackage?.paymentStatus === "club_billed" || isBuyingPackage ? "#FBF3DE" : "var(--open)",
@@ -1040,8 +1133,8 @@ export default function BookingClient({
               <span style={{ fontSize: 13, fontWeight: 600 }}>
                 {isBuyingPackage ? (
                   <>
-                    Buying: <span style={{ color: "var(--gold)" }}>{pendingPackageInfo!.label}</span>
-                    <span className="mono" style={{ color: "var(--muted)", fontWeight: 500 }}> - {centsToDollars(pendingPackageInfo!.priceCents)}</span>
+                    Buying: <span style={{ color: "var(--gold)" }}>{pendingPurchaseInfo!.label}</span>
+                    <span className="mono" style={{ color: "var(--muted)", fontWeight: 500 }}> - {centsToDollars(pendingPurchaseInfo!.priceCents)}</span>
                   </>
                 ) : (
                   <>
@@ -1245,7 +1338,7 @@ export default function BookingClient({
               <div className="mono" style={{ fontSize: 11, color: "#9DB8A9" }}>
                 {service === "lesson"
                   ? isBuyingPackage
-                    ? `${pendingPackageInfo!.label} - ${centsToDollars(pendingPackageInfo!.priceCents)}`
+                    ? `${pendingPurchaseInfo!.label} - ${centsToDollars(pendingPurchaseInfo!.priceCents)}`
                     : `Uses 1 of ${selectedPackage?.lessonsRemaining ?? 0} remaining`
                   : activeFitting ? `${activeFitting.label} - ${centsToDollars(activeFitting.priceCents)}` : ""}
               </div>
@@ -1335,7 +1428,7 @@ export default function BookingClient({
               {confirming ? "..." : service === "lesson" && !isBuyingPackage ? "Confirm" : "Pay & Confirm"}
             </button>
 
-            {service === "lesson" && isBuyingPackage && business.allowPayLater && (
+            {service === "lesson" && isBuyingPackage && !pendingDurationId && business.allowPayLater && (
               <button
                 onClick={depositAndBookSlot}
                 disabled={confirming || !contactValid() || !selectedInstructorId}
@@ -1349,7 +1442,7 @@ export default function BookingClient({
               </button>
             )}
 
-            {service === "lesson" && isBuyingPackage && business.allowClubBilling && (
+            {service === "lesson" && isBuyingPackage && !pendingDurationId && business.allowClubBilling && (
               <button
                 onClick={clubBilledAndBookSlot}
                 disabled={confirming || !contactValid() || !selectedInstructorId}

@@ -59,17 +59,19 @@ export async function POST(req: NextRequest) {
   const businessId = pending.businessId;
 
   if (pending.kind === "package" && pending.packageType) {
-    const pkg = findPackage(pending.packageType);
-    if (pkg) {
+    const isDurationPurchase = pending.packageType === "duration";
+    const pkg = isDurationPurchase ? null : findPackage(pending.packageType);
+    if (isDurationPurchase || pkg) {
       await ensureMembership(pending.userId, businessId, "player");
       const createdPackage = await prisma.package.create({
         data: {
           businessId,
           userId: pending.userId,
           instructorMembershipId: pending.instructorMembershipId,
-          type: pkg.id,
-          lessonsTotal: pkg.lessons,
-          lessonsRemaining: pkg.lessons,
+          type: isDurationPurchase ? "duration" : pkg!.id,
+          durationMinutes: isDurationPurchase ? pending.durationMinutes : null,
+          lessonsTotal: isDurationPurchase ? (pending.lessonsTotal ?? 1) : pkg!.lessons,
+          lessonsRemaining: isDurationPurchase ? (pending.lessonsTotal ?? 1) : pkg!.lessons,
           pricePaidCents: payment.amount_money?.amount ?? 0,
           squareOrderId: orderId,
         },
