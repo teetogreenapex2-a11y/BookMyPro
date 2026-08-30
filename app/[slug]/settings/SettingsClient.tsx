@@ -287,12 +287,12 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   }
   useEffect(() => { loadDurations(); }, [pricingInstructorId]);
 
-  async function addDuration() {
-    if (!pricingInstructorId) return;
+  async function addDuration(): Promise<string | null> {
+    if (!pricingInstructorId) return null;
     const minutes = parseInt(newDurationMinutes, 10);
     const priceDollars = parseFloat(newDurationPrice);
-    if (!Number.isInteger(minutes) || minutes <= 0) { alert("Enter a valid number of minutes."); return; }
-    if (isNaN(priceDollars) || priceDollars < 0) { alert("Enter a valid price."); return; }
+    if (!Number.isInteger(minutes) || minutes <= 0) { alert("Enter a valid number of minutes."); return null; }
+    if (isNaN(priceDollars) || priceDollars < 0) { alert("Enter a valid price."); return null; }
     setAddingDuration(true);
     try {
       const res = await fetch(`${apiBase}/instructors/${pricingInstructorId}/durations`, {
@@ -301,14 +301,17 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
         body: JSON.stringify({ minutes, label: newDurationLabel.trim() || null, singlePriceCents: Math.round(priceDollars * 100) }),
       });
       if (res.ok) {
+        const created = await res.json();
         setNewDurationMinutes("");
         setNewDurationLabel("");
         setNewDurationLabelCustom(false);
         setNewDurationPrice("");
-        loadDurations();
+        await loadDurations();
+        return created.id as string;
       } else {
         const data = await res.json().catch(() => ({}));
         alert(data.error || "Couldn't add that duration.");
+        return null;
       }
     } finally {
       setAddingDuration(false);
@@ -1417,8 +1420,8 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                               />
                               <button
                                 onClick={async () => {
-                                  await addDuration();
-                                  setDurationDropdownValue("");
+                                  const newId = await addDuration();
+                                  setDurationDropdownValue(newId || "");
                                 }}
                                 disabled={addingDuration}
                                 style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700 }}
