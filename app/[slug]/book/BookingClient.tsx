@@ -913,26 +913,25 @@ export default function BookingClient({
           )}
 
           {service === "fitting" && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ maxWidth: 320 }}>
               {enabledFittings(selectedInstructor || {}).length === 0 ? null : (
-                enabledFittings(selectedInstructor || {}).map((f) => (
-                  <button key={f.id} onClick={() => {
-                    if (fittingType === f.id) {
-                      setFittingType(null);
-                      setSelected(null);
-                    } else {
-                      setFittingType(f.id);
-                    }
-                  }} style={{
-                    background: fittingType === f.id ? "var(--gold)" : "var(--chalk)", color: "var(--fairway)",
-                    border: "none", borderRadius: 10, padding: "10px 14px", textAlign: "left", minWidth: 108,
-                  }}>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{f.label}</div>
-                    <div className="mono" style={{ fontSize: 11, fontWeight: 600 }}>
-                      {centsToDollars(f.priceCents)} - {f.durationMin} min
-                    </div>
-                  </button>
-                ))
+                <select
+                  value={fittingType || ""}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setFittingType(id || null);
+                    setSelected(null);
+                  }}
+                  style={{
+                    width: "100%", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px",
+                    fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)",
+                  }}
+                >
+                  <option value="" disabled>Choose a fitting…</option>
+                  {enabledFittings(selectedInstructor || {}).map((f) => (
+                    <option key={f.id} value={f.id}>{f.label} - {centsToDollars(f.priceCents)} - {f.durationMin} min</option>
+                  ))}
+                </select>
               )}
             </div>
           )}
