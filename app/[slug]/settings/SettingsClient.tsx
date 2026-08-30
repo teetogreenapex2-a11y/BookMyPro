@@ -17,7 +17,7 @@ type User = {
 };
 
 type LessonPackageOption = { id: string; lessonsCount: number; priceCents: number };
-type LessonDuration = { id: string; minutes: number; singlePriceCents: number; remoteEnabled: boolean; packages: LessonPackageOption[] };
+type LessonDuration = { id: string; minutes: number; label: string | null; singlePriceCents: number; remoteEnabled: boolean; packages: LessonPackageOption[] };
 
 type Business = {
   name: string;
@@ -185,6 +185,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   const [loadingDurations, setLoadingDurations] = useState(false);
   const [durationDropdownValue, setDurationDropdownValue] = useState("");
   const [newDurationMinutes, setNewDurationMinutes] = useState("");
+  const [newDurationLabel, setNewDurationLabel] = useState("");
   const [newDurationPrice, setNewDurationPrice] = useState("");
   const [addingDuration, setAddingDuration] = useState(false);
   const [newPackageInputs, setNewPackageInputs] = useState<Record<string, { count: string; price: string }>>({});
@@ -284,10 +285,11 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       const res = await fetch(`${apiBase}/instructors/${pricingInstructorId}/durations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ minutes, singlePriceCents: Math.round(priceDollars * 100) }),
+        body: JSON.stringify({ minutes, label: newDurationLabel.trim() || null, singlePriceCents: Math.round(priceDollars * 100) }),
       });
       if (res.ok) {
         setNewDurationMinutes("");
+        setNewDurationLabel("");
         setNewDurationPrice("");
         loadDurations();
       } else {
@@ -297,6 +299,15 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
     } finally {
       setAddingDuration(false);
     }
+  }
+
+  async function updateDurationLabel(durationId: string, label: string) {
+    setDurations((prev) => prev.map((d) => (d.id === durationId ? { ...d, label: label.trim() || null } : d)));
+    await fetch(`${apiBase}/durations/${durationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: label.trim() || null }),
+    });
   }
 
   async function updateDurationPrice(durationId: string, priceDollars: number) {
@@ -1336,7 +1347,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         }}
                       >
                         {durations.map((d) => (
-                          <option key={d.id} value={d.id}>{d.minutes} min - ${(d.singlePriceCents / 100).toFixed(2)}/lesson</option>
+                          <option key={d.id} value={d.id}>{d.label ? `${d.label} - ` : ""}{d.minutes} min - ${(d.singlePriceCents / 100).toFixed(2)}/lesson</option>
                         ))}
                         <option value="new">+ Add a new lesson length</option>
                       </select>
@@ -1345,7 +1356,14 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         const d = durations.find((x) => x.id === durationDropdownValue);
                         if (!d) {
                           return (
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div>
+                              <input
+                                value={newDurationLabel}
+                                onChange={(e) => setNewDurationLabel(e.target.value)}
+                                placeholder="Name this lesson (optional) - e.g. Putting Lesson"
+                                style={{ width: "100%", maxWidth: 320, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8, display: "block" }}
+                              />
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                               <input
                                 value={newDurationMinutes}
                                 onChange={(e) => setNewDurationMinutes(e.target.value)}
@@ -1371,11 +1389,18 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                               >
                                 {addingDuration ? "Adding…" : "+ Add lesson length"}
                               </button>
+                              </div>
                             </div>
                           );
                         }
                         return (
-                          <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, background: "var(--card)" }}>
+                          <div key={d.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, background: "var(--card)" }}>
+                            <input
+                              defaultValue={d.label || ""}
+                              onBlur={(e) => updateDurationLabel(d.id, e.target.value)}
+                              placeholder="Name this lesson (optional) - e.g. Putting Lesson"
+                              style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 8px", fontFamily: "inherit", fontSize: 13, marginBottom: 10, display: "block" }}
+                            />
                             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: d.packages.length > 0 ? 10 : 8 }}>
                               <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{d.minutes} min</span>
                               <span style={{ fontSize: 13, color: "var(--faint)" }}>$</span>

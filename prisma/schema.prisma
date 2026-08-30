@@ -279,6 +279,12 @@ model LessonDuration {
   membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   membershipId String
   minutes      Int
+  // Optional name for this specific offering - e.g. "Putting Lesson" or
+  // "Chipping Lesson" - so an instructor can offer several distinct
+  // lesson types, even ones that happen to share the same length,
+  // rather than being limited to duration as the only distinguishing
+  // factor. Left blank, it's just a generic lesson at this length.
+  label        String?
   singlePriceCents Int
   remoteEnabled Boolean   @default(true) // can a lesson at this duration be booked as a remote/video lesson too
   sortOrder    Int        @default(0)
@@ -349,6 +355,7 @@ model Package {
   // captured at purchase time so it stays accurate even if the instructor
   // later edits or removes the LessonDuration it came from.
   durationMinutes  Int?
+  durationLabel    String?
   lessonsTotal     Int
   lessonsRemaining Int
   pricePaidCents   Int       // the full listed price of this package, before any credit
@@ -739,6 +746,7 @@ model PendingSquarePayment {
   // that case, and these two carry the rest of what's actually needed.
   packageOptionId String?
   durationMinutes Int?
+  durationLabel   String?
   lessonsTotal    Int?
   availabilityId String?
   fittingType   String?

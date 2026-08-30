@@ -87,9 +87,10 @@ export default function BookingClient({
   // reserved for them at the moment they pay, not before and not after.
   const [pendingPackageType, setPendingPackageType] = useState<string | null>(null);
   const [fittingType, setFittingType] = useState<string | null>(null);
-  type Duration = { id: string; minutes: number; singlePriceCents: number; remoteEnabled: boolean; packages: { id: string; lessonsCount: number; priceCents: number }[] };
+  type Duration = { id: string; minutes: number; label: string | null; singlePriceCents: number; remoteEnabled: boolean; packages: { id: string; lessonsCount: number; priceCents: number }[] };
   const [durations, setDurations] = useState<Duration[]>([]);
   const [pendingDurationId, setPendingDurationId] = useState<string | null>(null);
+  const [pendingLessonsCount, setPendingLessonsCount] = useState<number | null>(null);
   const [pendingDurationPackageId, setPendingDurationPackageId] = useState<string | null>(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -607,12 +608,30 @@ export default function BookingClient({
     : null;
   const pendingDurationInfo = selectedDuration
     ? {
-        label: selectedDurationPackage
-          ? `${selectedDuration.minutes} min (${selectedDurationPackage.lessonsCount}-pack)`
-          : `${selectedDuration.minutes} min lesson`,
+        label: (() => {
+          const base = selectedDuration.label ? `${selectedDuration.label} (${selectedDuration.minutes} min)` : `${selectedDuration.minutes} min lesson`;
+          return selectedDurationPackage ? `${base} - ${selectedDurationPackage.lessonsCount}-pack` : base;
+        })(),
         priceCents: selectedDurationPackage ? selectedDurationPackage.priceCents : selectedDuration.singlePriceCents,
       }
     : null;
+
+  // Every lesson length has a single-lesson price, so "1" (single lesson)
+  // is always a real option once any duration exists at all. Beyond
+  // that, only package sizes some duration actually offers show up here
+  // - deduplicated, since more than one duration can share the same
+  // pack size (a 5-pack of 30-min and a 5-pack of 60-min both count as
+  // just one "5-pack" entry in this first dropdown).
+  const availableLessonsCounts = durations.length > 0
+    ? Array.from(new Set([1, ...durations.flatMap((d) => d.packages.map((p) => p.lessonsCount))])).sort((a, b) => a - b)
+    : [];
+  // Once a size is picked, only the durations that actually offer that
+  // exact size (as a single lesson, or as a package with that lesson
+  // count) belong in the second dropdown - each with its own real price
+  // for that specific combination.
+  const durationsForLessonsCount = pendingLessonsCount === 1
+    ? durations
+    : durations.filter((d) => d.packages.some((p) => p.lessonsCount === pendingLessonsCount));
 
   // The "Video lesson" package is inherently remote - no need to also flip
   // a separate toggle for it. Any other package still goes through the
@@ -836,39 +855,55 @@ export default function BookingClient({
               {durations.length > 0 ? (
                 <div>
                   <div className="mono" style={{ fontSize: 11, color: "#9DB8A9", marginBottom: 8, letterSpacing: "0.04em" }}>
-                    {pendingDurationInfo ? "SWITCH LESSON LENGTH" : "CHOOSE A LESSON LENGTH"}
+                    {pendingDurationInfo ? "SWITCH LESSON OPTION" : "CHOOSE A LESSON OPTION"}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 320 }}>
                     <select
-                      value={pendingDurationId || ""}
+                      value={pendingLessonsCount ?? ""}
                       onChange={(e) => {
-                        const id = e.target.value;
-                        if (id) chooseDurationOption(id, null);
+                        const count = Number(e.target.value);
+                        setPendingLessonsCount(count);
+                        setPendingDurationId(null);
+                        setPendingDurationPackageId(null);
                       }}
                       style={{
                         border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px",
                         fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)",
                       }}
                     >
-                      <option value="" disabled>Choose a lesson length…</option>
-                      {durations.map((d) => (
-                        <option key={d.id} value={d.id}>{d.minutes} min - {centsToDollars(d.singlePriceCents)}</option>
+                      <option value="" disabled>Choose an option…</option>
+                      {availableLessonsCounts.map((count) => (
+                        <option key={count} value={count}>{count === 1 ? "Single lesson" : `${count}-pack`}</option>
                       ))}
                     </select>
 
-                    {selectedDuration && selectedDuration.packages.length > 0 && (
+                    {pendingLessonsCount !== null && durationsForLessonsCount.length > 0 && (
                       <select
-                        value={pendingDurationPackageId || ""}
-                        onChange={(e) => chooseDurationOption(selectedDuration.id, e.target.value || null)}
+                        value={pendingDurationId || ""}
+                        onChange={(e) => {
+                          const durationId = e.target.value;
+                          if (!durationId) return;
+                          const duration = durations.find((d) => d.id === durationId);
+                          if (!duration) return;
+                          const packageOptionId = pendingLessonsCount === 1
+                            ? null
+                            : duration.packages.find((p) => p.lessonsCount === pendingLessonsCount)?.id || null;
+                          chooseDurationOption(durationId, packageOptionId);
+                        }}
                         style={{
                           border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px",
                           fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)",
                         }}
                       >
-                        <option value="">Single lesson - {centsToDollars(selectedDuration.singlePriceCents)}</option>
-                        {selectedDuration.packages.map((p) => (
-                          <option key={p.id} value={p.id}>{p.lessonsCount}-pack - {centsToDollars(p.priceCents)}</option>
-                        ))}
+                        <option value="" disabled>Choose a lesson length…</option>
+                        {durationsForLessonsCount.map((d) => {
+                          const priceCents = pendingLessonsCount === 1
+                            ? d.singlePriceCents
+                            : d.packages.find((p) => p.lessonsCount === pendingLessonsCount)!.priceCents;
+                          return (
+                            <option key={d.id} value={d.id}>{d.label ? `${d.label} - ` : ""}{d.minutes} min - {centsToDollars(priceCents)}</option>
+                          );
+                        })}
                       </select>
                     )}
                   </div>

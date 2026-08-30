@@ -35,7 +35,7 @@ export function findFitting(id: string) {
 // caller should treat that as a rejected purchase attempt, never fall
 // back to a default price.
 export function resolveDurationPurchase(
-  durations: { id: string; minutes: number; singlePriceCents: number; packages: { id: string; lessonsCount: number; priceCents: number }[] }[],
+  durations: { id: string; minutes: number; label?: string | null; singlePriceCents: number; packages: { id: string; lessonsCount: number; priceCents: number }[] }[],
   durationId: string,
   packageOptionId?: string | null
 ) {
@@ -43,11 +43,11 @@ export function resolveDurationPurchase(
   if (!duration) return null;
 
   if (!packageOptionId) {
-    return { minutes: duration.minutes, lessonsTotal: 1, priceCents: duration.singlePriceCents, packageOptionId: null as string | null };
+    return { minutes: duration.minutes, label: duration.label || null, lessonsTotal: 1, priceCents: duration.singlePriceCents, packageOptionId: null as string | null };
   }
   const option = duration.packages.find((p) => p.id === packageOptionId);
   if (!option) return null;
-  return { minutes: duration.minutes, lessonsTotal: option.lessonsCount, priceCents: option.priceCents, packageOptionId: option.id };
+  return { minutes: duration.minutes, label: duration.label || null, lessonsTotal: option.lessonsCount, priceCents: option.priceCents, packageOptionId: option.id };
 }
 
 // BusinessSettings stores per-item price + enabled state under fields like

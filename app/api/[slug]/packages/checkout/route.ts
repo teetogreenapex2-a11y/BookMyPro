@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // What's actually being purchased - resolved into one common shape
   // either way, so everything below (slot check, Stripe/Square session
   // creation) doesn't need to know or care which path produced it.
-  let purchase: { label: string; priceCents: number; lessonsTotal: number; packageTypeForDb: string; packageOptionIdForDb: string | null; durationMinutesForDb: number | null; isRemote: boolean };
+  let purchase: { label: string; priceCents: number; lessonsTotal: number; packageTypeForDb: string; packageOptionIdForDb: string | null; durationMinutesForDb: number | null; durationLabelForDb: string | null; isRemote: boolean };
 
   if (durationId) {
     // The new, instructor-defined lesson-length system (see
@@ -54,13 +54,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (!resolved) {
       return NextResponse.json({ error: "That lesson option is no longer available" }, { status: 400 });
     }
+    const baseLabel = resolved.label ? `${resolved.label} (${resolved.minutes} min)` : `${resolved.minutes}-min lesson`;
     purchase = {
-      label: resolved.lessonsTotal > 1 ? `${resolved.minutes}-min lesson (${resolved.lessonsTotal}-pack)` : `${resolved.minutes}-min lesson`,
+      label: resolved.lessonsTotal > 1 ? `${baseLabel} - ${resolved.lessonsTotal}-pack` : baseLabel,
       priceCents: resolved.priceCents,
       lessonsTotal: resolved.lessonsTotal,
       packageTypeForDb: "duration",
       packageOptionIdForDb: resolved.packageOptionId,
       durationMinutesForDb: resolved.minutes,
+      durationLabelForDb: resolved.label,
       isRemote: !!submittedIsRemote,
     };
   } else {
@@ -82,6 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       packageTypeForDb: pkg.id,
       packageOptionIdForDb: null,
       durationMinutesForDb: null,
+      durationLabelForDb: null,
       // The "video" package is inherently remote regardless of what the
       // client sent — derived server-side so this can't be spoofed or forgotten.
       isRemote: pkg.id === "video" || !!submittedIsRemote,
@@ -118,6 +121,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         packageType: purchase.packageTypeForDb,
         packageOptionId: purchase.packageOptionIdForDb,
         durationMinutes: purchase.durationMinutesForDb,
+        durationLabel: purchase.durationLabelForDb,
         lessonsTotal: purchase.lessonsTotal,
         availabilityId: availabilityId || null,
         instructorMembershipId: instructorMembershipId || null,
@@ -177,6 +181,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         packageType: purchase.packageTypeForDb,
         packageOptionId: purchase.packageOptionIdForDb || "",
         durationMinutes: purchase.durationMinutesForDb ? String(purchase.durationMinutesForDb) : "",
+        durationLabel: purchase.durationLabelForDb || "",
         lessonsTotal: String(purchase.lessonsTotal),
         availabilityId: availabilityId || "",
         instructorMembershipId: instructorMembershipId || "",

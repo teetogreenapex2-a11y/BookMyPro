@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
           instructorMembershipId: pending.instructorMembershipId,
           type: isDurationPurchase ? "duration" : pkg!.id,
           durationMinutes: isDurationPurchase ? pending.durationMinutes : null,
+          durationLabel: isDurationPurchase ? pending.durationLabel : null,
           lessonsTotal: isDurationPurchase ? (pending.lessonsTotal ?? 1) : pkg!.lessons,
           lessonsRemaining: isDurationPurchase ? (pending.lessonsTotal ?? 1) : pkg!.lessons,
           pricePaidCents: payment.amount_money?.amount ?? 0,

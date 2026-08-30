@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
             instructorMembershipId: meta.instructorMembershipId || null,
             type: isDurationPurchase ? "duration" : pkg!.id,
             durationMinutes: isDurationPurchase && meta.durationMinutes ? parseInt(meta.durationMinutes, 10) : null,
+            durationLabel: isDurationPurchase && meta.durationLabel ? meta.durationLabel : null,
             // For a duration purchase, lessonsTotal has to come from
             // Stripe's own line item quantity/amount rather than a
             // static lookup - the actual count was already validated
