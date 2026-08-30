@@ -63,6 +63,18 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     playingLesson9PriceCents: m.playingLesson9PriceCents,
     playingLesson18Enabled: m.playingLesson18Enabled,
     playingLesson18PriceCents: m.playingLesson18PriceCents,
+    customOffering1Name: m.customOffering1Name,
+    customOffering1PriceCents: m.customOffering1PriceCents,
+    customOffering2Name: m.customOffering2Name,
+    customOffering2PriceCents: m.customOffering2PriceCents,
+    customOffering3Name: m.customOffering3Name,
+    customOffering3PriceCents: m.customOffering3PriceCents,
+    customOffering4Name: m.customOffering4Name,
+    customOffering4PriceCents: m.customOffering4PriceCents,
+    customOffering5Name: m.customOffering5Name,
+    customOffering5PriceCents: m.customOffering5PriceCents,
+    customOffering6Name: m.customOffering6Name,
+    customOffering6PriceCents: m.customOffering6PriceCents,
   }));
 
   return NextResponse.json(shaped);
