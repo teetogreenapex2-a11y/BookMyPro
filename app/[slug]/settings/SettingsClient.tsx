@@ -66,7 +66,7 @@ type Business = {
 // "__custom__" is a sentinel value (never sent to the server) meaning
 // "show a free-text input instead."
 const LESSON_LABEL_PRESETS = [
-  "Single Lesson", "Playing Lesson/9", "Playing Lesson/18", "Video Lesson",
+  "Single Lesson", "Video Lesson",
   "Chipping Lesson", "Putting Lesson", "Junior Lesson", "Remote Lesson",
 ];
 const PACKAGE_SIZE_PRESETS = [3, 4, 5, 8, 10, 12];
@@ -84,6 +84,11 @@ const FITTING_ROWS = [
   { id: "driver", label: "Driver fitting", duration: "45 min", enabledKey: "fittingDriverEnabled", priceKey: "fittingDriverPriceCents" },
   { id: "iron", label: "Iron fitting", duration: "60 min", enabledKey: "fittingIronEnabled", priceKey: "fittingIronPriceCents" },
   { id: "full", label: "Full bag fitting", duration: "90 min", enabledKey: "fittingFullEnabled", priceKey: "fittingFullPriceCents" },
+] as const;
+
+const PLAYING_LESSON_ROWS = [
+  { id: "9", label: "9 holes", enabledKey: "playingLesson9Enabled", priceKey: "playingLesson9PriceCents" },
+  { id: "18", label: "18 holes", enabledKey: "playingLesson18Enabled", priceKey: "playingLesson18PriceCents" },
 ] as const;
 
 export default function SettingsClient({
@@ -1613,6 +1618,54 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                   </div>
                   </>
                   )}
+
+                  <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 8 }}>
+                    PLAYING LESSONS
+                  </div>
+                  <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 10px" }}>
+                    Out on the course with the student - a request, not an instant booking, since these need real coordination on timing.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+                    {PLAYING_LESSON_ROWS.map((row) => {
+                      const enabled = instructorPricing[row.enabledKey];
+                      const priceCents = instructorPricing[row.priceKey];
+                      return (
+                        <div key={row.id}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, opacity: enabled ? 1 : 0.5 }}>
+                            <button
+                              onClick={() => setInstructorPricing((p) => p && ({ ...p, [row.enabledKey]: !enabled }))}
+                              aria-label={`${enabled ? "Disable" : "Enable"} ${row.label}`}
+                              aria-pressed={enabled}
+                              style={{
+                                width: 36, height: 21, borderRadius: 11, border: "none", flexShrink: 0,
+                                background: enabled ? "var(--fairway)" : "var(--border)", position: "relative",
+                              }}
+                            >
+                              <span style={{
+                                position: "absolute", top: 2.5, left: enabled ? 18 : 2.5, width: 16, height: 16,
+                                borderRadius: "50%", background: "#FFF",
+                              }} />
+                            </button>
+                            <span style={{ fontSize: 13, fontWeight: 600, width: 92, flexShrink: 0 }}>{row.label}</span>
+                            <span style={{ fontSize: 13, color: "var(--faint)" }}>$</span>
+                            <input
+                              value={priceCents / 100}
+                              onChange={(e) => {
+                                const dollars = Number(e.target.value);
+                                setInstructorPricing((p) => p && ({ ...p, [row.priceKey]: Number.isFinite(dollars) ? Math.round(dollars * 100) : 0 }));
+                              }}
+                              disabled={!enabled}
+                              inputMode="numeric"
+                              style={{
+                                flex: 1, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px",
+                                fontFamily: "inherit", fontSize: 14, background: enabled ? "#FFF" : "#F2F0E9",
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
 
                   <div className="mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 8 }}>
                     CLUB FITTINGS

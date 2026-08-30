@@ -91,6 +91,12 @@ export default function BookingClient({
   const [durations, setDurations] = useState<Duration[]>([]);
   const [pendingDurationId, setPendingDurationId] = useState<string | null>(null);
   const [pendingLessonsCount, setPendingLessonsCount] = useState<number | null>(null);
+  const [pendingPlayingLessonHoles, setPendingPlayingLessonHoles] = useState<9 | 18 | null>(null);
+  const [playingLessonMode, setPlayingLessonMode] = useState(false);
+  const [playingLessonPreferredDate, setPlayingLessonPreferredDate] = useState("");
+  const [playingLessonNotes, setPlayingLessonNotes] = useState("");
+  const [submittingPlayingLessonRequest, setSubmittingPlayingLessonRequest] = useState(false);
+  const [playingLessonRequestSent, setPlayingLessonRequestSent] = useState(false);
   const [pendingDurationPackageId, setPendingDurationPackageId] = useState<string | null>(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -516,6 +522,32 @@ export default function BookingClient({
   // Buying a brand new package for a specific slot - the slot comes along in
   // checkout metadata, so paying both purchases the package AND books that
   // slot with the first credit, all in one step (see the webhook).
+  async function submitPlayingLessonRequest() {
+    if (!pendingPlayingLessonHoles || !selectedInstructorId || !contactValid()) return;
+    saveProfileFieldsIfProvided();
+    setSubmittingPlayingLessonRequest(true);
+    const res = await fetch(`${apiBase}/playing-lesson-requests`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instructorMembershipId: selectedInstructorId,
+        holes: pendingPlayingLessonHoles,
+        preferredDate: playingLessonPreferredDate || null,
+        notes: playingLessonNotes,
+        contactName: contact.name,
+        contactPhone: contact.phone,
+        contactEmail: contact.email,
+      }),
+    });
+    setSubmittingPlayingLessonRequest(false);
+    if (res.ok) {
+      setPlayingLessonRequestSent(true);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setMessage(data.error || "Something went wrong.");
+    }
+  }
+
   async function buyPackageAndBookSlot() {
     if (!selected || !selectedInstructorId || !contactValid()) return;
     if (!pendingPackageType && !pendingDurationId) return;
@@ -823,6 +855,8 @@ export default function BookingClient({
 
           {service === "lesson" && (
             <div>
+              {!playingLessonMode && (
+              <>
               {(selectedPackage || pendingPackageInfo || pendingDurationInfo) && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
                   <button
@@ -943,6 +977,91 @@ export default function BookingClient({
                   )}
                 </div>
               </div>
+              )}
+              </>
+              )}
+
+              {selectedInstructor && (selectedInstructor.playingLesson9Enabled || selectedInstructor.playingLesson18Enabled) && !playingLessonMode && (
+                <button
+                  onClick={() => { setPlayingLessonMode(true); setSelected(null); }}
+                  style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 12.5, textDecoration: "underline", padding: 0, marginTop: 10 }}
+                >
+                  Want a playing lesson instead? (9 or 18 holes on the course)
+                </button>
+              )}
+
+              {playingLessonMode && !playingLessonRequestSent && (
+                <div style={{ maxWidth: 320 }}>
+                  <div className="mono" style={{ fontSize: 11, color: "#9DB8A9", marginBottom: 8, letterSpacing: "0.04em" }}>
+                    REQUEST A PLAYING LESSON
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "#D7DED9", margin: "0 0 12px" }}>
+                    This sends a request rather than booking a time directly — {selectedInstructor?.name || "your instructor"} will follow up to arrange it.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <select
+                      value={pendingPlayingLessonHoles ?? ""}
+                      onChange={(e) => setPendingPlayingLessonHoles(Number(e.target.value) as 9 | 18)}
+                      style={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)" }}
+                    >
+                      <option value="" disabled>Choose 9 or 18 holes…</option>
+                      {selectedInstructor?.playingLesson9Enabled && (
+                        <option value={9}>9 holes - {centsToDollars(selectedInstructor.playingLesson9PriceCents)}</option>
+                      )}
+                      {selectedInstructor?.playingLesson18Enabled && (
+                        <option value={18}>18 holes - {centsToDollars(selectedInstructor.playingLesson18PriceCents)}</option>
+                      )}
+                    </select>
+                    <label style={{ display: "block" }}>
+                      <span style={{ fontSize: 12, color: "#9DB8A9", display: "block", marginBottom: 4 }}>Preferred date (optional)</span>
+                      <input
+                        type="date"
+                        value={playingLessonPreferredDate}
+                        onChange={(e) => setPlayingLessonPreferredDate(e.target.value)}
+                        style={{ width: "100%", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)" }}
+                      />
+                    </label>
+                    <label style={{ display: "block" }}>
+                      <span style={{ fontSize: 12, color: "#9DB8A9", display: "block", marginBottom: 4 }}>Anything else to mention (optional)</span>
+                      <textarea
+                        value={playingLessonNotes}
+                        onChange={(e) => setPlayingLessonNotes(e.target.value)}
+                        rows={3}
+                        style={{ width: "100%", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)", resize: "vertical" }}
+                      />
+                    </label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={submitPlayingLessonRequest}
+                        disabled={!pendingPlayingLessonHoles || submittingPlayingLessonRequest || !contactValid()}
+                        style={{
+                          flex: 1, background: "var(--gold)", color: "var(--fairway)", border: "none", borderRadius: 8,
+                          padding: "11px 16px", fontWeight: 700, fontSize: 14,
+                          opacity: !pendingPlayingLessonHoles || submittingPlayingLessonRequest || !contactValid() ? 0.6 : 1,
+                        }}
+                      >
+                        {submittingPlayingLessonRequest ? "Sending…" : "Send request"}
+                      </button>
+                      <button
+                        onClick={() => { setPlayingLessonMode(false); setPendingPlayingLessonHoles(null); }}
+                        style={{ background: "none", color: "#D7DED9", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "11px 16px", fontSize: 14 }}
+                      >
+                        Back
+                      </button>
+                    </div>
+                    {!contactValid() && (
+                      <p style={{ fontSize: 11.5, color: "#D7DED9" }}>Add your name, phone, and email below first.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {playingLessonMode && playingLessonRequestSent && (
+                <div style={{ maxWidth: 320 }}>
+                  <p style={{ fontSize: 14, color: "#D7DED9" }}>
+                    Request sent — {selectedInstructor?.name || "your instructor"} will reach out to arrange a time.
+                  </p>
+                </div>
               )}
             </div>
           )}

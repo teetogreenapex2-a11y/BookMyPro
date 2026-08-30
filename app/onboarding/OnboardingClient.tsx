@@ -11,7 +11,7 @@ const FITTING_ROWS = [
 ] as const;
 
 const LESSON_LABEL_PRESETS = [
-  "Single Lesson", "Playing Lesson/9", "Playing Lesson/18", "Video Lesson",
+  "Single Lesson", "Video Lesson",
   "Chipping Lesson", "Putting Lesson", "Junior Lesson", "Remote Lesson",
 ];
 

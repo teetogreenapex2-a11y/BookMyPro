@@ -9,6 +9,12 @@ const EDITABLE_FIELDS = [
   "packageSinglePriceCents", "packagePlayingPriceCents", "packageVideoPriceCents", "packageThreePriceCents", "packageFivePriceCents", "packageTenPriceCents",
   "fittingDriverEnabled", "fittingIronEnabled", "fittingFullEnabled",
   "fittingDriverPriceCents", "fittingIronPriceCents", "fittingFullPriceCents",
+  "customOffering1Name", "customOffering1PriceCents",
+  "customOffering2Name", "customOffering2PriceCents",
+  "customOffering3Name", "customOffering3PriceCents",
+  "customOffering4Name", "customOffering4PriceCents",
+  "playingLesson9Enabled", "playingLesson9PriceCents",
+  "playingLesson18Enabled", "playingLesson18PriceCents",
 ];
 
 // PATCH /api/{slug}/instructors/{id}/pricing

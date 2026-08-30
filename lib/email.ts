@@ -105,6 +105,39 @@ export async function sendInstructorRequestNotification(to: string | null | unde
   await sendEmail(to, `New instructor request: ${details.applicantName}`, html);
 }
 
+// Sent when a player requests a playing lesson (see PlayingLessonRequest
+// in schema.prisma) - unlike a regular booking, this doesn't confirm
+// anything on its own; the instructor still needs to follow up and
+// arrange the actual time before booking it manually.
+export async function sendPlayingLessonRequestNotification(to: string | string[] | null | undefined, details: { businessName: string; playerName: string; holes: number; priceCents: number; preferredDate: Date | null; notes: string | null; contactPhone: string | null; contactEmail: string | null }) {
+  const recipients = Array.isArray(to) ? to.filter(Boolean) : to ? [to] : [];
+  if (recipients.length === 0) return;
+
+  const priceDisplay = `$${(details.priceCents / 100).toFixed(2)}`;
+  const preferredDisplay = details.preferredDate
+    ? details.preferredDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })
+    : "No preference given";
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">New playing lesson request</h2>
+      <p style="color: #5C6459; margin-top: 0;">${details.businessName}</p>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        <tr><td style="padding: 4px 0; color: #8A8571;">Player</td><td style="padding: 4px 0; font-weight: 600;">${details.playerName}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Holes</td><td style="padding: 4px 0;">${details.holes}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Price</td><td style="padding: 4px 0;">${priceDisplay}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Preferred date</td><td style="padding: 4px 0;">${preferredDisplay}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Phone</td><td style="padding: 4px 0;">${details.contactPhone || "—"}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Email</td><td style="padding: 4px 0;">${details.contactEmail || "—"}</td></tr>
+      </table>
+      ${details.notes ? `<p style="color: #5C6459;">"${details.notes}"</p>` : ""}
+      <p>This is a request, not a confirmed booking - reach out to arrange a time, then book it yourself once it's set.</p>
+    </div>
+  `;
+
+  await sendEmail(recipients, `New playing lesson request: ${details.playerName}`, html);
+}
+
 // Sent when someone finishes onboarding their own new business through
 // /onboarding - it doesn't go live for real bookings until the platform
 // admin reviews and approves it.

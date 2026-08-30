@@ -129,6 +129,7 @@ model Business {
   availability Availability[]
   bookings     Booking[]
   packages     Package[]
+  playingLessonRequests PlayingLessonRequest[]
   conversations Conversation[]
   swingSessions SwingSession[]
   syncLogs     SyncLog[]
@@ -219,6 +220,7 @@ model Membership {
   sentMessages          Message[]
   aiAnalysisPreferences AiAnalysisPreference[]
   lessonDurations       LessonDuration[]
+  playingLessonRequestsAsInstructor PlayingLessonRequest[] @relation("PlayingLessonRequestInstructor")
 
   // Per-instructor pricing — each instructor on staff sets their own rates,
   // rather than one shared business-wide price. Mirrors the exact same
@@ -249,6 +251,16 @@ model Membership {
   fittingDriverPriceCents Int @default(8000)
   fittingIronPriceCents   Int @default(10000)
   fittingFullPriceCents   Int @default(20000)
+
+  // Playing lessons - out on the course with the student, 9 or 18 holes.
+  // Deliberately separate from LessonDuration (which is minutes-based):
+  // a playing lesson runs 2-4+ hours and isn't a fixed-length calendar
+  // slot the way a regular lesson is, so it's request-based rather than
+  // self-service booked - see PlayingLessonRequest below.
+  playingLesson9Enabled    Boolean @default(false)
+  playingLesson9PriceCents  Int    @default(0)
+  playingLesson18Enabled   Boolean @default(false)
+  playingLesson18PriceCents Int   @default(0)
 
   // Four open, instructor-defined pricing slots - anything that doesn't
   // fit the fixed package/fitting categories above (a specific lesson
@@ -305,6 +317,33 @@ model LessonPackageOption {
   sortOrder    Int            @default(0)
 }
 
+// A player's request for a playing lesson (9 or 18 holes out on the
+// course) - request-based rather than self-service booked, since the
+// actual time needs real coordination (tee time, course availability)
+// that the regular hourly-slot calendar isn't built for. The instructor
+// follows up and books the actual lesson manually once arranged.
+model PlayingLessonRequest {
+  id           String   @id @default(cuid())
+  business     Business @relation(fields: [businessId], references: [id])
+  businessId   String
+  instructor   Membership @relation("PlayingLessonRequestInstructor", fields: [instructorMembershipId], references: [id])
+  instructorMembershipId String
+  player       User     @relation(fields: [playerId], references: [id])
+  playerId     String
+  holes        Int      // 9 or 18
+  priceCents   Int      // snapshot of the instructor's price at request time
+  preferredDate DateTime?
+  notes        String?
+  // "pending" until the instructor has followed up and manually booked
+  // (or declined) the actual lesson - this only tracks whether the
+  // request itself has been handled, not a real booking's lifecycle.
+  status       String   @default("pending")
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  createdAt    DateTime @default(now())
+}
+
 // --- Identity (global — not tenant-scoped) ---
 
 model User {
@@ -325,6 +364,7 @@ model User {
   commonIssues   String?
   memberships    Membership[]
   packages       Package[]
+  playingLessonRequests PlayingLessonRequest[]
   bookings       Booking[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]

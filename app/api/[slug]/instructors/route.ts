@@ -59,6 +59,10 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     fittingDriverPriceCents: m.fittingDriverPriceCents,
     fittingIronPriceCents: m.fittingIronPriceCents,
     fittingFullPriceCents: m.fittingFullPriceCents,
+    playingLesson9Enabled: m.playingLesson9Enabled,
+    playingLesson9PriceCents: m.playingLesson9PriceCents,
+    playingLesson18Enabled: m.playingLesson18Enabled,
+    playingLesson18PriceCents: m.playingLesson18PriceCents,
   }));
 
   return NextResponse.json(shaped);
