@@ -10,9 +10,6 @@ workflows:
       # line to match.
       app_store_connect: codemagic
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.bookmypro.app
       vars:
         # No .xcworkspace exists here - that file is specifically what
         # CocoaPods creates to wrap the project together with its Pods
@@ -262,6 +259,30 @@ workflows:
           # calling xcodebuild directly here shows Xcode's own, real
           # error text instead, which should tell us the genuine reason.
           xcodebuild -project ios/App/App.xcodeproj -scheme App -showBuildSettings || true
+      - name: Set up keychain to be used for code signing using Codemagic CLI 'keychain' command
+        script: |
+          keychain initialize
+      # Explicit, rather than relying on Codemagic's own implicit
+      # automatic signing (the ios_signing: distribution_type +
+      # bundle_identifier shortcut this project used before) - that
+      # implicit path has been silently reusing a profile that's
+      # invisible both in Apple's own portal and in Codemagic's own
+      # "Code signing identities" list, exactly matching what
+      # --delete-stale-profiles is built to clean up: "profiles [with]
+      # active status with expiration date in the past... not shown in
+      # the Apple Developer Portal and [that] cannot be discovered
+      # using conventional read or list API queries." That flag is
+      # only reachable through this lower-level command, not through
+      # the implicit shortcut - hence switching to it here.
+      - name: Fetch signing files
+        script: |
+          app-store-connect fetch-signing-files "com.bookmypro.app" \
+            --type IOS_APP_STORE \
+            --create \
+            --delete-stale-profiles
+      - name: Set up signing certificate
+        script: |
+          keychain add-certificates
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
