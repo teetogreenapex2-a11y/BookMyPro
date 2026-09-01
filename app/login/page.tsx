@@ -2,7 +2,7 @@
 
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { SocialLogin } from "@capgo/capacitor-social-login";
 
@@ -25,6 +25,28 @@ function LoginPageInner() {
   const [signingInWithGoogle, setSigningInWithGoogle] = useState(false);
   const [appleError, setAppleError] = useState<string | null>(null);
   const [signingInWithApple, setSigningInWithApple] = useState(false);
+
+  // Both providers initialized together, once, rather than separately
+  // inside each sign-in handler - calling initialize() twice with only
+  // one provider each time risks the second call overwriting the first
+  // provider's configuration, depending on how the plugin merges
+  // settings internally. Combining them here avoids that entirely.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    SocialLogin.initialize({
+      google: {
+        webClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+        // Same real iOS OAuth client whose reversed form is already
+        // registered as a URL scheme in Info.plist by codemagic.yaml's
+        // "Add Google Sign-In URL scheme" step - hardcoded to match
+        // that file directly (this is a public client id, not a
+        // secret) rather than a new env var, both need to point at the
+        // exact same client for sign-in to actually complete on iOS.
+        iOSClientId: "748505012241-0ri4odsjmdmbcv9usac2ka67pgbqf9ao.apps.googleusercontent.com",
+      },
+      apple: {},
+    });
+  }, []);
 
   async function sendMagicLink() {
     if (!email.trim()) return;
@@ -50,18 +72,6 @@ function LoginPageInner() {
     setGoogleError(null);
     setSigningInWithGoogle(true);
     try {
-      await SocialLogin.initialize({
-        google: {
-          webClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
-          // Same real iOS OAuth client whose reversed form is already
-          // registered as a URL scheme in Info.plist by codemagic.yaml's
-          // "Add Google Sign-In URL scheme" step - hardcoded to match
-          // that file directly (this is a public client id, not a
-          // secret) rather than a new env var, both need to point at the
-          // exact same client for sign-in to actually complete on iOS.
-          iOSClientId: "748505012241-0ri4odsjmdmbcv9usac2ka67pgbqf9ao.apps.googleusercontent.com",
-        },
-      });
       // filterByAuthorizedAccounts defaults to true, which only shows
       // accounts that have already signed into this exact app before -
       // genuinely useless for every brand-new tester, who by definition
@@ -97,7 +107,46 @@ function LoginPageInner() {
     }
   }
 
+  // Apple's own sign-in screen isn't blocked inside an embedded web view
+  // the way Google's is - so the plain redirect below works fine on the
+  // website and on Android. iOS is the real exception: its WKWebView
+  // doesn't reliably carry cookies through the multi-hop redirect this
+  // flow requires. Rather than routing through the system browser and a
+  // Universal Link handoff (which needs the Associated Domains
+  // capability - the source of real, repeated build trouble), this uses
+  // the same native Sign in with Apple SDK the system already uses for
+  // Face ID, via the same plugin already used for native Google sign-in
+  // below. No web view, no cookies, no redirect at all.
   async function handleAppleSignIn() {
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
+      setAppleError(null);
+      setSigningInWithApple(true);
+      try {
+        const { result } = await SocialLogin.login({
+          provider: "apple",
+          options: { scopes: ["name", "email"] },
+        });
+        if (!result.idToken) throw new Error("Apple didn't return a token");
+
+        const name = [result.profile.givenName, result.profile.familyName].filter(Boolean).join(" ") || undefined;
+
+        const res = await fetch("/api/auth/apple-native", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identityToken: result.idToken, name }),
+        });
+        if (!res.ok) throw new Error("Sign-in failed - try again");
+
+        window.location.href = callbackUrl;
+      } catch (err: any) {
+        console.error("Native Apple sign-in failed:", err);
+        const detail = JSON.stringify(err, Object.getOwnPropertyNames(err || {})) || String(err) || "unknown error";
+        setAppleError(`Couldn't sign in with Apple: ${detail}`);
+      } finally {
+        setSigningInWithApple(false);
+      }
+      return;
+    }
     signIn("apple", { callbackUrl });
   }
 

@@ -48,13 +48,14 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true,
     },
-    // Only Google is actually used through this plugin - excluding the
-    // others keeps their SDKs (and app size) out of the build entirely.
+    // Google for native Android/iOS sign-in, Apple for native iOS
+    // sign-in (see handleAppleSignIn in app/login/page.tsx) - excluding
+    // the rest keeps their SDKs (and app size) out of the build.
     SocialLogin: {
       providers: {
         google: true,
         facebook: false,
-        apple: false,
+        apple: true,
         twitter: false,
       },
     },
