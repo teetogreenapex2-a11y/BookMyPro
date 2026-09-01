@@ -65,6 +65,19 @@ class MainViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMes
         webView.scrollView.bounces = false
         webView.scrollView.alwaysBounceVertical = false
 
+        // Without this, a plain white flash briefly shows at the top
+        // edge during scroll - that's the WebView's own default
+        // background color showing through for an instant before the
+        // page's real content renders over it, not anything about the
+        // page's own CSS. Setting it to the app's actual theme color
+        // directly removes that gap regardless of scroll speed or
+        // timing.
+        let fairway = UIColor(red: 0x1B / 255, green: 0x3A / 255, blue: 0x2F / 255, alpha: 1)
+        webView.backgroundColor = fairway
+        webView.scrollView.backgroundColor = fairway
+        webView.isOpaque = false
+        view.backgroundColor = fairway
+
         let bridgeScript = """
         window.AndroidTabBar = {
           setRole: function(role, slug, pageKey) {
