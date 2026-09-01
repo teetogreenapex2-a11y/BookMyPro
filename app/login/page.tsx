@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { SocialLogin } from "@capgo/capacitor-social-login";
-import { Browser } from "@capacitor/browser";
 
 export default function LoginPage() {
   return (
@@ -98,26 +97,7 @@ function LoginPageInner() {
     }
   }
 
-  // Apple's own sign-in screen isn't blocked inside an embedded web view
-  // the way Google's is - so the plain redirect below works fine on the
-  // website and on Android. iOS is the real exception: its WKWebView
-  // doesn't reliably carry cookies through the multi-hop redirect this
-  // flow requires, which shows up as the sign-in silently failing, or
-  // "succeeding" by unexpectedly escaping into Safari with no way back
-  // into the app. Routing this one platform through the system browser
-  // deliberately - then catching the person coming back via a Universal
-  // Link - fixes both: a real browser has none of the embedded view's
-  // cookie issues, and the handoff (see NativeAuthHandoff in
-  // schema.prisma) is what actually gets that session back into the
-  // app's own, separate cookie storage afterward.
   async function handleAppleSignIn() {
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
-      setSigningInWithApple(true);
-      const nativeCompleteUrl = `https://bookmypro.app/native-auth-complete?finalUrl=${encodeURIComponent(callbackUrl)}`;
-      const signInUrl = `https://bookmypro.app/api/auth/signin/apple?callbackUrl=${encodeURIComponent(nativeCompleteUrl)}`;
-      await Browser.open({ url: signInUrl });
-      return;
-    }
     signIn("apple", { callbackUrl });
   }
 

@@ -210,7 +210,7 @@ workflows:
           cd ios/App
           agvtool new-version -all $BUILD_NUMBER
           cd ../..
-      - name: Add push notification and Universal Links entitlements
+      - name: Add push notification entitlements
         script: |
           # Enabling the capability on the App ID over in Apple's own
           # developer portal is only half of what's needed - the app
@@ -220,13 +220,6 @@ workflows:
           # writes that request directly, then wires it into the
           # Xcode project so it's actually included when the app is
           # signed and built.
-          #
-          # com.apple.developer.associated-domains is the second real
-          # requirement for Apple sign-in's Universal Link handoff (see
-          # app/.well-known/apple-app-site-association/route.ts for the
-          # other half) - without this specific entitlement, iOS will
-          # never even attempt to check that file for this app at all,
-          # regardless of how correct the file itself is.
           cat > ios/App/App/App.entitlements << 'ENTITLEMENTS'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -237,10 +230,6 @@ workflows:
             <key>com.apple.developer.applesignin</key>
             <array>
               <string>Default</string>
-            </array>
-            <key>com.apple.developer.associated-domains</key>
-            <array>
-              <string>applinks:bookmypro.app</string>
             </array>
           </dict>
           </plist>
@@ -262,44 +251,6 @@ workflows:
           # calling xcodebuild directly here shows Xcode's own, real
           # error text instead, which should tell us the genuine reason.
           xcodebuild -project ios/App/App.xcodeproj -scheme App -showBuildSettings || true
-      - name: Set up keychain to be used for code signing using Codemagic CLI 'keychain' command
-        script: |
-          keychain initialize
-      # Explicit, rather than relying on Codemagic's own implicit
-      # automatic signing (the ios_signing: distribution_type +
-      # bundle_identifier shortcut this project used before) - that
-      # implicit path has been silently reusing a profile that's
-      # invisible both in Apple's own portal and in Codemagic's own
-      # "Code signing identities" list, exactly matching what
-      # --delete-stale-profiles is built to clean up: "profiles [with]
-      # active status with expiration date in the past... not shown in
-      # the Apple Developer Portal and [that] cannot be discovered
-      # using conventional read or list API queries." That flag is
-      # only reachable through this lower-level command, not through
-      # the implicit shortcut - hence this step, used purely for its
-      # cleanup side effect. --create is deliberately left off: it's
-      # what was triggering an unrelated certificate-saving requirement
-      # (a private key this project has never needed to manage, since
-      # Codemagic's own automatic signing - restored below via
-      # ios_signing - already handles the certificate side without it).
-      # Pure diagnostic - not attempting the actual fix yet. Two guesses
-      # at fetch-signing-files syntax have already failed tonight (one
-      # over --create, one even without it), so rather than guess a
-      # third time at the separate, certificate-independent "profiles"
-      # subcommand's exact syntax, this just asks the tool itself for
-      # its own authoritative help text. The archive step further down
-      # will still fail with the original error this round - that's
-      # expected and fine, since the only goal here is getting the real
-      # syntax to use for an actual fix attempt next.
-      - name: DIAGNOSTIC - print app-store-connect profiles command help
-        script: |
-          app-store-connect --help || true
-          echo "---"
-          app-store-connect profiles --help || true
-          echo "---"
-          app-store-connect profiles list --help || true
-          echo "---"
-          app-store-connect profiles delete --help || true
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
@@ -307,10 +258,7 @@ workflows:
         script: |
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME" \
-            --export-options-plist=/Users/builder/export_options.plist \
-            --verbose \
-            --disable-xcpretty
+            --scheme "$XCODE_SCHEME"
     artifacts:
       # Matches wherever the build actually places the .ipa, whether
       # that ends up being repo-root-relative or under ios/App - since
