@@ -270,7 +270,9 @@ workflows:
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
-            --export-options-plist=/Users/builder/export_options.plist
+            --export-options-plist=/Users/builder/export_options.plist \
+            --verbose \
+            --disable-xcpretty
     artifacts:
       # Matches wherever the build actually places the .ipa, whether
       # that ends up being repo-root-relative or under ios/App - since
