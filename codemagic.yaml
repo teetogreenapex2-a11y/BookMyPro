@@ -282,11 +282,24 @@ workflows:
       # (a private key this project has never needed to manage, since
       # Codemagic's own automatic signing - restored below via
       # ios_signing - already handles the certificate side without it).
-      - name: Fetch signing files
+      # Pure diagnostic - not attempting the actual fix yet. Two guesses
+      # at fetch-signing-files syntax have already failed tonight (one
+      # over --create, one even without it), so rather than guess a
+      # third time at the separate, certificate-independent "profiles"
+      # subcommand's exact syntax, this just asks the tool itself for
+      # its own authoritative help text. The archive step further down
+      # will still fail with the original error this round - that's
+      # expected and fine, since the only goal here is getting the real
+      # syntax to use for an actual fix attempt next.
+      - name: DIAGNOSTIC - print app-store-connect profiles command help
         script: |
-          app-store-connect fetch-signing-files "com.bookmypro.app" \
-            --type IOS_APP_STORE \
-            --delete-stale-profiles
+          app-store-connect --help || true
+          echo "---"
+          app-store-connect profiles --help || true
+          echo "---"
+          app-store-connect profiles list --help || true
+          echo "---"
+          app-store-connect profiles delete --help || true
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
