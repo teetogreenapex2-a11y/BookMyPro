@@ -31,7 +31,13 @@ html, body {
 body {
   margin: 0;
   font-family: 'Inter', sans-serif;
-  background: var(--chalk);
+  /* This background is what's actually visible in the safe-area gap
+     below (the status bar/notch padding on the native app) - every
+     single page's header starts with this same dark green
+     (var(--fairway)), so matching it here is what makes that gap
+     blend seamlessly into the real header immediately below it,
+     instead of showing as a visibly mismatched light block. */
+  background: var(--fairway);
   color: var(--ink);
   /* Pushes every screen's content down below the status bar/notch on
      the native app. env() resolves to 0 on the regular website (no
@@ -82,3 +88,4 @@ a {
     display: none !important;
   }
 }
+
