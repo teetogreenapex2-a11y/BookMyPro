@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "748505012241-fnabltdiqoll8v2aimd8kvkh51rmf9on.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bookmypro.app",
+            "certificate_hash": "f618cb1de20110a3575e3e7d8d1958ab36f419bc"
+          }
+        },
+        {
           "client_id": "748505012241-cpofgjbeuvqnvimf0fbd06muaeobv4fr.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -29,6 +37,13 @@
             {
               "client_id": "748505012241-cpofgjbeuvqnvimf0fbd06muaeobv4fr.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "748505012241-0ri4odsjmdmbcv9usac2ka67pgbqf9ao.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.bookmypro.app"
+              }
             }
           ]
         }
