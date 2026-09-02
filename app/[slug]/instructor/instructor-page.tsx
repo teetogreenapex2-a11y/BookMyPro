@@ -27,6 +27,7 @@ export default async function InstructorPage({ params }: { params: { slug: strin
       remoteLessonsEnabled={!!business.dailyApiKey}
       viewerMembershipId={membership.id}
       viewerRole={membership.role}
+      viewerName={session.user?.name || null}
       basePath={basePath}
       apiBase={apiBase}
       openHour={business.openHour}

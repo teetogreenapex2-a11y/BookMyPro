@@ -69,8 +69,8 @@ async function getFcmTokenWithRetry(FirebaseMessaging: any, attempts = 12, delay
 }
 
 export default function InstructorClient({
-  calendarConnected, calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, slug, basePath, apiBase, businessName, businessLogoUrl, openHour, closeHour,
-}: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null; openHour: number; closeHour: number }) {
+  calendarConnected, calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, viewerName, slug, basePath, apiBase, businessName, businessLogoUrl, openHour, closeHour,
+}: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; viewerName: string | null; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null; openHour: number; closeHour: number }) {
   // Built from the business's real, current hours instead of a fixed
   // list - without this, changing hours in Settings would update the
   // underlying data correctly, but the calendar itself would never
@@ -818,6 +818,11 @@ export default function InstructorClient({
     <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          {viewerName && (
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--chalk)", marginBottom: 10 }}>
+              Welcome, {viewerName.split(" ")[0]}
+            </div>
+          )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {businessLogoUrl && (
