@@ -1,11 +1,11 @@
 apply plugin: 'com.android.application'
 android {
     namespace = "com.bookmypro.app"
-    compileSdk 37
+    compileSdk 35
     defaultConfig {
         applicationId "com.bookmypro.app"
         minSdkVersion 24
-        targetSdkVersion 37
+        targetSdkVersion 35
         versionCode 9
         versionName "1.7.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -41,6 +41,16 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+}
+
+configurations.configureEach {
+    resolutionStrategy {
+        force 'androidx.core:core:1.15.0'
+        force 'androidx.core:core-ktx:1.15.0'
+        force 'androidx.browser:browser:1.8.0'
+        force 'androidx.activity:activity:1.9.3'
+        force 'androidx.activity:activity-ktx:1.9.3'
+    }
 }
 apply from: 'capacitor.build.gradle'
 try {
