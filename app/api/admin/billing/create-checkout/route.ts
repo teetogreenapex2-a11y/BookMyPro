@@ -34,6 +34,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Enter a valid number of instructors" }, { status: 400 });
   }
 
-  const url = await createPlatformCheckoutSession(business, tier, count);
-  return NextResponse.json({ url });
+  try {
+    const url = await createPlatformCheckoutSession(business, tier, count);
+    return NextResponse.json({ url });
+  } catch (err) {
+    console.error("Platform checkout session creation failed:", err);
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: `Stripe error: ${message}` }, { status: 500 });
+  }
 }
