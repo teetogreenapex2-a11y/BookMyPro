@@ -2,7 +2,7 @@
 
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { SocialLogin } from "@capgo/capacitor-social-login";
 
@@ -31,9 +31,23 @@ function LoginPageInner() {
   // one provider each time risks the second call overwriting the first
   // provider's configuration, depending on how the plugin merges
   // settings internally. Combining them here avoids that entirely.
+  //
+  // The promise itself is stored (not just fired and forgotten) so
+  // both sign-in handlers below can actually await it before calling
+  // login() - without this, a fast tap right after the page loads
+  // could fire before initialize() has genuinely finished, which the
+  // plugin reports as "provider was not initialized" even though it's
+  // really just not ready yet. This closes that race regardless of
+  // how quickly someone taps a button.
+  //
+  // apple is only included on iOS - Sign In with Apple doesn't
+  // natively apply on Android at all, so there's no reason to pass it
+  // there, and doing so risks whatever the plugin does internally with
+  // a provider config for a platform it was never meant to run on.
+  const socialLoginInit = useRef<Promise<void> | null>(null);
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    SocialLogin.initialize({
+    socialLoginInit.current = SocialLogin.initialize({
       google: {
         webClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
         // Same real iOS OAuth client whose reversed form is already
@@ -44,7 +58,7 @@ function LoginPageInner() {
         // exact same client for sign-in to actually complete on iOS.
         iOSClientId: "748505012241-0ri4odsjmdmbcv9usac2ka67pgbqf9ao.apps.googleusercontent.com",
       },
-      apple: {},
+      ...(Capacitor.getPlatform() === "ios" ? { apple: {} } : {}),
     });
   }, []);
 
@@ -72,6 +86,7 @@ function LoginPageInner() {
     setGoogleError(null);
     setSigningInWithGoogle(true);
     try {
+      if (socialLoginInit.current) await socialLoginInit.current;
       // filterByAuthorizedAccounts defaults to true, which only shows
       // accounts that have already signed into this exact app before -
       // genuinely useless for every brand-new tester, who by definition
@@ -122,6 +137,7 @@ function LoginPageInner() {
       setAppleError(null);
       setSigningInWithApple(true);
       try {
+        if (socialLoginInit.current) await socialLoginInit.current;
         const { result } = await SocialLogin.login({
           provider: "apple",
           options: { scopes: ["name", "email"] },
