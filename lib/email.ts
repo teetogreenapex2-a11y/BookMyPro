@@ -212,6 +212,28 @@ export async function sendTrialExpiredNotification(to: string | null | undefined
   await sendEmail(to, `Trial ended: ${details.businessName}`, html);
 }
 
+// Sent when a business's own BookMyPro subscription payment fails -
+// deliberately doesn't do anything to their access automatically (same
+// as the trial-expiry notification above), this just starts a real,
+// human follow-up rather than any automated lockout.
+export async function sendPlatformPaymentFailedNotification(to: string | null | undefined, details: { businessName: string; ownerName: string | null; ownerEmail: string | null }) {
+  if (!to) return;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">A subscription payment failed</h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        <tr><td style="padding: 4px 0; color: #8A8571;">Business</td><td style="padding: 4px 0; font-weight: 600;">${details.businessName}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Owner</td><td style="padding: 4px 0; font-weight: 600;">${details.ownerName || "—"}</td></tr>
+        <tr><td style="padding: 4px 0; color: #8A8571;">Email</td><td style="padding: 4px 0;">${details.ownerEmail || "—"}</td></tr>
+      </table>
+      <p>Nothing happens automatically to their access - Stripe will keep retrying the charge on its own schedule, but worth reaching out directly if it keeps failing.</p>
+    </div>
+  `;
+
+  await sendEmail(to, `Payment failed: ${details.businessName}`, html);
+}
+
 // Sends the actual magic link for passwordless sign-in - this is the
 // custom sendVerificationRequest NextAuth's Email provider calls instead
 // of its own default (which expects raw SMTP credentials we don't have,

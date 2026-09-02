@@ -48,3 +48,48 @@ export async function getAccountStatus(accountId: string) {
     payoutsEnabled: account.payouts_enabled,
   };
 }
+
+// --- Platform billing (BookMyPro's own subscription revenue) ---
+// Deliberately separate section from everything above - every function
+// above either creates or acts on a business's own connected account
+// (their money, from their players). This is the only place that ever
+// charges *the business itself*, on the platform's own, regular Stripe
+// account - never passing { stripeAccount: ... } at all, which is
+// exactly what would make this a connected-account charge instead of
+// a platform one.
+const PLATFORM_PRICE_IDS = {
+  monthly: "price_1UBJcS4uMHGraF5nhGskUm62",
+  academyBase: "price_1UBJhv4uMHGraF5nbYbRz7iy",
+  academyPerInstructor: "price_1UBJlo4uMHGraF5nnGIjrp0Q",
+};
+
+export async function createPlatformCheckoutSession(
+  business: { id: string; name: string; email: string; platformStripeCustomerId: string | null },
+  tier: "monthly" | "academy",
+  instructorCount: number
+) {
+  const items: Stripe.Checkout.SessionCreateParams.LineItem[] =
+    tier === "monthly"
+      ? [{ price: PLATFORM_PRICE_IDS.monthly, quantity: 1 }]
+      : [
+          { price: PLATFORM_PRICE_IDS.academyBase, quantity: 1 },
+          { price: PLATFORM_PRICE_IDS.academyPerInstructor, quantity: instructorCount },
+        ];
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    line_items: items,
+    // Reuses the same Stripe customer across attempts if one already
+    // exists for this business (e.g. a retry after a cancelled
+    // checkout), rather than creating a fresh, duplicate customer
+    // record every single time a link is generated.
+    ...(business.platformStripeCustomerId
+      ? { customer: business.platformStripeCustomerId }
+      : { customer_email: business.email || undefined }),
+    client_reference_id: business.id,
+    success_url: `${process.env.NEXTAUTH_URL}/subscription-confirmed?status=success`,
+    cancel_url: `${process.env.NEXTAUTH_URL}/subscription-confirmed?status=cancelled`,
+  });
+
+  return session.url;
+}

@@ -40,6 +40,42 @@ export async function POST(req: NextRequest) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
+
+    // Platform billing (the business paying BookMyPro itself) - checked
+    // first and handled entirely separately, since these sessions never
+    // carry meta.businessId at all, only client_reference_id, and never
+    // happen on a connected account (event.account is always absent
+    // here, unlike every path below this one).
+    if (session.mode === "subscription") {
+      const businessId = session.client_reference_id;
+      if (!businessId) return NextResponse.json({ received: true });
+
+      const business = await prisma.business.findUnique({ where: { id: businessId } });
+      if (!business) return NextResponse.json({ received: true });
+
+      const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+      if (!subscriptionId) return NextResponse.json({ received: true });
+
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      // Only present for an Academy subscription (the base-fee-only
+      // Monthly tier has no per-instructor line item at all) - stored
+      // separately so its quantity can be updated later without ever
+      // touching the base-fee item.
+      const instructorItem = subscription.items.data.find((item) => item.price.id === "price_1UBJlo4uMHGraF5nnGIjrp0Q");
+
+      await prisma.business.update({
+        where: { id: business.id },
+        data: {
+          platformStripeCustomerId: typeof session.customer === "string" ? session.customer : session.customer?.id,
+          platformStripeSubscriptionId: subscriptionId,
+          platformInstructorItemId: instructorItem?.id || null,
+          subscriptionStatus: "active",
+        },
+      });
+
+      return NextResponse.json({ received: true });
+    }
+
     const meta = session.metadata || {};
     const businessId = meta.businessId;
     if (!businessId) return NextResponse.json({ received: true }); // malformed/legacy session, nothing to do
@@ -486,6 +522,69 @@ export async function POST(req: NextRequest) {
           message: meta.message || null,
         }).catch((err) => console.error("Gift card email failed:", err));
       }
+    }
+  }
+
+  // --- Platform billing (the business paying BookMyPro itself) ---
+  // Deliberately separate from every event handler above, which are all
+  // about a business's own connected account receiving money from
+  // their players - these three are the only ones about the business
+  // itself being charged, on the platform's own account.
+
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+    if (customerId) {
+      const business = await prisma.business.findFirst({
+        where: { platformStripeCustomerId: customerId },
+        include: { memberships: { where: { role: "owner" }, include: { user: { select: { name: true, email: true } } } } },
+      });
+      if (business) {
+        await prisma.business.update({ where: { id: business.id }, data: { subscriptionStatus: "past_due" } });
+
+        // Same admin lookup pattern as the trial-expiry cron - nothing
+        // happens to the business's own access automatically, this
+        // just starts a real, human follow-up.
+        const adminBusiness = await prisma.business.findUnique({ where: { slug: "tee-to-green-golf" } });
+        const adminMembership = adminBusiness
+          ? await prisma.membership.findFirst({ where: { businessId: adminBusiness.id, role: "owner" }, include: { user: true } })
+          : null;
+        if (adminMembership?.user.email) {
+          const { sendPlatformPaymentFailedNotification } = await import("@/lib/email");
+          await sendPlatformPaymentFailedNotification(adminMembership.user.email, {
+            businessName: business.name,
+            ownerName: business.memberships[0]?.user.name || null,
+            ownerEmail: business.memberships[0]?.user.email || null,
+          }).catch((err) => console.error("Platform payment-failed email failed:", err));
+        }
+      }
+    }
+  }
+
+  if (event.type === "customer.subscription.deleted") {
+    const subscription = event.data.object as Stripe.Subscription;
+    const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
+    if (customerId) {
+      await prisma.business.updateMany({
+        where: { platformStripeCustomerId: customerId },
+        data: { subscriptionStatus: "cancelled" },
+      });
+    }
+  }
+
+  if (event.type === "invoice.paid") {
+    // Recovery case - a card that previously failed and got fixed
+    // shouldn't need a manual admin visit to get flipped back to
+    // active. This also fires for the very first, initial payment
+    // (already set to "active" by checkout.session.completed above),
+    // which is harmless - setting the same status twice does nothing.
+    const invoice = event.data.object as Stripe.Invoice;
+    const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+    if (customerId) {
+      await prisma.business.updateMany({
+        where: { platformStripeCustomerId: customerId, subscriptionStatus: "past_due" },
+        data: { subscriptionStatus: "active" },
+      });
     }
   }
 
