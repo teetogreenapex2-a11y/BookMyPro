@@ -682,9 +682,12 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                 squareStatus === null ? (
                   <p style={{ fontSize: 13, color: "var(--faint)" }}>Checking status…</p>
                 ) : squareStatus.connected && !squareStatus.expired ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3E7A56" }} />
                     <span style={{ fontSize: 13, fontWeight: 600 }}>Connected — ready to accept payments</span>
+                    <a href={`${apiBase}/square/connect`} style={{ fontSize: 12, color: "var(--faint)", textDecoration: "underline" }}>
+                      Reconnect
+                    </a>
                   </div>
                 ) : (
                   <div>
