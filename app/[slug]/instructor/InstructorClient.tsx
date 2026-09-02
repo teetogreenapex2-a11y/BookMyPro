@@ -310,18 +310,23 @@ export default function InstructorClient({
     if (!playerId || !buyNewPackageType || !instructorMembershipId) return;
     setSellingPackageOnly(true);
     setNewBookingError(null);
-    const res = await fetch(`${apiBase}/packages/sell`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, packageType: buyNewPackageType, instructorMembershipId, markAsPaid }),
-    });
-    setSellingPackageOnly(false);
-    if (res.ok) {
-      setNewBookingOpen(false);
-      setNewBookingForm((f) => ({ slotId: "", serviceType: "lesson", fittingType: "driver", playerId: "", packageId: "", buyNewPackageType: "", markAsPaid: true, instructorMembershipId: f.instructorMembershipId, isRemote: false }));
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setNewBookingError(data.error || "Something went wrong.");
+    try {
+      const res = await fetch(`${apiBase}/packages/sell`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId, packageType: buyNewPackageType, instructorMembershipId, markAsPaid }),
+      });
+      if (res.ok) {
+        setNewBookingOpen(false);
+        setNewBookingForm((f) => ({ slotId: "", serviceType: "lesson", fittingType: "driver", playerId: "", packageId: "", buyNewPackageType: "", markAsPaid: true, instructorMembershipId: f.instructorMembershipId, isRemote: false }));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setNewBookingError(data.error || "Something went wrong.");
+      }
+    } catch {
+      setNewBookingError("Couldn't reach the server - check your connection and try again.");
+    } finally {
+      setSellingPackageOnly(false);
     }
   }
 
@@ -333,29 +338,34 @@ export default function InstructorClient({
     }
     setCreatingBooking(true);
     setNewBookingError(null);
-    const res = await fetch(`${apiBase}/bookings/manual`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        availabilityId: slotId,
-        serviceType,
-        fittingType: serviceType === "fitting" ? fittingType : undefined,
-        playerId,
-        packageId: serviceType === "lesson" && packageId ? packageId : undefined,
-        buyNewPackageType: serviceType === "lesson" && buyNewPackageType ? buyNewPackageType : undefined,
-        markAsPaid,
-        instructorMembershipId,
-        isRemote: serviceType === "lesson" ? isRemote : false,
-      }),
-    });
-    setCreatingBooking(false);
-    if (res.ok) {
-      setNewBookingOpen(false);
-      setNewBookingForm((f) => ({ slotId: "", serviceType: "lesson", fittingType: "driver", playerId: "", packageId: "", buyNewPackageType: "", markAsPaid: true, instructorMembershipId: f.instructorMembershipId, isRemote: false }));
-      loadSlots();
-    } else {
-      const data = await res.json();
-      setNewBookingError(data.error || "Something went wrong.");
+    try {
+      const res = await fetch(`${apiBase}/bookings/manual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          availabilityId: slotId,
+          serviceType,
+          fittingType: serviceType === "fitting" ? fittingType : undefined,
+          playerId,
+          packageId: serviceType === "lesson" && packageId ? packageId : undefined,
+          buyNewPackageType: serviceType === "lesson" && buyNewPackageType ? buyNewPackageType : undefined,
+          markAsPaid,
+          instructorMembershipId,
+          isRemote: serviceType === "lesson" ? isRemote : false,
+        }),
+      });
+      if (res.ok) {
+        setNewBookingOpen(false);
+        setNewBookingForm((f) => ({ slotId: "", serviceType: "lesson", fittingType: "driver", playerId: "", packageId: "", buyNewPackageType: "", markAsPaid: true, instructorMembershipId: f.instructorMembershipId, isRemote: false }));
+        loadSlots();
+      } else {
+        const data = await res.json();
+        setNewBookingError(data.error || "Something went wrong.");
+      }
+    } catch {
+      setNewBookingError("Couldn't reach the server - check your connection and try again.");
+    } finally {
+      setCreatingBooking(false);
     }
   }
 
@@ -366,26 +376,31 @@ export default function InstructorClient({
     }
     setCreatingPlayer(true);
     setNewPlayerError(null);
-    const res = await fetch(`${apiBase}/players/manual`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newPlayerName, email: newPlayerEmail, phone: newPlayerPhone }),
-    });
-    const data = await res.json();
-    setCreatingPlayer(false);
-    if (!res.ok) {
-      setNewPlayerError(data.error || "Something went wrong.");
-      return;
+    try {
+      const res = await fetch(`${apiBase}/players/manual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newPlayerName, email: newPlayerEmail, phone: newPlayerPhone }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNewPlayerError(data.error || "Something went wrong.");
+        return;
+      }
+      // Add the new player to the list in place, then immediately select
+      // them in the booking form - no need to close and reopen anything,
+      // this picks up right where the instructor left off.
+      setPlayers((prev) => [...prev, { id: data.id, name: data.name, email: data.email, phone: data.phone, packages: [] }]);
+      setNewBookingForm((f) => ({ ...f, playerId: data.id }));
+      setAddingNewPlayer(false);
+      setNewPlayerName("");
+      setNewPlayerEmail("");
+      setNewPlayerPhone("");
+    } catch {
+      setNewPlayerError("Couldn't reach the server - check your connection and try again.");
+    } finally {
+      setCreatingPlayer(false);
     }
-    // Add the new player to the list in place, then immediately select
-    // them in the booking form - no need to close and reopen anything,
-    // this picks up right where the instructor left off.
-    setPlayers((prev) => [...prev, { id: data.id, name: data.name, email: data.email, phone: data.phone, packages: [] }]);
-    setNewBookingForm((f) => ({ ...f, playerId: data.id }));
-    setAddingNewPlayer(false);
-    setNewPlayerName("");
-    setNewPlayerEmail("");
-    setNewPlayerPhone("");
   }
 
   async function loadSyncLog() {
@@ -448,11 +463,20 @@ export default function InstructorClient({
 
   async function loadSlots() {
     setLoading(true);
-    const start = weekStart.toISOString();
-    const end = new Date(weekStart.getTime() + 7 * DAY_MS).toISOString();
-    const res = await fetch(`${apiBase}/availability?start=${start}&end=${end}&instructorMembershipId=${viewingInstructorId}`);
-    setSlots(await res.json());
-    setLoading(false);
+    try {
+      const start = weekStart.toISOString();
+      const end = new Date(weekStart.getTime() + 7 * DAY_MS).toISOString();
+      const res = await fetch(`${apiBase}/availability?start=${start}&end=${end}&instructorMembershipId=${viewingInstructorId}`);
+      if (res.ok) setSlots(await res.json());
+    } catch {
+      // Left silent deliberately - loadSlots runs constantly (on every
+      // navigation, filter change, and after nearly every action on this
+      // page), so a visible error here on every transient network blip
+      // would be far more disruptive than just leaving the slots as
+      // they were and letting the next successful load catch up.
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function toggleSlot(slot: Slot) {
@@ -604,19 +628,24 @@ export default function InstructorClient({
       return;
     }
     setSavingCapacity(true);
-    const res = await fetch(`${apiBase}/availability`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: rosterSlot.id, groupCapacity: capacity }),
-    });
-    setSavingCapacity(false);
-    if (res.ok) {
-      const updated = await res.json();
-      setRosterSlot((s) => (s ? { ...s, groupCapacity: updated.groupCapacity, status: updated.status } : s));
-      loadSlots();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error || "Couldn't update capacity.");
+    try {
+      const res = await fetch(`${apiBase}/availability`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: rosterSlot.id, groupCapacity: capacity }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setRosterSlot((s) => (s ? { ...s, groupCapacity: updated.groupCapacity, status: updated.status } : s));
+        loadSlots();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Couldn't update capacity.");
+      }
+    } catch {
+      alert("Couldn't reach the server - check your connection and try again.");
+    } finally {
+      setSavingCapacity(false);
     }
   }
 
@@ -625,20 +654,25 @@ export default function InstructorClient({
   async function addPlayerToGroup() {
     if (!rosterSlot || !addToGroupPlayerId) return;
     setAddingToGroup(true);
-    const res = await fetch(`${apiBase}/availability/${rosterSlot.id}/add-to-group`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId: addToGroupPlayerId }),
-    });
-    setAddingToGroup(false);
-    if (res.ok) {
-      setAddToGroupPlayerId("");
-      const rosterRes = await fetch(`${apiBase}/availability/${rosterSlot.id}/roster`);
-      if (rosterRes.ok) setRoster((await rosterRes.json()).roster);
-      loadSlots();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error || "Couldn't add this player.");
+    try {
+      const res = await fetch(`${apiBase}/availability/${rosterSlot.id}/add-to-group`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: addToGroupPlayerId }),
+      });
+      if (res.ok) {
+        setAddToGroupPlayerId("");
+        const rosterRes = await fetch(`${apiBase}/availability/${rosterSlot.id}/roster`);
+        if (rosterRes.ok) setRoster((await rosterRes.json()).roster);
+        loadSlots();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Couldn't add this player.");
+      }
+    } catch {
+      alert("Couldn't reach the server - check your connection and try again.");
+    } finally {
+      setAddingToGroup(false);
     }
   }
 
@@ -650,14 +684,19 @@ export default function InstructorClient({
       : "Cancel this group lesson? This can't be undone.";
     if (!window.confirm(warning)) return;
     setCancellingGroup(true);
-    const res = await fetch(`${apiBase}/availability/${rosterSlot.id}/cancel-group`, { method: "POST" });
-    setCancellingGroup(false);
-    if (res.ok) {
-      setRosterSlot(null);
-      loadSlots();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error || "Couldn't cancel this group lesson.");
+    try {
+      const res = await fetch(`${apiBase}/availability/${rosterSlot.id}/cancel-group`, { method: "POST" });
+      if (res.ok) {
+        setRosterSlot(null);
+        loadSlots();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Couldn't cancel this group lesson.");
+      }
+    } catch {
+      alert("Couldn't reach the server - check your connection and try again.");
+    } finally {
+      setCancellingGroup(false);
     }
   }
 
@@ -673,32 +712,42 @@ export default function InstructorClient({
 
   async function confirmBooking(booking: Booking) {
     setReviewing(true);
-    const res = await fetch(`${apiBase}/bookings/${booking.id}/confirm`, { method: "POST" });
-    setReviewing(false);
-    if (res.ok) {
-      setReviewingBooking(null);
-      loadSlots();
-      loadPendingBookings();
-    } else {
-      const data = await res.json();
-      setReviewMessage(data.error || "Something went wrong.");
+    try {
+      const res = await fetch(`${apiBase}/bookings/${booking.id}/confirm`, { method: "POST" });
+      if (res.ok) {
+        setReviewingBooking(null);
+        loadSlots();
+        loadPendingBookings();
+      } else {
+        const data = await res.json();
+        setReviewMessage(data.error || "Something went wrong.");
+      }
+    } catch {
+      setReviewMessage("Couldn't reach the server - check your connection and try again.");
+    } finally {
+      setReviewing(false);
     }
   }
 
   async function denyBooking(booking: Booking) {
     setReviewing(true);
-    const res = await fetch(`${apiBase}/bookings/${booking.id}/deny`, { method: "POST" });
-    const data = await res.json();
-    setReviewing(false);
-    if (res.ok) {
-      setReviewingBooking(null);
-      loadSlots();
-      loadPendingBookings();
-      if (data.refundNeeded) {
-        setReviewMessage("Denied - this was a paid booking, so remember to refund the player outside the app.");
+    try {
+      const res = await fetch(`${apiBase}/bookings/${booking.id}/deny`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setReviewingBooking(null);
+        loadSlots();
+        loadPendingBookings();
+        if (data.refundNeeded) {
+          setReviewMessage("Denied - this was a paid booking, so remember to refund the player outside the app.");
+        }
+      } else {
+        setReviewMessage(data.error || "Something went wrong.");
       }
-    } else {
-      setReviewMessage(data.error || "Something went wrong.");
+    } catch {
+      setReviewMessage("Couldn't reach the server - check your connection and try again.");
+    } finally {
+      setReviewing(false);
     }
   }
 
@@ -743,14 +792,19 @@ export default function InstructorClient({
     if (!bookingId) return;
     if (!window.confirm("Cancel this booking? Any package credit used will be refunded, and the time slot will reopen.")) return;
     setCancellingBooking(true);
-    const res = await fetch(`${apiBase}/bookings/${bookingId}/cancel`, { method: "POST" });
-    setCancellingBooking(false);
-    if (res.ok) {
-      setNoteSlot(null);
-      loadSlots();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error || "Couldn't cancel this booking.");
+    try {
+      const res = await fetch(`${apiBase}/bookings/${bookingId}/cancel`, { method: "POST" });
+      if (res.ok) {
+        setNoteSlot(null);
+        loadSlots();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Couldn't cancel this booking.");
+      }
+    } catch {
+      alert("Couldn't reach the server - check your connection and try again.");
+    } finally {
+      setCancellingBooking(false);
     }
   }
 
@@ -761,7 +815,7 @@ export default function InstructorClient({
   }, [slots]);
 
   return (
-    <div style={{ minHeight: "100vh" }}>
+    <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
@@ -1276,7 +1330,7 @@ export default function InstructorClient({
         )}
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ink)" }}>
             {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} –{" "}
             {new Date(weekStart.getTime() + 6 * DAY_MS).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </div>

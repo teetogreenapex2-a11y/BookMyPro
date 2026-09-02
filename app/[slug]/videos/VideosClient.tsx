@@ -179,7 +179,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
   }
 
   return (
-    <div style={{ minHeight: "100vh" }}>
+    <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
