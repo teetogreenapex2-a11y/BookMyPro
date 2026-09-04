@@ -26,6 +26,7 @@ html, body {
      page sideways instead of just being clipped in place. */
   overflow-x: hidden;
   max-width: 100vw;
+<<<<<<< HEAD
 }
 
 html {
@@ -34,6 +35,9 @@ html {
      actual scroll container instead. */
   height: 100%;
   overflow: hidden;
+=======
+  
+>>>>>>> 84dc9db8617becf380426631b70b8ab8c0423e6d
 }
 
 body {
