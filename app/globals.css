@@ -26,14 +26,14 @@ html, body {
      page sideways instead of just being clipped in place. */
   overflow-x: hidden;
   max-width: 100vw;
-  /* Stops iOS Safari/WKWebView's rubber-band scroll effect at the actual
-     page-content level - the native app already disables this on the
-     outer WebView container itself (MainViewController.swift), but that
-     alone doesn't reach how the web content inside it scrolls. Without
-     this, scrolling past the top or bottom still lets the page slide
-     past its own edges into blank space that was never meant to be
-     visible, even though nothing about the header or content changed. */
-  overscroll-behavior-y: none;
+}
+
+html {
+  /* Locks the outer document to exactly the real viewport height, with
+     no scrolling of its own at all - body (below) becomes the single,
+     actual scroll container instead. */
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -47,10 +47,27 @@ body {
      instead of showing as a visibly mismatched light block. */
   background: var(--fairway);
   color: var(--ink);
+  /* body is the actual scroll container - height: 100% pins it to
+     exactly the real viewport (matching html above), and
+     overflow-y: auto is where all of this page's scrolling genuinely
+     happens now, instead of the document as a whole. */
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   /* Pushes every screen's content down below the status bar/notch on
      the native app. env() resolves to 0 on the regular website (no
-     notch to account for there), so this is a no-op outside the app. */
+     notch to account for there), so this is a no-op outside the app.
+     box-sizing: border-box is what makes this safe, and is the actual
+     fix for the iOS scroll issue below - it counts this padding INSIDE
+     body's fixed height above rather than adding to it. Without
+     border-box, this padding stacked on top of an already-full-height
+     page, making the true scrollable area taller than the real
+     viewport by exactly this amount - phantom space with nothing in
+     it, which is exactly what was scrolling into view as a plain block
+     of this background color where there was never meant to be
+     anything to scroll into at all. */
   padding-top: env(safe-area-inset-top);
+  box-sizing: border-box;
 }
 
 button {
