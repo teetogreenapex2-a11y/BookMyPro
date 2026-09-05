@@ -26,10 +26,6 @@ html, body {
      page sideways instead of just being clipped in place. */
   overflow-x: hidden;
   max-width: 100vw;
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 87db9f4384f45dc17c1e2a8915ead710d2c4b206
 }
 
 html {
@@ -38,12 +34,6 @@ html {
      actual scroll container instead. */
   height: 100%;
   overflow: hidden;
-<<<<<<< HEAD
-=======
-  
->>>>>>> 84dc9db8617becf380426631b70b8ab8c0423e6d
-=======
->>>>>>> 87db9f4384f45dc17c1e2a8915ead710d2c4b206
 }
 
 body {
@@ -83,7 +73,9 @@ body {
 button {
   font-family: inherit;
   cursor: pointer;
-}.contact-input::placeholder {
+}
+
+.contact-input::placeholder {
   color: rgba(246, 244, 238, 0.65);
 }
 
@@ -123,6 +115,7 @@ a {
     display: none !important;
   }
 }
+  
 
 
 
