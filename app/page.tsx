@@ -149,26 +149,34 @@ function MarketingPage() {
               Players book lessons and fittings straight into your calendar, pay automatically,
               and send you their swing for review — all from a page with your own name on it.
             </p>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 320 }}>
               <a
-                href="/onboarding"
+                href="/tee-to-green-golf/book"
                 className="cta-btn"
                 style={{
-                  display: "inline-block", background: "#1B3A2F", color: "#F6F4EE", borderRadius: 8,
-                  padding: "13px 26px", fontWeight: 700, fontSize: 15, textDecoration: "none", transition: "all 0.15s",
+                  display: "block", background: "#1B3A2F", color: "#F6F4EE", borderRadius: 8,
+                  padding: "13px 20px", fontWeight: 700, fontSize: 15, textDecoration: "none", textAlign: "center", transition: "all 0.15s",
                 }}
               >
-                Get started
+                I'm looking to book a lesson
               </a>
               <a
-                href="/login"
+                href="/tee-to-green-golf/join-as-instructor"
                 style={{
-                  display: "inline-block", background: "none", color: "#1B3A2F", border: "1px solid #D8D1BF", borderRadius: 8,
-                  padding: "13px 26px", fontWeight: 600, fontSize: 15, textDecoration: "none",
+                  display: "block", background: "none", color: "#1B3A2F", border: "1px solid #D8D1BF", borderRadius: 8,
+                  padding: "13px 20px", fontWeight: 600, fontSize: 15, textDecoration: "none", textAlign: "center",
                 }}
               >
-                Sign in
+                I'm a coach or instructor
               </a>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginTop: 4 }}>
+                <a href="/onboarding" style={{ color: "#8A8571", textDecoration: "none" }}>
+                  Own golf business? Get started
+                </a>
+                <a href="/login" style={{ color: "#8A8571", textDecoration: "none" }}>
+                  Sign in
+                </a>
+              </div>
             </div>
           </div>
 
