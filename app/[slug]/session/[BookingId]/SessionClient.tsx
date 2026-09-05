@@ -343,7 +343,7 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
                 maxShoulderWidthRef.current = sw;
               }
               const headRadiusOverride = maxShoulderWidthRef.current ? maxShoulderWidthRef.current * 0.3 : null;
-              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3, headRadiusOverride);
+              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#EAE3D0", 3, headRadiusOverride);
               if (!headReferenceRef.current && points[12]) {
                 headReferenceRef.current = points[12];
               }

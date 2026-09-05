@@ -157,7 +157,13 @@ export function drawPoseSkeleton(
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = width;
+  // Real long bones are actually narrower along the shaft and flare out
+  // wider right at the joints - drawn that way here too: a thinner
+  // connecting line for the "shaft" between two points, with the joint
+  // markers below sized and outlined to read as the wider, rounded bone
+  // ends, rather than one uniform-width line the whole way with plain
+  // dots at each end.
+  ctx.lineWidth = width * 0.55;
   ctx.lineCap = "round";
   POSE_CONNECTIONS.forEach(([a, b]) => {
     const pa = effectivePoints[a], pb = effectivePoints[b];
@@ -174,13 +180,22 @@ export function drawPoseSkeleton(
     ctx.stroke();
     ctx.restore();
   });
+  const jointRadius = Math.max(5, width * 0.85);
   effectivePoints.forEach((p, i) => {
     if (i === 12) return; // head drawn separately below, as a proportional circle rather than a tiny dot
     ctx.save();
     if (lowConf.has(i)) ctx.globalAlpha = 0.45;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, Math.max(3, width / 2), 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, jointRadius, 0, Math.PI * 2);
     ctx.fill();
+    // A subtle darker outline on top of the same fill is what actually
+    // reads as a rounded, three-dimensional bone end rather than a flat
+    // dot - too subtle to fight the main color, just enough to define
+    // the joint's edge.
+    ctx.strokeStyle = "rgba(40, 30, 20, 0.35)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.strokeStyle = color;
     ctx.restore();
   });
   // The head - a proportional circle outline rather than a tiny dot the
@@ -192,9 +207,13 @@ export function drawPoseSkeleton(
     const headRadius = effectiveHeadRadius ?? Math.max(8, width * 2);
     ctx.save();
     if (lowConf.has(12)) ctx.globalAlpha = 0.45;
-    ctx.lineWidth = width;
+    ctx.lineWidth = width * 0.7;
     ctx.beginPath();
     ctx.arc(effectivePoints[12].x, effectivePoints[12].y, headRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    // Same subtle bone-edge outline as the joints, for visual consistency.
+    ctx.strokeStyle = "rgba(40, 30, 20, 0.35)";
+    ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
   }

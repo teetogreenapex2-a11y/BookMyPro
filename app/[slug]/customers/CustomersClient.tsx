@@ -552,36 +552,35 @@ export default function CustomersClient({
                           </div>
                           <div style={{ fontSize: 10, color: "var(--faint)", fontWeight: 600, marginTop: 2 }}>LEFT</div>
                         </div>
-                        <div style={{ display: "flex", gap: 4 }}>
-                          <button
-                            onClick={() => messageCustomer(c.id)}
-                            disabled={startingConversationId === c.id}
-                            title="Message"
-                            style={{
-                              width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: 13, color: "var(--fairway)", background: "var(--open)",
-                              border: "none", borderRadius: 6, cursor: "pointer",
-                            }}
-                          >
-                            {startingConversationId === c.id ? "…" : "✉"}
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Delete ${c.name || c.email} from your customer list? Their booking and payment history stays on record, but they'll no longer show up here.`)) {
-                                deleteCustomer(c.id);
-                              }
-                            }}
-                            disabled={deletingId === c.id}
-                            title="Delete"
-                            style={{
-                              width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: 13, color: "#B23A3A", background: "#FBE9E9",
-                              border: "none", borderRadius: 6, cursor: "pointer",
-                            }}
-                          >
-                            {deletingId === c.id ? "…" : "✕"}
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => messageCustomer(c.id)}
+                          disabled={startingConversationId === c.id}
+                          title="Message"
+                          style={{
+                            height: 36, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                            padding: "0 14px", fontSize: 13, fontWeight: 600, color: "var(--fairway)", background: "var(--open)",
+                            border: "none", borderRadius: 8, cursor: "pointer",
+                          }}
+                        >
+                          {startingConversationId === c.id ? "…" : (<><span style={{ fontSize: 15 }}>✉</span> Message</>)}
+                        </button>
+                        <div style={{ width: 20 }} />
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete ${c.name || c.email} from your customer list? Their booking and payment history stays on record, but they'll no longer show up here.`)) {
+                              deleteCustomer(c.id);
+                            }
+                          }}
+                          disabled={deletingId === c.id}
+                          title="Delete"
+                          style={{
+                            width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 13, color: "#B23A3A", background: "#FBE9E9",
+                            border: "none", borderRadius: 6, cursor: "pointer",
+                          }}
+                        >
+                          {deletingId === c.id ? "…" : "✕"}
+                        </button>
                       </div>
                     </div>
 

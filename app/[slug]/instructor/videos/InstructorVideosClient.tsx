@@ -130,7 +130,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                 reviewMaxShoulderWidthRef.current = sw;
               }
               const headRadiusOverride = reviewMaxShoulderWidthRef.current ? reviewMaxShoulderWidthRef.current * 0.3 : null;
-              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3, headRadiusOverride);
+              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#EAE3D0", 3, headRadiusOverride);
               // The first head position seen after turning the overlay on
               // becomes the reference point everything else compares
               // against - in practice, wherever playback happened to be
@@ -304,7 +304,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   selectedMaxShoulderWidthRef.current = sw;
                 }
                 const headRadiusOverride = selectedMaxShoulderWidthRef.current ? selectedMaxShoulderWidthRef.current * 0.3 : null;
-                drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#B8862B", 3, headRadiusOverride);
+                drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#EAE3D0", 3, headRadiusOverride);
                 if (!selectedHeadReferenceRef.current && points[12]) {
                   selectedHeadReferenceRef.current = points[12];
                 }

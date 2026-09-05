@@ -41,7 +41,7 @@ export default function FindAProPage() {
         const { latitude, longitude } = position.coords;
         setLoading(true);
         setSearched(true);
-        const res = await fetch(`/api/directory?lat=${latitude}&lng=${longitude}&radius=25`);
+        const res = await fetch(`/api/directory?lat=${latitude}&lng=${longitude}&radius=50`);
         const data = await res.json();
         setResults(Array.isArray(data) ? data : []);
         setLoading(false);

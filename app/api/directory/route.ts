@@ -3,14 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { milesBetween } from "@/lib/geocoding";
 
 // GET /api/directory?q=chapel+hill
-//   or  ?lat=35.9&lng=-79.0&radius=25
+//   or  ?lat=35.9&lng=-79.0&radius=50
 // Public, no auth required - this is the whole point of a discovery
 // directory. Only returns businesses that have explicitly opted in via
 // listedInDirectory.
 //
 // Two search modes: if lat/lng are provided (from the browser's own
 // location, or geocoded from a typed search), results are filtered to
-// the given radius (default 25 miles) and sorted nearest-first - a real
+// the given radius (default 50 miles) and sorted nearest-first - a real
 // distance search, not just text matching. Falls back to the original
 // text search against city/state/zip/name if no coordinates are given,
 // for businesses that haven't been geocoded yet or players who'd rather
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
   const lat = req.nextUrl.searchParams.get("lat");
   const lng = req.nextUrl.searchParams.get("lng");
-  const radiusMiles = Number(req.nextUrl.searchParams.get("radius")) || 25;
+  const radiusMiles = Number(req.nextUrl.searchParams.get("radius")) || 50;
 
   const baseSelect = {
     slug: true,

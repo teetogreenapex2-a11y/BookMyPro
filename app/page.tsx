@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { businessDestination } from "@/lib/businessUrl";
+import NativeMarketingRedirect from "./components/NativeMarketingRedirect";
 
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
@@ -119,6 +120,7 @@ function MarketingPage() {
 
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", color: "#14231C", background: "#F6F4EE" }}>
+      <NativeMarketingRedirect />
       <style>{`
         @media (max-width: 860px) {
           .hero-grid { grid-template-columns: 1fr !important; }
