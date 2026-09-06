@@ -874,14 +874,12 @@ export default function InstructorClient({
                   <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#B8862B", border: "1px solid var(--fairway)" }} />
                 )}
               </a>
-              {!isNative && (
-                <a href={`${basePath}/reports`} style={{
-                  fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
-                  border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
-                }}>
-                  Reports
-                </a>
-              )}
+              <a href={`${basePath}/reports`} style={{
+                fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+              }}>
+                Reports
+              </a>
               {!isNative && (
                 <a href={`${basePath}/settings`} style={{
                   fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
