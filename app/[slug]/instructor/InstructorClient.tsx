@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 import { User } from "lucide-react";
 import PushNotificationPrompt from "@/app/components/PushNotificationPrompt";
+import HelpWidget from "@/app/components/HelpWidget";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 import { enabledPackages, getPackagePriceCents, centsToDollars } from "@/lib/pricing";
 
@@ -822,6 +823,7 @@ export default function InstructorClient({
   return (
     <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
       <PushNotificationPrompt pushStatus={pushStatus} onEnable={enablePushNotifications} slug={slug} audience="instructor" />
+      <HelpWidget apiBase={apiBase} />
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           {viewerName && (

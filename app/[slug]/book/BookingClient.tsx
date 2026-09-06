@@ -6,6 +6,7 @@ import { Capacitor } from "@capacitor/core";
 import { FITTING_TYPES, centsToDollars, enabledPackages, enabledFittings, getFittingPriceCents } from "@/lib/pricing";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 import PushNotificationPrompt from "@/app/components/PushNotificationPrompt";
+import HelpWidget from "@/app/components/HelpWidget";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -717,6 +718,7 @@ export default function BookingClient({
   return (
     <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
       <PushNotificationPrompt pushStatus={pushStatus} onEnable={enablePushNotifications} slug={slug} audience="player" />
+      <HelpWidget apiBase={apiBase} />
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
