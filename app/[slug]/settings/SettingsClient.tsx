@@ -147,8 +147,12 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
     if (!confirm("Disconnect Google Calendar? Bookings will stop syncing until you reconnect.")) return;
     setDisconnectingGoogleCal(true);
     try {
-      await fetch(`${apiBase}/calendar/disconnect`, { method: "POST" });
-      setGoogleCalStatus({ connected: false });
+      const res = await fetch(`${apiBase}/calendar/disconnect`, { method: "POST" });
+      if (res.ok) {
+        setGoogleCalStatus({ connected: false });
+      } else {
+        alert("Couldn't disconnect - try again.");
+      }
     } finally {
       setDisconnectingGoogleCal(false);
     }

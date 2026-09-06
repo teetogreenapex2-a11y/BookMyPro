@@ -875,6 +875,14 @@ export default function InstructorClient({
                 )}
               </a>
               {!isNative && (
+                <a href={`${basePath}/reports`} style={{
+                  fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                  border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                }}>
+                  Reports
+                </a>
+              )}
+              {!isNative && (
                 <a href={`${basePath}/settings`} style={{
                   fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                   border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
@@ -1361,17 +1369,20 @@ export default function InstructorClient({
                     <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>
                       {dayDate.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
                     </span>
-                    <button
-                      onClick={() => closeDayOff(dayDate)}
-                      title="Block the whole day off"
-                      style={{
-                        background: "none", border: "1px solid var(--border)", borderRadius: 6,
-                        width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 12, color: "var(--muted)", lineHeight: 1, padding: 0,
-                      }}
-                    >
-                      🚫
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ fontSize: 10.5, color: "var(--muted)" }}>Block day</span>
+                      <button
+                        onClick={() => closeDayOff(dayDate)}
+                        title="Block the whole day off"
+                        style={{
+                          background: "none", border: "1px solid var(--border)", borderRadius: 6,
+                          width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 12, color: "var(--muted)", lineHeight: 1, padding: 0,
+                        }}
+                      >
+                        🚫
+                      </button>
+                    </div>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {TIMES.map((time) => {
