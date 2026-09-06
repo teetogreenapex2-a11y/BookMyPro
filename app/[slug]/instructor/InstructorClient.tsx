@@ -601,11 +601,15 @@ export default function InstructorClient({
       : `Close all ${openSlots.length} open slot${openSlots.length === 1 ? "" : "s"} on ${dayLabel}?`;
     if (!confirm(message)) return;
 
-    await fetch(`${apiBase}/availability/close-day`, {
+    const res = await fetch(`${apiBase}/availability/close-day`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slotIds: openSlots.map((s) => s.id), instructorMembershipId: viewingInstructorId }),
     });
+    if (!res.ok) {
+      alert("Couldn't close this day off - try again.");
+      return;
+    }
     loadSlots();
   }
 

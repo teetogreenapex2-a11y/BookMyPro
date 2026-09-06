@@ -147,7 +147,7 @@ export default function SwingSessionClient({
     <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "20px" }}>
         <div style={{ maxWidth: 520, margin: "0 auto" }}>
-          <a href={basePath} style={{ color: "#D7DED9", textDecoration: "none", fontSize: 13 }}>&larr; Back</a>
+          <a href={`${basePath}/videos`} style={{ color: "#D7DED9", textDecoration: "none", fontSize: 13 }}>&larr; Back</a>
           <h1 className="display" style={{ fontSize: 22, margin: "6px 0 0" }}>Two-camera swing session</h1>
         </div>
       </header>
