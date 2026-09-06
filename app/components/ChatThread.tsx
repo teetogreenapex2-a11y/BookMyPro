@@ -107,7 +107,7 @@ export default function ChatThread({
         <div style={{ fontSize: 15, fontWeight: 700, color: "#1B3A2F" }}>{title}</div>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
         {loading ? (
           <p style={{ color: "#8A8571", fontSize: 13 }}>Loading...</p>
         ) : messages.length === 0 ? (
@@ -119,6 +119,7 @@ export default function ChatThread({
                 maxWidth: "75%", padding: m.imageUrl && !m.body ? 4 : "9px 13px", borderRadius: 14, fontSize: 14, lineHeight: 1.4,
                 background: m.isMine ? "#1B3A2F" : "#FFF", color: m.isMine ? "#F6F4EE" : "#14231C",
                 border: m.isMine ? "none" : "1px solid #E3D9C9",
+                overflowWrap: "break-word", wordBreak: "break-word",
               }}>
                 {m.imageUrl && (
                   <img
