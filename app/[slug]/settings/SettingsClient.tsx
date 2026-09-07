@@ -1244,8 +1244,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                   <div style={{ marginTop: 14 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>Who gets notified</div>
                     <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 8px" }}>
-                      For a business with more than one instructor - a real gap before this existed, since every
-                      booking used to email this one address above regardless of who it was actually with.
+                      If you have more than one instructor, choose who gets notified when a new booking comes in.
                     </p>
                     <div style={{ display: "flex", gap: 6 }}>
                       {([

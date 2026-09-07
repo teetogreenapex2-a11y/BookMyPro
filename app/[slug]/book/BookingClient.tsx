@@ -1020,15 +1020,6 @@ export default function BookingClient({
               </>
               )}
 
-              {selectedInstructor && (selectedInstructor.playingLesson9Enabled || selectedInstructor.playingLesson18Enabled) && !playingLessonMode && (
-                <button
-                  onClick={() => { setPlayingLessonMode(true); setSelected(null); }}
-                  style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 12.5, textDecoration: "underline", padding: 0, marginTop: 10 }}
-                >
-                  Want a playing lesson instead? (9 or 18 holes on the course)
-                </button>
-              )}
-
               {playingLessonMode && !playingLessonRequestSent && (
                 <div style={{ maxWidth: 320 }}>
                   <div className="mono" style={{ fontSize: 11, color: "#9DB8A9", marginBottom: 8, letterSpacing: "0.04em" }}>
