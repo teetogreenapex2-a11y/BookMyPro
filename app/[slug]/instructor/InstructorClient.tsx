@@ -822,7 +822,7 @@ export default function InstructorClient({
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
-      <PushNotificationPrompt pushStatus={pushStatus} onEnable={enablePushNotifications} slug={slug} audience="instructor" />
+      <PushNotificationPrompt pushStatus={pushStatus} pushError={pushError} onEnable={enablePushNotifications} slug={slug} audience="instructor" />
       <HelpWidget apiBase={apiBase} />
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>

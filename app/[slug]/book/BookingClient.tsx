@@ -717,7 +717,7 @@ export default function BookingClient({
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
-      <PushNotificationPrompt pushStatus={pushStatus} onEnable={enablePushNotifications} slug={slug} audience="player" />
+      <PushNotificationPrompt pushStatus={pushStatus} pushError={pushError} onEnable={enablePushNotifications} slug={slug} audience="player" />
       <HelpWidget apiBase={apiBase} />
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
