@@ -776,6 +776,12 @@ export default function BookingClient({
                   Settings
                 </a>
               )}
+              <a href="/find-a-pro" style={{
+                fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+              }}>
+                Find a Pro
+              </a>
               <button onClick={() => signOut({ callbackUrl: "/login" })} style={{
                 background: "none", color: "#D7DED9", fontSize: 12.5, fontWeight: 600,
                 border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
