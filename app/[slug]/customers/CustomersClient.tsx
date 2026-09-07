@@ -492,7 +492,7 @@ export default function CustomersClient({
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
                       <div style={{ minWidth: 0 }}>
                         {editingNameId === c.id ? (
                           <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
