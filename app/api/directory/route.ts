@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     latitude: true,
     longitude: true,
     memberships: {
-      where: { role: { in: ["owner", "instructor"] } },
+      where: { role: { in: ["owner", "instructor"] }, hiddenFromBooking: false },
       select: { specialty: true, user: { select: { name: true } } },
     },
   };
