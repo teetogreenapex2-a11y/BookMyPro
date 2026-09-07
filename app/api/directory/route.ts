@@ -60,12 +60,23 @@ export async function GET(req: NextRequest) {
       listedInDirectory: true,
       ...(q
         ? {
-            OR: [
-              { city: { contains: q, mode: "insensitive" } },
-              { state: { contains: q, mode: "insensitive" } },
-              { zipCode: { contains: q, mode: "insensitive" } },
-              { name: { contains: q, mode: "insensitive" } },
-            ],
+            // Split on commas/whitespace so "Raleigh, NC" or "Raleigh NC"
+            // works correctly - previously the whole typed string was
+            // only ever checked as one single substring against each
+            // field, so a combined city+state search could never match
+            // anything at all, since no single field actually contains
+            // literal text like "Raleigh, NC".
+            AND: q
+              .split(/[,\s]+/)
+              .filter(Boolean)
+              .map((term) => ({
+                OR: [
+                  { city: { contains: term, mode: "insensitive" as const } },
+                  { state: { contains: term, mode: "insensitive" as const } },
+                  { zipCode: { contains: term, mode: "insensitive" as const } },
+                  { name: { contains: term, mode: "insensitive" as const } },
+                ],
+              })),
           }
         : {}),
     },
