@@ -20,7 +20,7 @@ FOR PLAYERS (people booking lessons):
 - Book a lesson: go to the business's booking page, pick "Lesson," choose an instructor, pick a package or pay-as-you-go, then pick an open time slot.
 - Book a club fitting: same booking page, choose "Fitting" instead of "Lesson."
 - Join a group lesson: on the booking page, group sessions show separately with spots remaining - tap one and pay to join.
-- Request a playing lesson: on the booking page under Lesson, there's a "Want a playing lesson instead?" option - propose a date, the instructor confirms directly, no calendar slot needed.
+- Buy a lesson package, a custom offering, or pay-as-you-go: all shown as options right on the booking page when picking "Lesson."
 - Buy a gift card: look for "Gift cards" on the business's page.
 - Message your instructor: go to Messages (in the app's navigation) - your conversation is created automatically the first time you open it.
 - See upcoming lessons: your bookings show on your own account's session list.
@@ -35,7 +35,8 @@ FOR INSTRUCTORS/OWNERS:
 - Create a booking manually: tap "+ New booking" on the dashboard - pick a time, a player, and whether it's a lesson, fitting, or a custom offering.
 - Add a player to a group lesson: open the group lesson's roster and use the "Add a player" dropdown.
 - Reschedule a lesson: tap the booked lesson on your calendar, then "Reschedule" - pick a new open time, even in a different week using the arrows.
-- Set your pricing: go to Settings - lesson packages, fittings, playing lessons, and up to 6 custom offerings of your own can all be priced there.
+- Set lesson pricing (the Lesson Builder): in Settings, look for "LESSON BUILDER." Each lesson length (like "45 minutes" or "60 minutes") is its own lesson type with its own price - use the dropdown to add a new one, or pick an existing one to add package sizes to it (like a 5-pack, priced separately from a single lesson).
+- Set fitting and other pricing: also in Settings - club fittings, playing lessons, and up to 6 custom offerings of your own can all be priced there too.
 - Import your client list: Customers page → "Import clients" → upload a CSV with Name, Email, Phone columns (Email is required).
 - Message all your customers at once: Customers page has a "Message all" option.
 - Connect your calendar: Settings → Google Calendar or Outlook, for two-way sync.
