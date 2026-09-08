@@ -408,9 +408,6 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
             </a>
           </div>
           <h1 className="display" style={{ fontSize: 24, margin: 0 }}>Review submissions</h1>
-          <a href={`${basePath}/swing-session`} style={{ fontSize: 13, color: "var(--gold)", fontWeight: 700, textDecoration: "none", display: "inline-block", marginTop: 6 }}>
-            Record two angles at once (down-the-line + face-on) &rarr;
-          </a>
         </div>
       </header>
 
@@ -540,9 +537,12 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                       opacity: recording || uploading ? 0.7 : 1,
                     }}
                   >
-                    {recording ? "Opening camera..." : "🎥 Record a new video"}
+                    {recording ? "Opening camera..." : "🎥 Add/Record a video"}
                   </button>
                 )}
+                <a href={`${basePath}/swing-session`} style={{ fontSize: 12, color: "var(--gold)", fontWeight: 700, textDecoration: "none", display: "block", marginBottom: 8 }}>
+                  Want two camera angles at once instead? (down-the-line + face-on) &rarr;
+                </a>
                 <label style={{ display: "inline-block", textAlign: "center", background: "var(--gold)", color: "var(--fairway)", borderRadius: 8, padding: "10px 16px", fontWeight: 700, fontSize: 13, cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}>
                   {uploading ? "Uploading..." : "Choose video file"}
                   <input
