@@ -43,6 +43,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     playerId: s.playerId,
     instructorName: s.instructor.user.name,
     instructorMembershipId: s.instructorMembershipId,
+    swingSessionId: s.swingSessionId,
+    angle: s.angle,
     comments: s.comments.map((c) => ({ id: c.id, timestampSeconds: c.timestampSeconds, text: c.text, createdAt: c.createdAt })),
   }));
 

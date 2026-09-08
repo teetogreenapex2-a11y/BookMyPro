@@ -11,12 +11,107 @@ type Comment = { id: string; timestampSeconds: number; text: string };
 type Submission = {
   id: string; videoUrl: string; title: string | null; playerNote: string | null;
   status: string; submittedAt: string; playerName: string; playerId: string; comments: Comment[];
+  swingSessionId: string | null; angle: string | null;
 };
 
 function formatTimestamp(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+type ListEntryUnion =
+  | { kind: "single"; submission: { id: string; title: string | null; playerName: string } }
+  | { kind: "pair"; swingSessionId: string; a: { playerName: string }; b: { playerName: string } };
+
+function ListEntryButton({
+  entry, isSelected, onSelect, dimmed,
+}: { entry: ListEntryUnion; isSelected: boolean; onSelect: () => void; dimmed?: boolean }) {
+  const label = entry.kind === "single" ? (entry.submission.title || "Untitled video") : "🎥🎥 Two-camera swing";
+  const playerName = entry.kind === "single" ? entry.submission.playerName : entry.a.playerName;
+  return (
+    <button
+      onClick={onSelect}
+      style={{
+        textAlign: "left", background: isSelected ? "var(--open)" : "#FFF",
+        border: isSelected ? "1px solid var(--fairway)" : "1px solid var(--border)",
+        borderRadius: 8, padding: "8px 12px", opacity: dimmed ? 0.8 : 1,
+      }}
+    >
+      <div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div>
+      <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{playerName}</div>
+    </button>
+  );
+}
+
+function SwingSessionPairView({
+  videos, onReviewIndividually,
+}: { videos: Submission[]; onReviewIndividually: (id: string) => void }) {
+  const refA = useRef<HTMLVideoElement | null>(null);
+  const refB = useRef<HTMLVideoElement | null>(null);
+
+  // Ordered consistently (down-the-line first) regardless of which
+  // camera happened to upload first.
+  const sorted = [...videos].sort((a, b) => (a.angle === "down_the_line" ? -1 : 1));
+  const [a, b] = sorted;
+  if (!a || !b) return <p style={{ fontSize: 13, color: "var(--faint)" }}>Both angles aren't available for this swing yet.</p>;
+
+  function playBoth() {
+    refA.current?.play();
+    refB.current?.play();
+  }
+  function pauseBoth() {
+    refA.current?.pause();
+    refB.current?.pause();
+  }
+
+  function angleLabel(v: Submission) {
+    if (v.angle === "down_the_line") return "Down the line";
+    if (v.angle === "face_on") return "Face on";
+    return v.title || "Untitled";
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Two-camera swing</div>
+      <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 12 }}>
+        {a.playerName} - {new Date(a.submittedAt).toLocaleDateString()}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        <button
+          onClick={playBoth}
+          style={{ flex: 1, background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 700 }}
+        >
+          ▶ Play both
+        </button>
+        <button
+          onClick={pauseBoth}
+          style={{ flex: 1, background: "var(--card)", color: "var(--fairway)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 700 }}
+        >
+          Pause both
+        </button>
+      </div>
+      <p style={{ fontSize: 11, color: "var(--faint)", margin: "-6px 0 14px" }}>
+        Started together, but each phone recorded independently, so they may drift out of sync over a longer clip - scrub each one individually if needed.
+      </p>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {[{ v: a, ref: refA }, { v: b, ref: refB }].map(({ v, ref }) => (
+          <div key={v.id} style={{ flex: "1 1 240px", minWidth: 200 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>{angleLabel(v)}</div>
+            <video ref={ref} src={v.videoUrl} crossOrigin="anonymous" controls playsInline style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }} />
+            <button
+              onClick={() => onReviewIndividually(v.id)}
+              style={{ marginTop: 6, background: "none", border: "none", color: "var(--gold)", fontWeight: 700, fontSize: 12, padding: 0 }}
+            >
+              Review this angle individually &rarr;
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // See VideosClient.tsx for why this fetches the file rather than using a
@@ -40,6 +135,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedSwingSessionId, setSelectedSwingSessionId] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
   const [posting, setPosting] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -258,8 +354,34 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   }, []);
 
   const selected = submissions.find((s) => s.id === selectedId) || null;
-  const pending = submissions.filter((s) => s.status === "pending");
-  const reviewed = submissions.filter((s) => s.status === "reviewed");
+
+  // A two-camera pair (same swingSessionId) collapses into a single list
+  // entry rather than showing as two separate, seemingly-unrelated
+  // videos - a lone video (swingSessionId null, the common case) passes
+  // through unchanged.
+  type ListEntry = { kind: "single"; submission: Submission } | { kind: "pair"; swingSessionId: string; a: Submission; b: Submission };
+  function groupForList(items: Submission[]): ListEntry[] {
+    const seen = new Set<string>();
+    const entries: ListEntry[] = [];
+    for (const s of items) {
+      if (seen.has(s.id)) continue;
+      if (s.swingSessionId) {
+        const partner = items.find((o) => o.id !== s.id && o.swingSessionId === s.swingSessionId);
+        if (partner) {
+          seen.add(s.id);
+          seen.add(partner.id);
+          entries.push({ kind: "pair", swingSessionId: s.swingSessionId, a: s, b: partner });
+          continue;
+        }
+      }
+      seen.add(s.id);
+      entries.push({ kind: "single", submission: s });
+    }
+    return entries;
+  }
+
+  const pending = groupForList(submissions.filter((s) => s.status === "pending"));
+  const reviewed = groupForList(submissions.filter((s) => s.status === "reviewed"));
 
   useEffect(() => {
     if (!selected) { setSelectedAiEnabled(false); return; }
@@ -572,19 +694,16 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                       PENDING ({pending.length})
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 }}>
-                      {pending.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => setSelectedId(s.id)}
-                          style={{
-                            textAlign: "left", background: selectedId === s.id ? "var(--open)" : "#FFF",
-                            border: selectedId === s.id ? "1px solid var(--fairway)" : "1px solid var(--border)",
-                            borderRadius: 8, padding: "8px 12px",
+                      {pending.map((entry) => (
+                        <ListEntryButton
+                          key={entry.kind === "single" ? entry.submission.id : entry.swingSessionId}
+                          entry={entry}
+                          isSelected={entry.kind === "single" ? selectedId === entry.submission.id : selectedSwingSessionId === entry.swingSessionId}
+                          onSelect={() => {
+                            if (entry.kind === "single") { setSelectedId(entry.submission.id); setSelectedSwingSessionId(null); }
+                            else { setSelectedSwingSessionId(entry.swingSessionId); setSelectedId(null); }
                           }}
-                        >
-                          <div style={{ fontSize: 13, fontWeight: 700 }}>{s.title || "Untitled video"}</div>
-                          <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{s.playerName}</div>
-                        </button>
+                        />
                       ))}
                     </div>
                   </>
@@ -595,19 +714,17 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                       REVIEWED ({reviewed.length})
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {reviewed.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => setSelectedId(s.id)}
-                          style={{
-                            textAlign: "left", background: selectedId === s.id ? "var(--open)" : "#FFF",
-                            border: selectedId === s.id ? "1px solid var(--fairway)" : "1px solid var(--border)",
-                            borderRadius: 8, padding: "8px 12px", opacity: 0.8,
+                      {reviewed.map((entry) => (
+                        <ListEntryButton
+                          key={entry.kind === "single" ? entry.submission.id : entry.swingSessionId}
+                          entry={entry}
+                          isSelected={entry.kind === "single" ? selectedId === entry.submission.id : selectedSwingSessionId === entry.swingSessionId}
+                          onSelect={() => {
+                            if (entry.kind === "single") { setSelectedId(entry.submission.id); setSelectedSwingSessionId(null); }
+                            else { setSelectedSwingSessionId(entry.swingSessionId); setSelectedId(null); }
                           }}
-                        >
-                          <div style={{ fontSize: 13, fontWeight: 700 }}>{s.title || "Untitled video"}</div>
-                          <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{s.playerName}</div>
-                        </button>
+                          dimmed
+                        />
                       ))}
                     </div>
                   </>
@@ -617,7 +734,12 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
           </div>
 
           <div style={{ flex: "2 1 400px", minWidth: 300 }}>
-            {!selected ? (
+            {selectedSwingSessionId ? (
+              <SwingSessionPairView
+                videos={submissions.filter((s) => s.swingSessionId === selectedSwingSessionId)}
+                onReviewIndividually={(id) => { setSelectedId(id); setSelectedSwingSessionId(null); }}
+              />
+            ) : !selected ? (
               <p style={{ fontSize: 13, color: "var(--faint)" }}>Pick a video from the list to review it.</p>
             ) : (
               <div>
