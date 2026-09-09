@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { SocialLogin } from "@capgo/capacitor-social-login";
+import { hasSignedInOnThisDeviceBefore } from "@/lib/deviceHistory";
+import FindProSearch from "@/app/components/FindProSearch";
 
 export default function LoginPage() {
   return (
@@ -25,6 +27,17 @@ function LoginPageInner() {
   const [signingInWithGoogle, setSigningInWithGoogle] = useState(false);
   const [appleError, setAppleError] = useState<string | null>(null);
   const [signingInWithApple, setSigningInWithApple] = useState(false);
+
+  // Determined client-side only, after mount (not during the initial
+  // render) - checking localStorage while the page is still being
+  // server-rendered would create a mismatch between what the server
+  // sent and what the browser actually has stored, which React flags as
+  // a hydration error. null means "not yet determined" - nothing
+  // renders below until this resolves, which is virtually instant.
+  const [showLoginForm, setShowLoginForm] = useState<boolean | null>(null);
+  useEffect(() => {
+    setShowLoginForm(hasSignedInOnThisDeviceBefore());
+  }, []);
 
   // Both providers initialized together, once, rather than separately
   // inside each sign-in handler - calling initialize() twice with only
@@ -187,7 +200,34 @@ function LoginPageInner() {
           width: "100%",
         }}
       >
-        <img src="/logo.jpg" alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", margin: "0 auto 14px" }} />
+        {showLoginForm === false ? (
+          <>
+            <img src="/logo.jpg" alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", margin: "0 auto 14px" }} />
+            <div className="mono" style={{ fontSize: 12, letterSpacing: "0.12em", color: "var(--gold)", marginBottom: 8 }}>
+              BOOKMYPRO
+            </div>
+            <h1 className="display" style={{ fontSize: 24, marginBottom: 4 }}>
+              Find a golf pro near you
+            </h1>
+            <p style={{ fontSize: 13, color: "var(--faint)", marginBottom: 20 }}>
+              Search for instructors and coaches in your area.
+            </p>
+            <div style={{ textAlign: "left" }}>
+              <FindProSearch />
+            </div>
+            <button
+              onClick={() => setShowLoginForm(true)}
+              style={{
+                width: "100%", background: "none", color: "var(--fairway)", border: "1px solid var(--border)",
+                borderRadius: 8, padding: "12px 20px", fontWeight: 600, fontSize: 14, marginTop: 20,
+              }}
+            >
+              Already have an account? Sign in
+            </button>
+          </>
+        ) : (
+          <>
+            <img src="/logo.jpg" alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", margin: "0 auto 14px" }} />
         <div className="mono" style={{ fontSize: 12, letterSpacing: "0.12em", color: "var(--gold)", marginBottom: 8 }}>
           BOOKMYPRO
         </div>
@@ -303,6 +343,8 @@ function LoginPageInner() {
         <a href="/find-a-pro" style={{ display: "block", marginTop: 16, fontSize: 12.5, color: "var(--faint)" }}>
           Don't have a link from your instructor? Find a Pro near you &gt;
         </a>
+          </>
+        )}
       </div>
     </div>
   );

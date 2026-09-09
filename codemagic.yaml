@@ -163,6 +163,7 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'BookMyPro saves your recorded swing videos to your photo library so you can review them later.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'BookMyPro uses your camera to record your golf swing for review.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'BookMyPro records audio along with your swing video.'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 'BookMyPro uses your location to find golf instructors near you.'" "$PLIST" || true
       - name: Add Google Sign-In URL scheme
         script: |
           # Google Sign-In on iOS specifically needs a "URL scheme"

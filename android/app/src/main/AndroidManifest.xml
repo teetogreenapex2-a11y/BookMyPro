@@ -36,4 +36,9 @@
          and doesn't need these at all. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <!-- Needed for Find a Pro's "Use my current location" search - without
+         these, the WebView silently denies the page's own JavaScript
+         geolocation request regardless of what the person taps. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>

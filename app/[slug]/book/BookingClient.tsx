@@ -7,6 +7,7 @@ import { FITTING_TYPES, centsToDollars, enabledPackages, enabledFittings, getFit
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 import PushNotificationPrompt from "@/app/components/PushNotificationPrompt";
 import HelpWidget from "@/app/components/HelpWidget";
+import { markHasSignedInOnThisDevice } from "@/lib/deviceHistory";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -52,6 +53,13 @@ export default function BookingClient({
   basePath: string;
   apiBase: string;
 }) {
+  // Reaching this page at all proves a real, signed-in account with a
+  // membership - the most reliable place to record that this device has
+  // signed in successfully before, regardless of which method was used.
+  useEffect(() => {
+    markHasSignedInOnThisDevice();
+  }, []);
+
   // Built from the business's real, current hours instead of a fixed
   // list - without this, a business widening its hours in Settings would
   // never actually show any of those newly-added times to a player,

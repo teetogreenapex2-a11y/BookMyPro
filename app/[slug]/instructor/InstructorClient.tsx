@@ -6,6 +6,7 @@ import { Capacitor } from "@capacitor/core";
 import { User } from "lucide-react";
 import PushNotificationPrompt from "@/app/components/PushNotificationPrompt";
 import HelpWidget from "@/app/components/HelpWidget";
+import { markHasSignedInOnThisDevice } from "@/lib/deviceHistory";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 import { enabledPackages, getPackagePriceCents, centsToDollars } from "@/lib/pricing";
 
@@ -73,6 +74,13 @@ async function getFcmTokenWithRetry(FirebaseMessaging: any, attempts = 12, delay
 export default function InstructorClient({
   calendarConnected, calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, viewerName, slug, basePath, apiBase, businessName, businessLogoUrl, openHour, closeHour,
 }: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; viewerName: string | null; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null; openHour: number; closeHour: number }) {
+  // Reaching this page at all proves a real, signed-in account with a
+  // membership - the most reliable place to record that this device has
+  // signed in successfully before, regardless of which method was used.
+  useEffect(() => {
+    markHasSignedInOnThisDevice();
+  }, []);
+
   // Built from the business's real, current hours instead of a fixed
   // list - without this, changing hours in Settings would update the
   // underlying data correctly, but the calendar itself would never
@@ -454,12 +462,15 @@ export default function InstructorClient({
     }
   }, [reviewingBooking]);
 
-  // Same reasoning as the review panel above - tapping a booked slot to
-  // see who it's with and add a note shouldn't require manually scrolling
-  // down to find where that panel actually landed.
+  // Tapping a booked slot to see who it's with and add a note shouldn't
+  // require manually scrolling down to find where that panel actually
+  // landed. Aligned to the top rather than centered - this panel is
+  // genuinely tall (title, contact card, golf profile, note field), so
+  // centering it would push the title and who the lesson is with above
+  // the visible screen entirely.
   useEffect(() => {
     if (noteSlot) {
-      notePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      notePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [noteSlot]);
 
