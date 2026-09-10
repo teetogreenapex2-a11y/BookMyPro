@@ -143,6 +143,13 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
     setBiz((b) => ({ ...b, logoUrl: data.logoUrl }));
   }
   const [saved, setSaved] = useState(false);
+  // Kept separate from biz.bookingWindowDays itself, which only ever
+  // holds a genuinely valid number - this lets the field be freely
+  // cleared or mid-edited (an empty string, a single partial digit)
+  // without snapping back to the old value on every keystroke, the
+  // way a fully-controlled input tied directly to the validated number
+  // would.
+  const [bookingWindowText, setBookingWindowText] = useState(String(biz.bookingWindowDays));
   async function handleDisconnectGoogleCal() {
     if (!confirm("Disconnect Google Calendar? Bookings will stop syncing until you reconnect.")) return;
     setDisconnectingGoogleCal(true);
@@ -1195,11 +1202,16 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               </p>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <input
-                  value={biz.bookingWindowDays}
+                  value={bookingWindowText}
                   onChange={(e) => {
-                    const days = Number(e.target.value);
-                    setBiz((b) => ({ ...b, bookingWindowDays: Number.isFinite(days) && days > 0 ? Math.round(days) : b.bookingWindowDays }));
+                    const text = e.target.value;
+                    setBookingWindowText(text);
+                    const days = Number(text);
+                    if (text.trim() !== "" && Number.isFinite(days) && days > 0) {
+                      setBiz((b) => ({ ...b, bookingWindowDays: Math.round(days) }));
+                    }
                   }}
+                  onBlur={() => setBookingWindowText(String(biz.bookingWindowDays))}
                   inputMode="numeric"
                   style={{
                     width: 80, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px",
