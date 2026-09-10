@@ -1,0 +1,54 @@
+Initialized native services in: C:\Users\User\.gradle\native
+Initialized jansi services in: C:\Users\User\.gradle\native
+Received JVM installation metadata from 'C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot': {JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot, JAVA_VERSION=17.0.20.1, JAVA_VENDOR=Eclipse Adoptium, RUNTIME_NAME=OpenJDK Runtime Environment, RUNTIME_VERSION=17.0.20.1+1, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=17.0.20.1+1, VM_VENDOR=Eclipse Adoptium, OS_ARCH=amd64}
+Found daemon DaemonInfo{pid=3956, address=[0c87ecfb-b6f7-4a25-aed9-1e5951fb166c port:56051, addresses:[/127.0.0.1]], state=Idle, lastBusy=1788974057755, context=DefaultDaemonContext[uid=f32ad110-1611-44fb-8dd5-41c3a606252a,javaHome=C:\Program Files\Android\Android Studio1\jbr,javaVersion=25,javaVendor=JetBrains s.r.o.,daemonRegistryDir=C:\Users\User\.gradle\daemon,pid=3956,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=--add-opens=java.base/java.util=ALL-UNNAMED,--add-opens=java.base/java.lang=ALL-UNNAMED,--add-opens=java.base/java.lang.invoke=ALL-UNNAMED,--add-opens=java.prefs/java.util.prefs=ALL-UNNAMED,--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED,--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED,--add-opens=java.base/java.nio.charset=ALL-UNNAMED,--add-opens=java.base/java.net=ALL-UNNAMED,--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED,-Xmx1536m,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]} however its context does not match the desired criteria.
+JVM is incompatible.
+Wanted: DaemonRequestContext{jvmCriteria=C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot (no JDK specified, using current Java home), daemonOpts=[--add-opens=java.base/java.util=ALL-UNNAMED, --add-opens=java.base/java.lang=ALL-UNNAMED, --add-opens=java.base/java.lang.invoke=ALL-UNNAMED, --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED, --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED, --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED, --add-opens=java.base/java.nio.charset=ALL-UNNAMED, --add-opens=java.base/java.net=ALL-UNNAMED, --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED, -Xmx1536m, -Dfile.encoding=windows-1252, -Duser.country=US, -Duser.language=en, -Duser.variant], applyInstrumentationAgent=true, nativeServicesMode=ENABLED, priority=NORMAL}
+Actual: DefaultDaemonContext[uid=f32ad110-1611-44fb-8dd5-41c3a606252a,javaHome=C:\Program Files\Android\Android Studio1\jbr,javaVersion=25,javaVendor=JetBrains s.r.o.,daemonRegistryDir=C:\Users\User\.gradle\daemon,pid=3956,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=--add-opens=java.base/java.util=ALL-UNNAMED,--add-opens=java.base/java.lang=ALL-UNNAMED,--add-opens=java.base/java.lang.invoke=ALL-UNNAMED,--add-opens=java.prefs/java.util.prefs=ALL-UNNAMED,--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED,--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED,--add-opens=java.base/java.nio.charset=ALL-UNNAMED,--add-opens=java.base/java.net=ALL-UNNAMED,--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED,-Xmx1536m,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]
+
+  Looking for a different daemon...
+Found daemon DaemonInfo{pid=7756, address=[6fc1ee15-3657-4a5a-a0fd-02ac75c27977 port:52942, addresses:[/127.0.0.1]], state=Idle, lastBusy=1788974806529, context=DefaultDaemonContext[uid=6f3e8a35-ab09-4ee6-bdaa-529d43fbaed6,javaHome=C:\Users\User\.jdks\temurin-17.0.20.1,javaVersion=17,javaVendor=Eclipse Adoptium,daemonRegistryDir=C:\Users\User\.gradle\daemon,pid=7756,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=--add-opens=java.base/java.util=ALL-UNNAMED,--add-opens=java.base/java.lang=ALL-UNNAMED,--add-opens=java.base/java.lang.invoke=ALL-UNNAMED,--add-opens=java.prefs/java.util.prefs=ALL-UNNAMED,--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED,--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED,--add-opens=java.base/java.nio.charset=ALL-UNNAMED,--add-opens=java.base/java.net=ALL-UNNAMED,--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED,-Xmx1536m,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]} however its context does not match the desired criteria.
+JVM is incompatible.
+Wanted: DaemonRequestContext{jvmCriteria=C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot (no JDK specified, using current Java home), daemonOpts=[--add-opens=java.base/java.util=ALL-UNNAMED, --add-opens=java.base/java.lang=ALL-UNNAMED, --add-opens=java.base/java.lang.invoke=ALL-UNNAMED, --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED, --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED, --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED, --add-opens=java.base/java.nio.charset=ALL-UNNAMED, --add-opens=java.base/java.net=ALL-UNNAMED, --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED, -Xmx1536m, -Dfile.encoding=windows-1252, -Duser.country=US, -Duser.language=en, -Duser.variant], applyInstrumentationAgent=true, nativeServicesMode=ENABLED, priority=NORMAL}
+Actual: DefaultDaemonContext[uid=6f3e8a35-ab09-4ee6-bdaa-529d43fbaed6,javaHome=C:\Users\User\.jdks\temurin-17.0.20.1,javaVersion=17,javaVendor=Eclipse Adoptium,daemonRegistryDir=C:\Users\User\.gradle\daemon,pid=7756,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=--add-opens=java.base/java.util=ALL-UNNAMED,--add-opens=java.base/java.lang=ALL-UNNAMED,--add-opens=java.base/java.lang.invoke=ALL-UNNAMED,--add-opens=java.prefs/java.util.prefs=ALL-UNNAMED,--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED,--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED,--add-opens=java.base/java.nio.charset=ALL-UNNAMED,--add-opens=java.base/java.net=ALL-UNNAMED,--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED,-Xmx1536m,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]
+
+  Looking for a different daemon...
+The client will now receive all logging from the daemon (pid: 7320). The daemon log file: C:\Users\User\.gradle\daemon\8.10.2\daemon-7320.out.log
+Starting 2nd build in daemon [uptime: 1 mins 23.564 secs, performance: 99%, GC rate: 0.00/s, heap usage: 0% of 1.5 GiB]
+Using 8 worker leases.
+Now considering [C:\Users\User\Downloads\tee-to-green-web\android] as hierarchies to watch
+Watching the file system is configured to be enabled if available
+File system watching is active
+Starting Build
+Transforming foojay-resolver-0.10.0.jar (org.gradle.toolchains:foojay-resolver:0.10.0) with InstrumentationAnalysisTransform
+Transforming gson-2.10.1.jar (com.google.code.gson:gson:2.10.1) with InstrumentationAnalysisTransform
+Transforming foojay-resolver-0.10.0.jar (org.gradle.toolchains:foojay-resolver:0.10.0) with InstrumentationAnalysisTransform
+Transforming foojay-resolver-0.10.0.jar (org.gradle.toolchains:foojay-resolver:0.10.0) with MergeInstrumentationAnalysisTransform
+Transforming gson-2.10.1.jar (com.google.code.gson:gson:2.10.1) with InstrumentationAnalysisTransform
+Transforming gson-2.10.1.jar (com.google.code.gson:gson:2.10.1) with MergeInstrumentationAnalysisTransform
+Transforming foojay-resolver-0.10.0.jar (org.gradle.toolchains:foojay-resolver:0.10.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming gson-2.10.1.jar (com.google.code.gson:gson:2.10.1) with ExternalDependencyInstrumentingArtifactTransform
+Settings evaluated using settings file 'C:\Users\User\Downloads\tee-to-green-web\android\settings.gradle'.
+Projects loaded. Root project using build file 'C:\Users\User\Downloads\tee-to-green-web\android\build.gradle'.
+Included projects: [root project 'android', project ':app', project ':capacitor-android', project ':capacitor-camera', project ':capacitor-cordova-android-plugins', project ':capacitor-firebase-messaging', project ':capacitor-splash-screen', project ':capgo-capacitor-social-login']
+
+> Configure project :
+Evaluating root project 'android' using build file 'C:\Users\User\Downloads\tee-to-green-web\android\build.gradle'.
+
+FAILURE: Build failed with an exception.
+
+* Where:
+Build file 'C:\Users\User\Downloads\tee-to-green-web\android\build.gradle' line: 1
+
+* What went wrong:
+A problem occurred evaluating root project 'android'.
+> Plugin with id 'com.android.application' not found.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 996ms
+Watched directory hierarchies: []
