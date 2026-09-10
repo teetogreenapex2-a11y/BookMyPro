@@ -499,15 +499,21 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [deletingAccount, setDeletingAccount] = useState(false);
+    const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function deleteAccount() {
     setDeletingAccount(true);
+    setDeleteError(null);
     const res = await fetch("/api/user/delete", { method: "POST" });
     if (res.ok) {
       await signOut({ callbackUrl: "/login" });
     } else {
+      const data = await res.json().catch(() => ({}));
+      setDeleteError(data.error || "Couldn't delete your account - try again.");
       setDeletingAccount(false);
+    }
+  }
     }
   }
 
@@ -599,8 +605,11 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               ) : deleteConfirmOpen ? (
                 <div>
                   <p style={{ fontSize: 12, color: "#8A2E2E", margin: "0 0 10px" }}>
-                    This removes your personal information permanently and signs you out everywhere. It can't be undone. Type DELETE below to confirm.
+                                        This removes your personal information permanently and signs you out everywhere. It can't be undone. Type DELETE below to confirm.
                   </p>
+                  {deleteError && (
+                    <p style={{ fontSize: 12, color: "#8A2E2E", fontWeight: 700, margin: "0 0 10px" }}>{deleteError}</p>
+                  )}
                   <input
                     value={deleteConfirmText}
                     onChange={(e) => setDeleteConfirmText(e.target.value)}
