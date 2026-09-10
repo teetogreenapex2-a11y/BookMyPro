@@ -6,7 +6,7 @@ android {
         applicationId "com.bookmypro.app"
         minSdkVersion 24
         targetSdkVersion 37
-        versionCode 11
+        versionCode 12
         versionName "1.7.3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
