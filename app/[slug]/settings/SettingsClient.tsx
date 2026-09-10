@@ -514,8 +514,8 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       setDeletingAccount(false);
     }
   }
-    }
-  }
+    
+  
 
   const tabs = isInstructor
     ? (["profile", "notifications", "business"] as const)
