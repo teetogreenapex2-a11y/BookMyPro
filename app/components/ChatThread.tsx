@@ -101,7 +101,7 @@ export default function ChatThread({
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#F6F4EE", fontFamily: "sans-serif", overflowX: "hidden" }}>
+    <div style={{ minHeight: "100vh", width: "100%", maxWidth: "100vw", display: "flex", flexDirection: "column", background: "#F6F4EE", fontFamily: "sans-serif", overflowX: "hidden", boxSizing: "border-box" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", borderBottom: "1px solid #E3D9C9", background: "#FFF" }}>
         <a href={backHref} style={{ color: "#1B3A2F", textDecoration: "none", fontSize: 20 }}>&larr;</a>
         <div style={{ fontSize: 15, fontWeight: 700, color: "#1B3A2F" }}>{title}</div>
@@ -116,7 +116,7 @@ export default function ChatThread({
           messages.map((m) => (
             <div key={m.id} style={{ display: "flex", justifyContent: m.isMine ? "flex-end" : "flex-start" }}>
               <div style={{
-                maxWidth: "75%", padding: m.imageUrl && !m.body ? 4 : "9px 13px", borderRadius: 14, fontSize: 14, lineHeight: 1.4,
+                maxWidth: "75%", padding: m.imageUrl && !m.body ? 4 : "9px 13px", borderRadius: 14, fontSize: 16, lineHeight: 1.4,
                 background: m.isMine ? "#1B3A2F" : "#FFF", color: m.isMine ? "#F6F4EE" : "#14231C",
                 border: m.isMine ? "none" : "1px solid #E3D9C9",
                 overflowWrap: "break-word", wordBreak: "break-word",
@@ -163,7 +163,7 @@ export default function ChatThread({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") send(); }}
           placeholder="Type a message..."
-          style={{ flex: 1, minWidth: 0, border: "1px solid #E3D9C9", borderRadius: 20, padding: "10px 16px", fontSize: 14 }}
+          style={{ flex: 1, minWidth: 0, border: "1px solid #E3D9C9", borderRadius: 20, padding: "10px 16px", fontSize: 16 }}
         />
         <button
           onClick={send}
