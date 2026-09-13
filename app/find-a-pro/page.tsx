@@ -1,6 +1,7 @@
 "use client";
 
 import FindProSearch from "@/app/components/FindProSearch";
+import { REGION_CITIES } from "@/lib/regionCities";
 
 export default function FindAProPage() {
   return (
@@ -18,6 +19,21 @@ export default function FindAProPage() {
 
       <main style={{ maxWidth: 560, margin: "0 auto", padding: "24px 20px 60px" }}>
         <FindProSearch />
+
+        <div style={{ marginTop: 32 }}>
+          <h2 style={{ fontSize: 13, color: "#8A8571", marginBottom: 10 }}>Browse by area</h2>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {REGION_CITIES.map((c) => (
+              <a
+                key={c.slug}
+                href={`/find-a-pro/${c.slug}`}
+                style={{ fontSize: 12.5, color: "#1B3A2F", background: "#FFF", border: "1px solid #E3D9C9", borderRadius: 20, padding: "6px 12px", textDecoration: "none" }}
+              >
+                {c.name}
+              </a>
+            ))}
+          </div>
+        </div>
       </main>
     </div>
   );
