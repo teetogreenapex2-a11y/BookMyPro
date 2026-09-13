@@ -94,14 +94,19 @@ export async function POST(req: NextRequest) {
       data: { sessionToken, userId: user.id, expires },
     });
 
-    const isHttps = (process.env.NEXTAUTH_URL || "").startsWith("https://");
-    const cookieName = isHttps ? "__Secure-next-auth.session-token" : "next-auth.session-token";
-
+    // sameSite: "none" (not the default "lax") is required for this
+    // cookie to actually survive inside the native iOS app's WKWebView -
+    // the same documented issue already fixed for NextAuth's own
+    // sessionToken cookie in lib/auth.ts, but this route sets its cookie
+    // manually and never got that same fix applied, which is exactly
+    // what was causing sign-in to appear to succeed (a valid session
+    // genuinely gets created) while the very next page found no session
+    // at all and silently bounced back to /login.
     const response = NextResponse.json({ success: true });
-    response.cookies.set(cookieName, sessionToken, {
+    response.cookies.set("__Secure-next-auth.session-token", sessionToken, {
       httpOnly: true,
-      secure: isHttps,
-      sameSite: "lax",
+      secure: true,
+      sameSite: "none",
       path: "/",
       expires,
     });
