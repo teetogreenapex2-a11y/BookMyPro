@@ -4,7 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
 
-type Message = { id: string; body: string | null; imageUrl: string | null; createdAt: string; isMine: boolean; senderName: string };
+type Message = { id: string; body: string | null; imageUrl: string | null; createdAt: string; readAt: string | null; isMine: boolean; senderName: string };
+
+// Just the time for anything sent today (the common case); a short date
+// added in front of the time for anything older, so a message from last
+// week doesn't read as if it just arrived.
+function formatMessageTime(iso: string) {
+  const d = new Date(iso);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (isToday) return time;
+  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
+}
 
 export default function ChatThread({
   apiBase, conversationId, title, backHref,
@@ -113,8 +125,14 @@ export default function ChatThread({
         ) : messages.length === 0 ? (
           <p style={{ color: "#8A8571", fontSize: 13 }}>No messages yet - say hello.</p>
         ) : (
-          messages.map((m) => (
-            <div key={m.id} style={{ display: "flex", justifyContent: m.isMine ? "flex-end" : "flex-start" }}>
+          (() => {
+            // Only the most recent message I sent shows a "Read"
+            // indicator, once it has one - the standard convention,
+            // rather than marking every single past message individually.
+            let lastMineIndex = -1;
+            messages.forEach((m, i) => { if (m.isMine) lastMineIndex = i; });
+            return messages.map((m, i) => (
+            <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: m.isMine ? "flex-end" : "flex-start" }}>
               <div style={{
                 maxWidth: "75%", padding: m.imageUrl && !m.body ? 4 : "9px 13px", borderRadius: 14, fontSize: 16, lineHeight: 1.4,
                 background: m.isMine ? "#1B3A2F" : "#FFF", color: m.isMine ? "#F6F4EE" : "#14231C",
@@ -130,8 +148,13 @@ export default function ChatThread({
                 )}
                 {m.body}
               </div>
+              <span style={{ fontSize: 11, color: "#8A8571", marginTop: 3, padding: "0 4px" }}>
+                {formatMessageTime(m.createdAt)}
+                {i === lastMineIndex && m.readAt && " - Read"}
+              </span>
             </div>
-          ))
+            ));
+          })()
         )}
         <div ref={bottomRef} />
       </div>

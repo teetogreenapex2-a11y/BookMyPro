@@ -30,6 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       body: m.body,
       imageUrl: m.imageUrl,
       createdAt: m.createdAt,
+      readAt: m.readAt,
       isMine: m.senderMembershipId === auth.membership.id,
       senderName: m.sender.user.name || m.sender.user.email,
     }))
@@ -65,5 +66,5 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     await sendPushToMembership(auth.conversation.playerMembershipId, { title: `Message from ${auth.business.name}`, body: preview, url });
   }
 
-  return NextResponse.json({ id: message.id, body: message.body, imageUrl: null, createdAt: message.createdAt, isMine: true });
+  return NextResponse.json({ id: message.id, body: message.body, imageUrl: null, createdAt: message.createdAt, readAt: null, isMine: true });
 }
