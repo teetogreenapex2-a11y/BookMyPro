@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
+import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
+import { sendPushToMembership } from "@/lib/pushNotifications";
 
 async function getAuthorizedConversation(slug: string, userId: string, conversationId: string) {
   const business = await getBusinessBySlug(slug);
@@ -63,6 +65,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     data: { conversationId: params.id, senderMembershipId: auth.membership.id, body: body.trim() },
   });
   await prisma.staffConversation.update({ where: { id: params.id }, data: { lastMessageAt: message.createdAt } });
+
+  const otherMembershipId = auth.conversation.memberAId === auth.membership.id ? auth.conversation.memberBId : auth.conversation.memberAId;
+  const url = getBusinessAbsoluteUrl(req, params.slug, `/instructor/staff-messages/${params.id}`);
+  const preview = body.trim().length > 80 ? body.trim().slice(0, 80) + "..." : body.trim();
+  await sendPushToMembership(otherMembershipId, { title: "New staff message", body: preview, url });
 
   return NextResponse.json({ id: message.id, body: message.body, imageUrl: null, createdAt: message.createdAt, readAt: null, isMine: true });
 }

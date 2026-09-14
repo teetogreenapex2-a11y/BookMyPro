@@ -166,6 +166,19 @@ export default function InstructorClient({
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const [unreadStaffMessages, setUnreadStaffMessages] = useState(0);
+  useEffect(() => {
+    function checkUnreadStaff() {
+      fetch(`${apiBase}/staff-conversations/unread-count`)
+        .then((r) => r.json())
+        .then((d) => setUnreadStaffMessages(d.count || 0))
+        .catch(() => {});
+    }
+    checkUnreadStaff();
+    const interval = setInterval(checkUnreadStaff, 15000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
   }, []);
@@ -890,10 +903,13 @@ export default function InstructorClient({
                 )}
               </a>
               <a href={`${basePath}/instructor/staff-messages`} style={{
-                fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                position: "relative", fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                 border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
               }}>
                 Staff
+                {unreadStaffMessages > 0 && (
+                  <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#B8862B", border: "1px solid var(--fairway)" }} />
+                )}
               </a>
               <a href={`${basePath}/reports`} style={{
                 fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
