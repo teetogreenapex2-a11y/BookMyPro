@@ -21,12 +21,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const { token } = await req.json();
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
-  // A device's FCM token is unique - upsert so re-registering (e.g. after
-  // reinstalling the app) doesn't create duplicate rows for the same
-  // real device.
+  // Upsert on the token+membership pair (not the token alone) - this is
+  // what actually lets one physical device stay registered for more than
+  // one membership at once, rather than the newest registration silently
+  // erasing an earlier one for a different account or role.
   await prisma.fcmToken.upsert({
-    where: { token },
-    update: { membershipId: membership.id },
+    where: { token_membershipId: { token, membershipId: membership.id } },
+    update: {},
     create: { membershipId: membership.id, token },
   });
 
@@ -38,9 +39,19 @@ export async function DELETE(req: NextRequest, { params }: { params: { slug: str
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
 
+  const business = await getBusinessBySlug(params.slug);
+  if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
+
+  const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor", "player"]);
+  if (!membership) return NextResponse.json({ error: "Membership required" }, { status: 403 });
+
   const { token } = await req.json();
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
-  await prisma.fcmToken.deleteMany({ where: { token } });
+  // Scoped to just this membership now that one token can hold several
+  // at once - a wildcard delete on the token alone would silently kill
+  // notifications for every other account or role on this same device
+  // too, not just the one actually being disabled.
+  await prisma.fcmToken.deleteMany({ where: { token, membershipId: membership.id } });
   return NextResponse.json({ ok: true });
 }

@@ -717,11 +717,15 @@ model PushSubscription {
   id           String     @id @default(cuid())
   membership   Membership @relation(fields: [membershipId], references: [id])
   membershipId String
-  endpoint     String     @unique
+  // Same reasoning as FcmToken's token field below - unique on the pair
+  // with membershipId rather than the endpoint alone, so one browser can
+  // stay registered for more than one membership at once.
+  endpoint     String
   p256dh       String
   auth         String
   createdAt    DateTime   @default(now())
 
+  @@unique([endpoint, membershipId])
   @@index([membershipId])
 }
 
@@ -736,9 +740,17 @@ model FcmToken {
   id           String     @id @default(cuid())
   membership   Membership @relation(fields: [membershipId], references: [id])
   membershipId String
-  token        String     @unique
+  // A device's token was previously unique on its own, meaning the same
+  // phone could only ever be registered for one membership at a time -
+  // switching between accounts or roles (player vs. instructor) on the
+  // same device silently broke notifications for whichever membership
+  // wasn't the most recently opened one. Unique on the pair instead, so
+  // one device can hold a real, simultaneous registration for every
+  // membership the person actually uses on it.
+  token        String
   createdAt    DateTime   @default(now())
 
+  @@unique([token, membershipId])
   @@index([membershipId])
 }
 

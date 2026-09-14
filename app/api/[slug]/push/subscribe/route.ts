@@ -23,12 +23,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "Invalid subscription data" }, { status: 400 });
   }
 
-  // A given browser's endpoint is unique - upsert so re-subscribing (e.g.
-  // after clearing site data) doesn't create duplicate rows for the same
-  // real device.
+  // Upsert on the endpoint+membership pair (not the endpoint alone) -
+  // this is what lets one browser/device stay registered for more than
+  // one membership at once, rather than the newest registration
+  // silently erasing an earlier one for a different account or role.
   await prisma.pushSubscription.upsert({
-    where: { endpoint },
-    update: { membershipId: membership.id, p256dh: keys.p256dh, auth: keys.auth },
+    where: { endpoint_membershipId: { endpoint, membershipId: membership.id } },
+    update: { p256dh: keys.p256dh, auth: keys.auth },
     create: { membershipId: membership.id, endpoint, p256dh: keys.p256dh, auth: keys.auth },
   });
 
@@ -40,9 +41,18 @@ export async function DELETE(req: NextRequest, { params }: { params: { slug: str
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
 
+  const business = await getBusinessBySlug(params.slug);
+  if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
+
+  const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor", "player"]);
+  if (!membership) return NextResponse.json({ error: "Membership required" }, { status: 403 });
+
   const { endpoint } = await req.json();
   if (!endpoint) return NextResponse.json({ error: "Missing endpoint" }, { status: 400 });
 
-  await prisma.pushSubscription.deleteMany({ where: { endpoint } });
+  // Scoped to just this membership, same reasoning as the FCM route -
+  // a wildcard delete on the endpoint alone would kill notifications
+  // for every other account or role on this same browser too.
+  await prisma.pushSubscription.deleteMany({ where: { endpoint, membershipId: membership.id } });
   return NextResponse.json({ ok: true });
 }
