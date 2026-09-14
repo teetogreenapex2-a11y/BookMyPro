@@ -19,8 +19,8 @@ function formatMessageTime(iso: string) {
 }
 
 export default function ChatThread({
-  apiBase, conversationId, title, backHref,
-}: { apiBase: string; conversationId: string; title: string; backHref: string }) {
+  apiBase, conversationId, title, backHref, endpointBase = "conversations", supportsImages = true,
+}: { apiBase: string; conversationId: string; title: string; backHref: string; endpointBase?: string; supportsImages?: boolean }) {
   const [messages, setMessages] = useState<Message[]>([]);
   // The native tab bar sits on top of the page rather than shrinking the
   // space available to it (a deliberate tradeoff made when fixing a real
@@ -54,7 +54,7 @@ export default function ChatThread({
   }, [messages.length]);
 
   async function load() {
-    const res = await fetch(`${apiBase}/conversations/${conversationId}/messages`);
+    const res = await fetch(`${apiBase}/${endpointBase}/${conversationId}/messages`);
     if (res.ok) setMessages(await res.json());
     setLoading(false);
   }
@@ -68,7 +68,7 @@ export default function ChatThread({
     const body = draft.trim();
     setDraft("");
     try {
-      const res = await fetch(`${apiBase}/conversations/${conversationId}/messages`, {
+      const res = await fetch(`${apiBase}/${endpointBase}/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body }),
@@ -100,7 +100,7 @@ export default function ChatThread({
     try {
       await upload(file.name, file, {
         access: "public",
-        handleUploadUrl: `${apiBase}/conversations/${conversationId}/messages/upload-token`,
+        handleUploadUrl: `${apiBase}/${endpointBase}/${conversationId}/messages/upload-token`,
       });
       for (let attempt = 0; attempt < 3; attempt++) {
         await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
@@ -163,24 +163,28 @@ export default function ChatThread({
         {error && <p style={{ fontSize: 12, color: "#B23A3A", margin: "6px 0 0" }}>{error}</p>}
       </div>
       <div style={{ display: "flex", gap: 8, padding: `12px 16px ${isNative ? 84 : 12}px`, borderTop: "1px solid #E3D9C9", background: "#FFF" }}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) sendImage(f); e.target.value = ""; }}
-        />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploadingImage}
-          title="Send a photo"
-          style={{
-            flexShrink: 0, width: 42, background: "none", border: "1px solid #E3D9C9", borderRadius: 20,
-            fontSize: 18, opacity: uploadingImage ? 0.5 : 1,
-          }}
-        >
-          {uploadingImage ? "…" : "📷"}
-        </button>
+        {supportsImages && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) sendImage(f); e.target.value = ""; }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingImage}
+              title="Send a photo"
+              style={{
+                flexShrink: 0, width: 42, background: "none", border: "1px solid #E3D9C9", borderRadius: 20,
+                fontSize: 18, opacity: uploadingImage ? 0.5 : 1,
+              }}
+            >
+              {uploadingImage ? "…" : "📷"}
+            </button>
+          </>
+        )}
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

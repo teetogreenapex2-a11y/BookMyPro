@@ -131,6 +131,7 @@ model Business {
   packages     Package[]
   playingLessonRequests PlayingLessonRequest[]
   conversations Conversation[]
+  staffConversations StaffConversation[]
   swingSessions SwingSession[]
   syncLogs     SyncLog[]
   videoSubmissions VideoSubmission[]
@@ -218,6 +219,9 @@ model Membership {
   fcmTokens         FcmToken[]
   conversationsAsPlayer Conversation[]
   sentMessages          Message[]
+  staffConversationsAsA StaffConversation[] @relation("StaffConversationsAsA")
+  staffConversationsAsB StaffConversation[] @relation("StaffConversationsAsB")
+  sentStaffMessages     StaffMessage[]
   aiAnalysisPreferences AiAnalysisPreference[]
   lessonDurations       LessonDuration[]
   playingLessonRequestsAsInstructor PlayingLessonRequest[] @relation("PlayingLessonRequestInstructor")
@@ -894,4 +898,43 @@ model Message {
   imageUrl       String? // set for an image message, alongside or instead of body text
   readAt         DateTime? // null until the recipient actually opens the thread - drives the unread indicator
   createdAt      DateTime     @default(now())
+}
+
+// Staff-to-staff messaging - owner<->instructor or instructor<->instructor
+// at the same business. Genuinely separate from Conversation/Message
+// above rather than extending them, since that pair is structurally
+// built around exactly one player per conversation (playerMembershipId
+// is a single, required field) and isn't a natural fit for two staff
+// members messaging each other.
+//
+// The two participants are always stored in a consistent order (whichever
+// membership id sorts first alphabetically as memberAId, the other as
+// memberBId) regardless of who actually started the conversation - this
+// is what lets the unique constraint below prevent two separate, duplicate
+// conversations from ever existing between the same two people.
+model StaffConversation {
+  id            String   @id @default(cuid())
+  business      Business @relation(fields: [businessId], references: [id])
+  businessId    String
+  memberA       Membership @relation("StaffConversationsAsA", fields: [memberAId], references: [id])
+  memberAId     String
+  memberB       Membership @relation("StaffConversationsAsB", fields: [memberBId], references: [id])
+  memberBId     String
+  messages      StaffMessage[]
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@unique([businessId, memberAId, memberBId])
+}
+
+model StaffMessage {
+  id                  String            @id @default(cuid())
+  conversation        StaffConversation @relation(fields: [conversationId], references: [id])
+  conversationId      String
+  sender              Membership        @relation(fields: [senderMembershipId], references: [id])
+  senderMembershipId  String
+  body                String?
+  imageUrl            String?
+  readAt              DateTime?
+  createdAt           DateTime          @default(now())
 }
