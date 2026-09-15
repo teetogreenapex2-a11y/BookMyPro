@@ -184,6 +184,8 @@ model Membership {
   // access on its own, only the actual approval does.
   status     String   @default("active")
   specialty  String?  // short tagline shown to players, e.g. "Short game, junior coaching" — only meaningful for owner/instructor roles
+  bio        String?  // a fuller, self-written bio - edited by the instructor themselves, shown on the booking page rather than in search result badges
+  bioPhotoUrl String? // a dedicated profile photo for this bio, separate from the account's general sign-in avatar (User.image)
   // Keeps this person out of the player-facing booking picker without
   // touching their own access to the app at all - unlike status
   // "inactive" (which also blocks their own Settings/calendar access),

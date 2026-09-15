@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
+import MyProfileEditor from "@/app/components/MyProfileEditor";
 
 type User = {
   name: string | null;
@@ -242,6 +243,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [togglingHiddenId, setTogglingHiddenId] = useState<string | null>(null);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingBioId, setEditingBioId] = useState<string | null>(null);
   const [nameValue, setNameValue] = useState("");
   const [savingName, setSavingName] = useState(false);
   async function saveInstructorName(membershipId: string) {
@@ -548,6 +550,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       <main style={{ maxWidth: 720, margin: "0 auto", padding: "20px 20px 40px" }}>
         {tab === "profile" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {isInstructor && <MyProfileEditor apiBase={apiBase} />}
             <Field label="Full name" value={profile.name} onChange={(v) => setProfile((p) => ({ ...p, name: v }))} />
             <Field label="Email" value={user.email} onChange={() => {}} disabled />
             <Field label="Phone" value={profile.phone} onChange={(v) => setProfile((p) => ({ ...p, phone: v }))} />
@@ -1079,6 +1082,26 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                       ) : t.specialty ? (
                         <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{t.specialty}</div>
                       ) : null}
+                      {canEditThis && (
+                        <button
+                          onClick={() => setEditingBioId(editingBioId === t.id ? null : t.id)}
+                          style={{ background: "none", border: "none", color: "var(--gold)", fontSize: 11, fontWeight: 600, padding: 0, marginTop: 6 }}
+                        >
+                          {editingBioId === t.id ? "Hide bio & photo editor" : "Edit bio & photo"}
+                        </button>
+                      )}
+                      {editingBioId === t.id && (
+                        <div style={{ marginTop: 10 }}>
+                          <MyProfileEditor
+                            apiBase={apiBase}
+                            targetMembershipId={t.id}
+                            initialBio={t.bio}
+                            initialPhotoUrl={t.bioPhotoUrl}
+                            title={`${t.name || t.email}'s Profile`}
+                            description="A photo and a fuller bio players see on this instructor's booking page."
+                          />
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                     <span style={{

@@ -847,6 +847,26 @@ export default function BookingClient({
             </div>
           )}
 
+          {selectedInstructor && (selectedInstructor.bio || selectedInstructor.bioPhotoUrl) && (
+            <div style={{
+              display: "flex", gap: 12, background: "var(--card)", border: "1px solid var(--border)",
+              borderRadius: 12, padding: 14, marginBottom: 16,
+            }}>
+              {selectedInstructor.bioPhotoUrl && (
+                <img
+                  src={selectedInstructor.bioPhotoUrl}
+                  alt=""
+                  style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+                />
+              )}
+              {selectedInstructor.bio && (
+                <p style={{ fontSize: 13, lineHeight: 1.6, color: "var(--fairway)", margin: 0, whiteSpace: "pre-wrap" }}>
+                  {selectedInstructor.bio}
+                </p>
+              )}
+            </div>
+          )}
+
           {instructors.length > 1 && !selectedInstructorId ? (
             <p style={{ fontSize: 13, color: "#D7DED9", margin: "4px 0 0" }}>
               Choose an instructor above to see their lesson and fitting pricing.

@@ -36,6 +36,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     role: m.role,
     status: m.status,
     specialty: m.specialty,
+    bio: m.bio,
+    bioPhotoUrl: m.bioPhotoUrl,
     hiddenFromBooking: m.hiddenFromBooking,
     // Each instructor's own pricing — spread directly rather than
     // hand-listing every field, since lib/pricing.ts's helpers just read
