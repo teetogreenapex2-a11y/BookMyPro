@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getBusinessBySlug, getBusinessInstructors } from "@/lib/tenant";
 
+// Bios and photos can change at any time, so this needs to render fresh
+// on every request - without this, Next.js could statically cache the
+// page (since nothing else here signals dynamic behavior), silently
+// serving a stale snapshot from before someone's latest photo upload.
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const business = await getBusinessBySlug(params.slug);
   if (!business) return {};
