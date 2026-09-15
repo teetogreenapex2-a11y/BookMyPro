@@ -68,6 +68,20 @@ export default function MyProfileEditor({
         handleUploadUrl: `${apiBase}/profile/upload-token`,
         clientPayload: targetMembershipId ? JSON.stringify({ targetMembershipId }) : undefined,
       });
+      // Save the URL directly here too, rather than depending solely on
+      // the upload-token route's async onUploadCompleted webhook, which
+      // requires Vercel Blob to be able to reach back to this server -
+      // if that silently doesn't happen, the file still exists but the
+      // database never learns its URL without this.
+      const res = await fetch(`${apiBase}/profile/photo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: blob.url, targetMembershipId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Photo uploaded, but couldn't save it - try again.");
+      }
       setPhotoUrl(blob.url);
     } catch (err: any) {
       setError(err?.message || "Couldn't upload that photo - try again.");
