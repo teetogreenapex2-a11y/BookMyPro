@@ -847,6 +847,13 @@ export default function BookingClient({
             </div>
           )}
 
+          <a
+            href={`${basePath}/instructors`}
+            style={{ display: "block", fontSize: 12.5, color: "var(--gold)", fontWeight: 600, marginBottom: 16, textDecoration: "none" }}
+          >
+            Meet our instructors &rarr;
+          </a>
+
           {selectedInstructor && (selectedInstructor.bio || selectedInstructor.bioPhotoUrl) && (
             <div style={{
               display: "flex", gap: 12, background: "var(--card)", border: "1px solid var(--border)",
