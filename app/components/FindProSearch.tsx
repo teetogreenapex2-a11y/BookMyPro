@@ -18,6 +18,28 @@ export default function FindProSearch() {
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [inviteSent, setInviteSent] = useState(false);
+
+  async function handleInvite() {
+    const shareText =
+      "I use BookMyPro to book golf lessons - if you're a golf instructor, you can set up your own booking page here:";
+    const shareUrl = "https://bookmypro.app/onboarding";
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: shareText, url: shareUrl });
+      } catch {
+        // User cancelled the native share sheet - not an error, do nothing.
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+      setInviteSent(true);
+      setTimeout(() => setInviteSent(false), 2500);
+    } catch {
+      // Clipboard blocked - nothing more we can do here silently.
+    }
+  }
 
   async function search() {
     setLoading(true);
@@ -95,7 +117,24 @@ export default function FindProSearch() {
       </div>
 
       {searched && !loading && results.length === 0 && (
-        <p style={{ fontSize: 13, color: "#8A8571" }}>No pros found nearby yet.</p>
+        <div style={{ background: "#FFF", border: "1px solid #E3D9C9", borderRadius: 12, padding: 18, marginBottom: 12 }}>
+          <p style={{ fontSize: 13.5, color: "#3A3A3A", margin: "0 0 4px", fontWeight: 700 }}>
+            No pros in your area yet
+          </p>
+          <p style={{ fontSize: 13, color: "#8A8571", margin: "0 0 14px", lineHeight: 1.5 }}>
+            We're adding new instructors all the time - check back soon. If you already have a
+            golf pro, let them know BookMyPro exists so they can get set up.
+          </p>
+          <button
+            onClick={handleInvite}
+            style={{
+              width: "100%", background: "#1B3A2F", color: "#F6F4EE", border: "none", borderRadius: 8,
+              padding: "11px 16px", fontSize: 13.5, fontWeight: 700,
+            }}
+          >
+            {inviteSent ? "Link copied!" : "Tell your pro about BookMyPro"}
+          </button>
+        </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
