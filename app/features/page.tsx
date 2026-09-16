@@ -48,6 +48,7 @@ export default function FeaturesPage() {
             "Sell lesson packages and club fittings with your own pricing",
             "Sell gift cards",
             "Run a small shop for products",
+            "Klarna offered alongside card payment - pay in full or in installments",
           ]} />
           <Group title="Remote Lessons & Video Tools" items={[
             "Built-in video call for remote lessons",
@@ -60,12 +61,20 @@ export default function FeaturesPage() {
           <Group title="Customers & Notifications" items={[
             "Full customer list with search and golf profiles",
             "Push notifications for new bookings, video submissions, and low packages",
+            "In-app messaging with players, with read receipts and timestamps",
+          ]} />
+          <Group title="Credibility & Team" items={[
+            "Your own bio and photo, shown on your public booking page and the \"Meet Our Instructors\" page",
+            "Star ratings and written reviews from players after completed lessons",
+            "Owners can manage bios and photos for their whole team",
+            "Private staff messaging between owners and instructors, separate from player chats",
           ]} />
         </Section>
 
         <Section title="For Your Players">
           <Group title="Finding & Booking" items={[
             "Find a Pro - search by real distance or city",
+            "Browse instructor bios, photos, and star ratings before booking",
             "Sign in with Google, or a password-free email link",
             "Book a lesson or club fitting online in a few taps",
             "Remote or in-person options",
@@ -77,11 +86,13 @@ export default function FeaturesPage() {
             "Get feedback as timestamped comments",
             "Receive Swing Sketches",
             "View all upcoming sessions in one place",
+            "Leave a star rating and review after a completed lesson",
           ]} />
           <Group title="Payments & Extras" items={[
             "Buy gift cards",
             "Shop your products",
             "Download their own swing videos",
+            "Pay with card, or with Klarna where offered",
             "Push notifications for confirmations, feedback, and low packages",
           ]} />
         </Section>
