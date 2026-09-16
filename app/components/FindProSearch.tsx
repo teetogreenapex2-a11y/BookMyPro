@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 
 type Listing = {
   slug: string;
@@ -12,6 +13,7 @@ type Listing = {
 };
 
 export default function FindProSearch() {
+  const { status } = useSession();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Listing[]>([]);
   const [searched, setSearched] = useState(false);
@@ -142,6 +144,19 @@ export default function FindProSearch() {
           <a
             key={b.slug}
             href={`/${b.slug}/book`}
+            onClick={(e) => {
+              // Booking pages require a signed-in session - the server page
+              // itself redirects unauthenticated visitors to /login, but
+              // that server-side redirect hop doesn't reliably render inside
+              // the native app's webview (it can fail silently, leaving the
+              // person right back on this same search screen with no
+              // explanation). Checking sign-in status here first and sending
+              // them to /login directly avoids that hop entirely.
+              if (status !== "authenticated") {
+                e.preventDefault();
+                window.location.href = `/login?callbackUrl=${encodeURIComponent(`/${b.slug}/book`)}`;
+              }
+            }}
             style={{
               display: "block", background: "#FFF", border: "1px solid #E3D9C9", borderRadius: 12,
               padding: 16, textDecoration: "none", color: "inherit",
