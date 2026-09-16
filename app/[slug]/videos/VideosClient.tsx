@@ -230,22 +230,44 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
             rows={2}
             style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8, resize: "vertical" }}
           />
-          {isNative && (
-            <button
-              onClick={recordVideo}
-              disabled={recording}
+          {isNative ? (
+            <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: "1px solid var(--fairway)", marginBottom: 10 }}>
+              <button
+                onClick={recordVideo}
+                disabled={recording}
+                style={{
+                  flex: 1, background: "var(--card)", color: "var(--fairway)", border: "none",
+                  padding: "10px 12px", fontSize: 13, fontWeight: 700,
+                  opacity: recording ? 0.7 : 1,
+                }}
+              >
+                {recording ? "Opening camera..." : "🎥 Record a video"}
+              </button>
+              <a
+                href={`${basePath}/swing-session`}
+                title="Record two camera angles at once - down-the-line + face-on"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  padding: "10px 14px", background: "var(--card)", color: "var(--fairway)",
+                  textDecoration: "none", fontSize: 13, fontWeight: 700,
+                  borderLeft: "1px solid var(--fairway)", whiteSpace: "nowrap",
+                }}
+              >
+                📐 2 cams
+              </a>
+            </div>
+          ) : (
+            <a
+              href={`${basePath}/swing-session`}
               style={{
-                width: "100%", background: "var(--card)", color: "var(--fairway)", border: "1px solid var(--fairway)",
-                borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 700, marginBottom: 8,
-                opacity: recording ? 0.7 : 1,
+                display: "block", textAlign: "center", background: "var(--card)", color: "var(--fairway)",
+                border: "1px solid var(--fairway)", borderRadius: 8, padding: "10px 16px", fontSize: 13,
+                fontWeight: 700, textDecoration: "none", marginBottom: 10,
               }}
             >
-              {recording ? "Opening camera..." : "🎥 Add/Record a video"}
-            </button>
+              📐 Record two camera angles at once
+            </a>
           )}
-          <a href={`${basePath}/swing-session`} style={{ fontSize: 12.5, color: "var(--gold)", fontWeight: 700, textDecoration: "none", display: "inline-block", marginBottom: 10 }}>
-            Want two camera angles at once instead? (down-the-line + face-on) &rarr;
-          </a>
           <input
             type="file"
             accept="video/mp4,video/quicktime,video/webm,video/x-m4v"
