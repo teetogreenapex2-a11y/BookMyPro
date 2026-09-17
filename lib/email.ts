@@ -182,6 +182,20 @@ export async function sendVideoReviewedNotification(to: string, details: { busin
   await sendEmail(to, subject, html);
 }
 
+export async function sendReviewRequestEmail(to: string, details: { businessName: string; instructorName: string; reviewUrl: string }) {
+  const subject = `How was your lesson with ${details.instructorName}?`;
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">How was your lesson?</h2>
+      <p style="color: #5C6459; margin-top: 0;">${details.businessName}</p>
+      <p>Got a minute to rate your lesson with ${details.instructorName}? It helps other players find the right instructor.</p>
+      <a href="${details.reviewUrl}" style="display: inline-block; background: #1B3A2F; color: #F6F4EE; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 700; margin-top: 8px;">
+        Leave a review
+      </a>
+    </div>
+  `;
+  await sendEmail(to, subject, html);
+}
 // Sent to whoever the gift card is for — the purchaser, if no recipient
 // email was given, or the actual recipient if this was bought as a gift.
 export async function sendGiftCardEmail(to: string, details: { businessName: string; code: string; amountCents: number; recipientName: string | null; message: string | null }) {
