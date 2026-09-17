@@ -54,6 +54,15 @@ export default function CustomersClient({
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<{ totalRows: number; newPeople: number; existingPeopleAdded: number; skipped: { row: number; name: string; reason: string }[] } | null>(null);
+  const [emailBlastOpen, setEmailBlastOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailResult, setEmailResult] = useState<string | null>(null);
 
   async function deleteCustomer(customerId: string, force = false) {
     setDeletingId(customerId);
@@ -69,6 +78,99 @@ export default function CustomersClient({
       setCustomers((prev) => prev.filter((c) => c.id !== customerId));
     } else {
       alert(data.error || "Something went wrong.");
+    }
+  }
+
+  // Minimal, quote-aware CSV parser - handles plain commas and commas
+  // inside quoted fields ("Smith, Jr."), which is all a contacts export
+  // needs. Row 0 is treated as the header row.
+  function parseCsv(text: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let field = "";
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+        } else {
+          field += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        row.push(field); field = "";
+      } else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && text[i + 1] === "\n") i++;
+        row.push(field); field = "";
+        if (row.some((c) => c.trim() !== "")) rows.push(row);
+        row = [];
+      } else {
+        field += ch;
+      }
+    }
+    if (field !== "" || row.length > 0) { row.push(field); if (row.some((c) => c.trim() !== "")) rows.push(row); }
+    return rows;
+  }
+
+  // Recognizes the handful of header spellings that matter here: Wix's
+  // plain contacts export ("First Name" / "Last Name" / "Email" / "Phone"),
+  // Wix's Google-formatted export ("Name" / "E-mail 1 - Value" /
+  // "Phone 1 - Value"), and a generic "Name, Email, Phone" spreadsheet.
+  function findColumn(headers: string[], candidates: string[]): number {
+    const lower = headers.map((h) => h.trim().toLowerCase());
+    for (const c of candidates) {
+      const idx = lower.indexOf(c);
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  }
+
+  async function handleImportFile(file: File) {
+    setImportError(null);
+    setImportResult(null);
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const table = parseCsv(text);
+      if (table.length < 2) throw new Error("Couldn't find any rows in that file.");
+      const headers = table[0];
+
+      const emailCol = findColumn(headers, ["email", "e-mail", "e-mail 1 - value", "email address"]);
+      const nameCol = findColumn(headers, ["name", "full name"]);
+      const firstCol = findColumn(headers, ["first name", "given name"]);
+      const lastCol = findColumn(headers, ["last name", "family name"]);
+      const phoneCol = findColumn(headers, ["phone", "phone 1 - value", "phone number", "mobile phone"]);
+
+      if (emailCol === -1) throw new Error("Couldn't find an email column in that file.");
+      if (nameCol === -1 && firstCol === -1) throw new Error("Couldn't find a name column in that file.");
+
+      const rows = table.slice(1).map((r) => {
+        const name = nameCol !== -1
+          ? (r[nameCol] || "").trim()
+          : [r[firstCol], lastCol !== -1 ? r[lastCol] : ""].filter(Boolean).join(" ").trim();
+        return {
+          name,
+          email: (r[emailCol] || "").trim(),
+          phone: phoneCol !== -1 ? (r[phoneCol] || "").trim() : "",
+        };
+      }).filter((r) => r.email);
+
+      if (rows.length === 0) throw new Error("No rows with an email address were found.");
+
+      const res = await fetch(`${apiBase}/players/bulk-import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Import failed.");
+      setImportResult(data);
+    } catch (err: any) {
+      setImportError(err.message || "Something went wrong reading that file.");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -106,6 +208,27 @@ export default function CustomersClient({
       setBlastBody("");
     } else {
       setBlastResult(data.error || "Something went wrong.");
+    }
+  }
+
+  async function sendEmailBlast() {
+    if (!emailSubject.trim() || !emailBody.trim()) return;
+    setEmailSending(true);
+    setEmailResult(null);
+    const res = await fetch(`${apiBase}/customers/email-blast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject: emailSubject, message: emailBody }),
+    });
+    const data = await res.json();
+    setEmailSending(false);
+    if (res.ok) {
+      const skippedNote = data.optedOut > 0 ? ` (${data.optedOut} skipped, unsubscribed)` : "";
+      setEmailResult(`Sent to ${data.sent} customer${data.sent === 1 ? "" : "s"}${skippedNote}.`);
+      setEmailSubject("");
+      setEmailBody("");
+    } else {
+      setEmailResult(data.error || "Something went wrong.");
     }
   }
 
@@ -374,6 +497,17 @@ export default function CustomersClient({
             >
               + Add customer
             </button>
+            {isOwner && (
+              <button
+                onClick={() => { setImportOpen((o) => !o); setImportError(null); setImportResult(null); }}
+                style={{
+                  background: "#FFF", color: "var(--fairway)", border: "1px solid var(--fairway)", borderRadius: 8,
+                  padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                }}
+              >
+                Import CSV
+              </button>
+            )}
             <button
               onClick={() => { setBlastOpen((o) => !o); setBlastResult(null); }}
               style={{
@@ -383,6 +517,17 @@ export default function CustomersClient({
             >
               Message all
             </button>
+            {isOwner && (
+              <button
+                onClick={() => { setEmailBlastOpen((o) => !o); setEmailResult(null); }}
+                style={{
+                  background: "#FFF", color: "var(--fairway)", border: "1px solid var(--fairway)", borderRadius: 8,
+                  padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                }}
+              >
+                Email blast
+              </button>
+            )}
             <SortButton active={sortBy === "name"} onClick={() => setSortBy("name")} label="Name" />
             <SortButton active={sortBy === "remaining"} onClick={() => setSortBy("remaining")} label="Lessons left" />
           </div>
@@ -433,6 +578,56 @@ export default function CustomersClient({
           </div>
         )}
 
+        {importOpen && (
+          <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18, boxShadow: "0 2px 10px rgba(27,58,47,0.06)" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Import customers from a CSV file</div>
+            <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 14px" }}>
+              Exported your contact list from Wix or another site? Upload that CSV file here. Anyone already a
+              customer here is skipped automatically - safe to run more than once.
+            </p>
+            {!importResult && (
+              <label style={{ display: "inline-block", background: "var(--fairway)", color: "var(--chalk)", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: importing ? "default" : "pointer", opacity: importing ? 0.6 : 1 }}>
+                {importing ? "Importing…" : "Choose CSV file"}
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  style={{ display: "none" }}
+                  disabled={importing}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }}
+                />
+              </label>
+            )}
+            {importError && <p style={{ fontSize: 12, color: "#B23A3A", margin: "10px 0 0" }}>{importError}</p>}
+            {importResult && (
+              <div style={{ marginTop: 6 }}>
+                <p style={{ fontSize: 13, margin: "0 0 8px" }}>
+                  Read {importResult.totalRows} row{importResult.totalRows === 1 ? "" : "s"} - added{" "}
+                  <strong>{importResult.newPeople + importResult.existingPeopleAdded}</strong> new customer
+                  {importResult.newPeople + importResult.existingPeopleAdded === 1 ? "" : "s"}.
+                </p>
+                {importResult.skipped.length > 0 && (
+                  <details style={{ fontSize: 12, color: "var(--faint)" }}>
+                    <summary style={{ cursor: "pointer" }}>{importResult.skipped.length} row{importResult.skipped.length === 1 ? "" : "s"} skipped</summary>
+                    <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                      {importResult.skipped.map((s, i) => (
+                        <li key={i}>Row {s.row} ({s.name}): {s.reason}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <button
+                    onClick={() => window.location.reload()}
+                    style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Done - refresh list
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {blastOpen && (
           <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18, boxShadow: "0 2px 10px rgba(27,58,47,0.06)" }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Message all customers</div>
@@ -462,6 +657,47 @@ export default function CustomersClient({
                 style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
               >
                 {blastSending ? "Sending…" : "Send to all"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {emailBlastOpen && (
+          <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18, boxShadow: "0 2px 10px rgba(27,58,47,0.06)" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Email blast</div>
+            <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 14px" }}>
+              A real email, sent to every customer's inbox directly - not the in-app messages above. Good for
+              announcements to people who haven't signed into the app yet. Includes an unsubscribe link and your
+              business address automatically, as required by law. Anyone who's unsubscribed is skipped.
+            </p>
+            <input
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              placeholder="Subject"
+              style={{ ...inputStyle, width: "100%", marginBottom: 10, boxSizing: "border-box" }}
+            />
+            <textarea
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              placeholder="Type your message… (leave a blank line between paragraphs)"
+              rows={6}
+              style={{ ...inputStyle, width: "100%", resize: "vertical", marginBottom: 10, boxSizing: "border-box" }}
+            />
+            {emailResult && <p style={{ fontSize: 12, color: emailResult.startsWith("Sent") ? "var(--fairway)" : "#B23A3A", margin: "0 0 10px" }}>{emailResult}</p>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setEmailBlastOpen(false)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm(`Send this email to all ${customers.length} customer${customers.length === 1 ? "" : "s"} who haven't unsubscribed?`)) {
+                    sendEmailBlast();
+                  }
+                }}
+                disabled={emailSending || !emailSubject.trim() || !emailBody.trim()}
+                style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                {emailSending ? "Sending…" : "Send emails"}
               </button>
             </div>
           </div>

@@ -12,15 +12,26 @@ function getClient(): Resend | null {
 }
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "notifications@example.com";
+// Deliberately a different address than transactional mail above. A cold
+// announcement to an imported customer list is far more likely to get spam
+// complaints than a sign-in link ever would - keeping it on its own address
+// means a bad complaint rate there can't drag down the sender reputation
+// that magic-link sign-in emails depend on.
+const MARKETING_FROM_EMAIL = process.env.RESEND_MARKETING_FROM_EMAIL || "hello@bookmypro.app";
+const MARKETING_MAILING_ADDRESS = "1301 Mountain Mill Dr, Raleigh, NC 27614";
 
 async function sendEmail(to: string | string[], subject: string, html: string) {
+  return sendEmailFrom(FROM_EMAIL, to, subject, html);
+}
+
+async function sendEmailFrom(from: string, to: string | string[], subject: string, html: string) {
   const client = getClient();
   if (!client) {
     console.warn("RESEND_API_KEY is not set — skipping notification email.");
     return;
   }
   try {
-    await client.emails.send({ from: FROM_EMAIL, to, subject, html });
+    await client.emails.send({ from, to, subject, html });
   } catch (err) {
     // Never let a notification failure break the booking flow itself.
     console.error("Failed to send notification email:", err);
@@ -290,4 +301,60 @@ export async function sendDailyScheduleEmail(
   `;
 
   await sendEmail(to, `Today's schedule: ${details.items.length} ${details.items.length === 1 ? "booking" : "bookings"}`, html);
+}
+
+// --- Marketing email blasts (owner-initiated, e.g. announcing BookMyPro to
+// an imported customer list) ---
+//
+// Signed unsubscribe links, not a stored-token table: an HMAC of the
+// recipient's own user id, using a secret this app already has configured
+// (NextAuth requires NEXTAUTH_SECRET to exist for sessions to work at all),
+// so there's nothing new to provision and no per-recipient row to create
+// or expire. Anyone with a link can only unsubscribe the one id it was
+// signed for - they can't forge a link for someone else's id without the
+// secret.
+import { createHmac, timingSafeEqual } from "crypto";
+
+function unsubscribeSecret(): string {
+  return process.env.UNSUBSCRIBE_SECRET || process.env.NEXTAUTH_SECRET || "";
+}
+
+export function makeUnsubscribeToken(userId: string): string {
+  return createHmac("sha256", unsubscribeSecret()).update(userId).digest("hex");
+}
+
+export function verifyUnsubscribeToken(userId: string, token: string): boolean {
+  const expected = makeUnsubscribeToken(userId);
+  const a = Buffer.from(expected);
+  const b = Buffer.from(token || "");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+// bodyHtml is the sender's own message content, inserted as-is - the
+// composer UI (owner-only, see the customers/email-blast route) is
+// responsible for what goes in it. This function's job is just wrapping it
+// with the parts that are legally required for a US commercial email
+// (CAN-SPAM): a working unsubscribe link and a real mailing address.
+export async function sendMarketingBlastEmail(
+  to: string,
+  subject: string,
+  bodyHtml: string,
+  details: { businessName: string; unsubscribeUserId: string }
+) {
+  const token = makeUnsubscribeToken(details.unsubscribeUserId);
+  const unsubscribeUrl = `https://bookmypro.app/unsubscribe?u=${encodeURIComponent(details.unsubscribeUserId)}&t=${token}`;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <p style="color: #5C6459; margin-top: 0; font-size: 12px;">${details.businessName}</p>
+      ${bodyHtml}
+      <hr style="border: none; border-top: 1px solid #E3D9C9; margin: 28px 0 12px;" />
+      <p style="color: #8A8571; font-size: 11px; margin: 0;">
+        ${MARKETING_MAILING_ADDRESS}<br/>
+        You're receiving this because you're a past customer. <a href="${unsubscribeUrl}" style="color: #8A8571;">Unsubscribe</a>
+      </p>
+    </div>
+  `;
+
+  await sendEmailFrom(MARKETING_FROM_EMAIL, to, subject, html);
 }

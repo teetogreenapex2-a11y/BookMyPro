@@ -366,6 +366,10 @@ model User {
   emailReminders Boolean      @default(true)
   textReminders  Boolean      @default(true)
   reminderHours  Int          @default(24)
+  // Set only via the unsubscribe link in a marketing email blast — never
+  // touches emailReminders (booking/schedule notifications), which is a
+  // separate, opted-in-by-default relationship the person expects.
+  marketingOptOut Boolean     @default(false)
   // Golf profile — filled in once by the player, visible to the instructor
   // on every booking (not booking-specific, since these don't change visit
   // to visit).
