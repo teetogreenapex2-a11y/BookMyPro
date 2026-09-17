@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import FindProSearch from "@/app/components/FindProSearch";
 import { REGION_CITIES } from "@/lib/regionCities";
 

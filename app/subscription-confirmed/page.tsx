@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 function SubscriptionConfirmedContent({ status }: { status: string }) {
   const success = status === "success";
   return (
