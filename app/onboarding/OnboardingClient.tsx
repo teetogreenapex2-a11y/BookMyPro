@@ -280,7 +280,7 @@ export default function OnboardingClient() {
     <div style={{ minHeight: "100vh", background: "var(--fairway, #1B3A2F)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "#F6F4EE", borderRadius: 16, padding: "36px 32px", maxWidth: 460, width: "100%" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-          <img src="/logo.jpg" alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
+          <Image src="/logo.jpg" alt="" width={44} height={44} style={{ borderRadius: 10, objectFit: "cover" }} />
           <a
             href="/features"
             target="_blank"

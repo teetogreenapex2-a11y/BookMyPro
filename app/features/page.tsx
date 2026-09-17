@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 
 // Belt-and-suspenders with robots.txt - this is a more direct, page-level
 // signal to search engines not to index this specific page, which still
@@ -16,7 +17,7 @@ export default function FeaturesPage() {
           <a href="/onboarding" style={{ display: "inline-block", color: "#D7DED9", fontSize: 13, textDecoration: "none", marginBottom: 12 }}>
             {"<"} Back to onboarding
           </a>
-          <img src="/logo.jpg" alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", marginBottom: 8 }} />
+          <Image src="/logo.jpg" alt="" width={36} height={36} style={{ borderRadius: 8, objectFit: "cover", marginBottom: 8 }} />
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#B8862B", marginBottom: 10 }}>BOOKMYPRO</div>
           <h1 style={{ fontSize: 26, margin: "0 0 8px" }}>Everything included</h1>
           <p style={{ fontSize: 14, color: "#D7DED9", margin: 0 }}>

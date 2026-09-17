@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { upload } from "@vercel/blob/client";
 
 export default function MyProfileEditor({
@@ -104,7 +105,7 @@ export default function MyProfileEditor({
               background: "#F0EBDD", display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               {photoUrl ? (
-                <img src={photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <Image src={photoUrl} alt="" width={64} height={64} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
                 <span style={{ fontSize: 22, color: "#B8A97A" }}>👤</span>
               )}

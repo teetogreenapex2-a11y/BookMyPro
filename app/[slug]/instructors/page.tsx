@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getBusinessBySlug, getBusinessInstructors } from "@/lib/tenant";
+import Image from "next/image";
 
 // Bios and photos can change at any time, so this needs to render fresh
 // on every request - without this, Next.js could statically cache the
@@ -48,7 +49,7 @@ export default async function InstructorsPage({ params }: { params: { slug: stri
                     background: "#F0EBDD", display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
                     {m.bioPhotoUrl ? (
-                      <img src={m.bioPhotoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <Image src={m.bioPhotoUrl} alt="" width={76} height={76} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     ) : (
                       <span style={{ fontSize: 28, color: "#B8A97A" }}>👤</span>
                     )}

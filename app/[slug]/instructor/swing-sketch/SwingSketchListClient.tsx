@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 type Player = { id: string; name: string | null; email: string };
 type Sketch = { id: string; imageUrl: string; label: string | null; playerName: string; updatedAt: string };
@@ -86,7 +87,9 @@ export default function SwingSketchListClient({ slug, basePath, apiBase }: { slu
                 href={`${basePath}/instructor/swing-sketch/${s.id}`}
                 style={{ textDecoration: "none", color: "var(--ink)" }}
               >
-                <img src={s.imageUrl} alt={s.label || "Swing sketch"} style={{ width: "100%", aspectRatio: "3/2", objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)" }} />
+                <div style={{ position: "relative", width: "100%", aspectRatio: "3/2", borderRadius: 8, border: "1px solid var(--border)", overflow: "hidden" }}>
+                  <Image src={s.imageUrl} alt={s.label || "Swing sketch"} fill sizes="200px" style={{ objectFit: "cover" }} />
+                </div>
                 <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{s.label || "Untitled"}</div>
                 <div className="mono" style={{ fontSize: 10, color: "var(--faint)" }}>{s.playerName}</div>
               </a>

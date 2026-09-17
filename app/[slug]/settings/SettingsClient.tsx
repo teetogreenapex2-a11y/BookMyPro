@@ -891,7 +891,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Business logo</div>
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 {biz.logoUrl ? (
-                  <img src={biz.logoUrl} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+                  <Image src={biz.logoUrl} alt="" width={56} height={56} style={{ borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
                 ) : (
                   <div style={{ width: 56, height: 56, borderRadius: 10, background: "var(--closed)", flexShrink: 0 }} />
                 )}

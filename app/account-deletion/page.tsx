@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 
 export const metadata: Metadata = {
   title: "Delete Your Account | BookMyPro",
@@ -23,7 +24,7 @@ export default function AccountDeletionPage() {
     <div style={{ minHeight: "100vh", background: chalk, fontFamily: "sans-serif" }}>
       <header style={{ background: fairway, color: chalk, padding: "28px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          <img src="/logo.jpg" alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", marginBottom: 8 }} />
+          <Image src="/logo.jpg" alt="" width={36} height={36} style={{ borderRadius: 8, objectFit: "cover", marginBottom: 8 }} />
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: gold, marginBottom: 10 }}>BOOKMYPRO</div>
           <h1 style={{ fontSize: 26, margin: "0 0 8px" }}>Delete Your Account</h1>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 import { User } from "lucide-react";
@@ -858,7 +859,7 @@ export default function InstructorClient({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {businessLogoUrl && (
-                <img src={businessLogoUrl} alt="" style={{ width: 24, height: 24, borderRadius: 5, objectFit: "cover" }} />
+                <Image src={businessLogoUrl} alt="" width={24} height={24} style={{ borderRadius: 5, objectFit: "cover" }} />
               )}
               <span className="mono" style={{ fontSize: 12, letterSpacing: "0.1em", color: "var(--gold)" }}>
                 INSTRUCTOR - {businessName.toUpperCase()}
@@ -1058,7 +1059,7 @@ export default function InstructorClient({
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
           <span style={{ fontSize: 11, color: "var(--faint)", fontWeight: 600 }}>Powered by</span>
-          <img src="/ping-logo.png" alt="PING" style={{ height: 24, width: "auto", flexShrink: 0 }} />
+          <Image src="/ping-logo.png" alt="PING" width={80} height={24} style={{ height: 24, width: "auto", flexShrink: 0 }} />
         </div>
 
         <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import type { CSSProperties } from "react";
 
 type Variant = { id: string; label: string; stockQuantity: number };
@@ -197,7 +198,7 @@ export default function InstructorShopClient({ slug, basePath, apiBase }: { slug
                 {products.map((p) => (
                   <div key={p.id} style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 10, padding: 12, display: "flex", gap: 12, alignItems: "center", opacity: p.enabled ? 1 : 0.55 }}>
                     {p.imageUrl ? (
-                      <img src={p.imageUrl} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />
+                      <Image src={p.imageUrl} alt="" width={48} height={48} style={{ borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />
                     ) : (
                       <div style={{ width: 48, height: 48, borderRadius: 6, background: "var(--closed)", flexShrink: 0 }} />
                     )}

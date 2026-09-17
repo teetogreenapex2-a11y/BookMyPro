@@ -3,7 +3,7 @@ function SubscriptionConfirmedContent({ status }: { status: string }) {
   return (
     <div style={{ minHeight: "100vh", background: "var(--fairway, #1B3A2F)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "#F6F4EE", borderRadius: 16, padding: "36px 32px", maxWidth: 420, width: "100%", textAlign: "center" }}>
-        <img src="/logo.jpg" alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", marginBottom: 16 }} />
+        <Image src="/logo.jpg" alt="" width={48} height={48} style={{ borderRadius: 10, objectFit: "cover", marginBottom: 16 }} />
         <h1 style={{ fontSize: 22, margin: "0 0 10px", color: "#1B3A2F" }}>
           {success ? "You're all set" : "Checkout cancelled"}
         </h1>

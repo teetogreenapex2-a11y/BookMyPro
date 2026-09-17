@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { signIn } from "next-auth/react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
@@ -202,7 +203,7 @@ function LoginPageInner() {
       >
         {showLoginForm === false ? (
           <>
-            <img src="/logo.jpg" alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", margin: "0 auto 14px" }} />
+            <Image src="/logo.jpg" alt="" width={56} height={56} style={{ borderRadius: 12, objectFit: "cover", margin: "0 auto 14px" }} />
             <div className="mono" style={{ fontSize: 12, letterSpacing: "0.12em", color: "var(--gold)", marginBottom: 8 }}>
               BOOKMYPRO
             </div>
@@ -227,7 +228,7 @@ function LoginPageInner() {
           </>
         ) : (
           <>
-            <img src="/logo.jpg" alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover", margin: "0 auto 14px" }} />
+            <Image src="/logo.jpg" alt="" width={56} height={56} style={{ borderRadius: 12, objectFit: "cover", margin: "0 auto 14px" }} />
         <div className="mono" style={{ fontSize: 12, letterSpacing: "0.12em", color: "var(--gold)", marginBottom: 8 }}>
           BOOKMYPRO
         </div>

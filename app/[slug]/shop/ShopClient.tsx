@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 
@@ -143,7 +144,9 @@ export default function ShopClient({ slug, basePath, apiBase, businessName }: { 
             {products.map((p) => (
               <div key={p.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: 14, display: "flex", flexDirection: "column" }}>
                 {p.imageUrl ? (
-                  <img src={p.imageUrl} alt={p.name} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />
+                  <div style={{ position: "relative", width: "100%", aspectRatio: "1", borderRadius: 8, marginBottom: 10, overflow: "hidden" }}>
+                    <Image src={p.imageUrl} alt={p.name} fill sizes="(max-width: 600px) 50vw, 300px" style={{ objectFit: "cover" }} />
+                  </div>
                 ) : (
                   <div style={{ width: "100%", aspectRatio: "1", background: "var(--closed)", borderRadius: 8, marginBottom: 10 }} />
                 )}

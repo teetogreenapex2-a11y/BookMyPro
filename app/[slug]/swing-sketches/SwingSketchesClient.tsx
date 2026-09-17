@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 
@@ -72,11 +73,15 @@ export default function SwingSketchesClient({ slug, basePath, apiBase }: { slug:
                 onClick={() => setSelected(s)}
                 style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: 10, textAlign: "left", cursor: "pointer" }}
               >
-                <img
-                  src={s.imageUrl}
-                  alt={s.label || "Swing sketch"}
-                  style={{ width: "100%", aspectRatio: "3/2", objectFit: "cover", borderRadius: 8, marginBottom: 8, background: "#000" }}
-                />
+                <div style={{ position: "relative", width: "100%", aspectRatio: "3/2", marginBottom: 8, background: "#000", borderRadius: 8, overflow: "hidden" }}>
+                  <Image
+                    src={s.imageUrl}
+                    alt={s.label || "Swing sketch"}
+                    fill
+                    sizes="(max-width: 600px) 50vw, 300px"
+                    style={{ objectFit: "cover" }}
+                  />
+                </div>
                 <div style={{ fontSize: 13, fontWeight: 700 }}>{s.label || "Swing Sketch"}</div>
                 <div style={{ fontSize: 11, color: "var(--faint)" }}>
                   {new Date(s.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}

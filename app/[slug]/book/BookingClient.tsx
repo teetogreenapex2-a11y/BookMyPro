@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 import { FITTING_TYPES, centsToDollars, enabledPackages, enabledFittings, getFittingPriceCents } from "@/lib/pricing";
@@ -732,7 +733,7 @@ export default function BookingClient({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {business.logoUrl && (
-                <img src={business.logoUrl} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
+                <Image src={business.logoUrl} alt="" width={28} height={28} style={{ borderRadius: 6, objectFit: "cover" }} />
               )}
               <span className="display" style={{ fontSize: 18, fontWeight: 700, color: "var(--chalk)" }}>
                 {business.name}
@@ -860,10 +861,12 @@ export default function BookingClient({
               borderRadius: 12, padding: 14, marginBottom: 16,
             }}>
               {selectedInstructor.bioPhotoUrl && (
-                <img
+                <Image
                   src={selectedInstructor.bioPhotoUrl}
                   alt=""
-                  style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+                  width={56}
+                  height={56}
+                  style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
                 />
               )}
               {selectedInstructor.bio && (
@@ -1354,7 +1357,7 @@ export default function BookingClient({
               textDecoration: "none", lineHeight: 0,
             }}
           >
-            <img src="/ping-logo.png" alt="PING" style={{ height: 24, width: "auto", flexShrink: 0 }} />
+            <Image src="/ping-logo.png" alt="PING" width={80} height={24} style={{ height: 24, width: "auto", flexShrink: 0 }} />
           </a>
         </div>
 
