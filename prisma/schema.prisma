@@ -128,7 +128,7 @@ model Business {
   memberships  Membership[]
   availability Availability[]
   bookings     Booking[]
-  packages     Package[]
+  reviews      Review[]
   playingLessonRequests PlayingLessonRequest[]
   conversations Conversation[]
   staffConversations StaffConversation[]
@@ -213,7 +213,7 @@ model Membership {
   // as createdAt above, then this auto-updates on every future change.
   updatedAt DateTime @default(now()) @updatedAt
   assignedBookings Booking[]
-  soldPackages Package[]
+  reviewsReceived Review[]
   availability Availability[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
@@ -380,7 +380,7 @@ model User {
   packages       Package[]
   playingLessonRequests PlayingLessonRequest[]
   bookings       Booking[]
-  videoSubmissions VideoSubmission[]
+  reviewsWritten Review[]
   swingSketches SwingSketch[]
   orders         Order[]
   giftCardsPurchased GiftCard[] @relation("PurchasedGiftCards")
@@ -421,6 +421,11 @@ model Package {
   // actually needs collecting in person at the first lesson.
   balanceDueCents  Int       @default(0)
   paidAt           DateTime?
+  // Set once a review request has gone out for ANY lesson in this
+  // package - checked instead of per-booking, so a 5-lesson package
+  // triggers exactly one request (after the first completed lesson in
+  // it), not one after every single lesson.
+  reviewRequestedAt DateTime?
   stripeSessionId  String?
   squareOrderId    String?
   createdAt        DateTime  @default(now())
@@ -507,6 +512,32 @@ model Booking {
   swingSketches         SwingSketch[]
   giftCardRedemptions   GiftCardRedemption[]
   createdAt             DateTime      @default(now())
+  // Set once a review request (push + email) has actually gone out for
+  // this booking - the cron job below checks this, not whether a Review
+  // exists yet, so someone who never leaves a review still only gets
+  // asked once, not every day forever.
+  reviewRequestedAt     DateTime?
+  review                Review?
+}
+
+// One review per completed booking - the unique constraint on bookingId
+// is what makes "already reviewed" a database fact rather than something
+// every call site has to remember to check. Tied to the instructor's
+// Membership (not just their User), consistent with how the rest of this
+// app scopes a person's identity to one specific business.
+model Review {
+  id                      String    @id @default(cuid())
+  business                Business  @relation(fields: [businessId], references: [id])
+  businessId              String
+  instructor              Membership @relation(fields: [instructorMembershipId], references: [id])
+  instructorMembershipId  String
+  player                  User      @relation(fields: [playerId], references: [id])
+  playerId                String
+  booking                 Booking   @relation(fields: [bookingId], references: [id])
+  bookingId               String    @unique
+  rating                  Int       // 1-5
+  text                    String?
+  createdAt               DateTime  @default(now())
 }
 
 // Swing analysis: a player submits a video, the instructor reviews it and
