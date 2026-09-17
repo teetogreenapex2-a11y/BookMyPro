@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getBusinessBySlug, getBusinessInstructors } from "@/lib/tenant";
+import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 
 // Bios and photos can change at any time, so this needs to render fresh
@@ -22,8 +23,46 @@ export default async function InstructorsPage({ params }: { params: { slug: stri
   const staff = await getBusinessInstructors(business.id);
   const withBios = staff.filter((m) => !m.hiddenFromBooking);
 
+  // One aggregate per instructor, not one for the whole business - the
+  // page shows (and Google's structured-data rules require showing)
+  // a rating next to the specific person it's about, not a blended
+  // business-wide number sitting next to each individual bio.
+  const ratingRows = await prisma.review.groupBy({
+    by: ["instructorMembershipId"],
+    where: { businessId: business.id },
+    _avg: { rating: true },
+    _count: { rating: true },
+  });
+  const ratingsByMembership = new Map(
+    ratingRows.map((r) => [r.instructorMembershipId, { avg: r._avg.rating || 0, count: r._count.rating }])
+  );
+
+  // Structured data only for instructors who actually have at least one
+  // real review - Google's guidelines explicitly disallow publishing a
+  // rating with zero reviews behind it, so nothing gets a default or
+  // placeholder value here.
+  const jsonLd = withBios
+    .filter((m) => ratingsByMembership.has(m.id))
+    .map((m) => {
+      const rating = ratingsByMembership.get(m.id)!;
+      return {
+        "@context": "https://schema.org",
+        "@type": "Service",
+        name: `Golf lessons with ${m.user.name || "instructor"}`,
+        provider: { "@type": "LocalBusiness", name: business.name },
+        aggregateRating: {
+          "@type": "AggregateRating",
+          ratingValue: rating.avg.toFixed(1),
+          reviewCount: rating.count,
+        },
+      };
+    });
+
   return (
     <div style={{ minHeight: "100vh", background: "#F6F4EE", fontFamily: "sans-serif" }}>
+      {jsonLd.map((entry, i) => (
+        <script key={i} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(entry) }} />
+      ))}
       <header style={{ background: "#1B3A2F", color: "#F6F4EE", padding: "28px 20px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#B8862B", marginBottom: 10 }}>
@@ -60,6 +99,14 @@ export default async function InstructorsPage({ params }: { params: { slug: stri
                     </div>
                     {m.specialty && (
                       <div style={{ fontSize: 12.5, color: "#8A8571", marginTop: 2 }}>{m.specialty}</div>
+                    )}
+                    {ratingsByMembership.has(m.id) && (
+                      <div style={{ fontSize: 12.5, color: "#B8862B", marginTop: 4, fontWeight: 700 }}>
+                        &#9733; {ratingsByMembership.get(m.id)!.avg.toFixed(1)}{" "}
+                        <span style={{ color: "#8A8571", fontWeight: 400 }}>
+                          ({ratingsByMembership.get(m.id)!.count} review{ratingsByMembership.get(m.id)!.count === 1 ? "" : "s"})
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
