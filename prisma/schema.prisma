@@ -129,6 +129,7 @@ model Business {
   availability Availability[]
   bookings     Booking[]
   reviews      Review[]
+  packages     Package[]
   playingLessonRequests PlayingLessonRequest[]
   conversations Conversation[]
   staffConversations StaffConversation[]
@@ -214,6 +215,7 @@ model Membership {
   updatedAt DateTime @default(now()) @updatedAt
   assignedBookings Booking[]
   reviewsReceived Review[]
+  soldPackages Package[]
   availability Availability[]
   videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
@@ -381,6 +383,7 @@ model User {
   playingLessonRequests PlayingLessonRequest[]
   bookings       Booking[]
   reviewsWritten Review[]
+  videoSubmissions VideoSubmission[]
   swingSketches SwingSketch[]
   orders         Order[]
   giftCardsPurchased GiftCard[] @relation("PurchasedGiftCards")
