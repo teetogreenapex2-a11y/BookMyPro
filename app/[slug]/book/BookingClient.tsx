@@ -132,7 +132,7 @@ export default function BookingClient({
   // there's no chance of "I picked a time but nothing happened."
   useEffect(() => {
     if (selected && confirmCardRef.current) {
-      confirmCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      confirmCardRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }, [selected]);
   const [confirming, setConfirming] = useState(false);
