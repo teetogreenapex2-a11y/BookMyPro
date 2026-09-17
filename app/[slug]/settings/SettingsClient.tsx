@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 import MyProfileEditor from "@/app/components/MyProfileEditor";
