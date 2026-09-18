@@ -7,6 +7,8 @@ import { Capacitor } from "@capacitor/core";
 import { User } from "lucide-react";
 import PushNotificationPrompt from "@/app/components/PushNotificationPrompt";
 import HelpWidget from "@/app/components/HelpWidget";
+import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 import { markHasSignedInOnThisDevice } from "@/lib/deviceHistory";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 import { enabledPackages, getPackagePriceCents, centsToDollars } from "@/lib/pricing";
@@ -154,6 +156,7 @@ export default function InstructorClient({
   // and only flipping it true after the component has actually mounted
   // on the client avoids that mismatch entirely.
   const [isNative, setIsNative] = useState(false);
+  const isSandboxPreview = useSandboxPreview();
   const [unreadMessages, setUnreadMessages] = useState(0);
   useEffect(() => {
     function checkUnread() {
@@ -866,7 +869,7 @@ export default function InstructorClient({
               </span>
             </span>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              {!isNative && (
+              {!isNative && !isSandboxPreview && (
                 <>
                   <a href={`${basePath}/customers`} style={{
                     fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
@@ -918,7 +921,7 @@ export default function InstructorClient({
               }}>
                 Reports
               </a>
-              {!isNative && (
+              {!isNative && !isSandboxPreview && (
                 <a href={`${basePath}/settings`} style={{
                   fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                   border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
@@ -1001,7 +1004,7 @@ export default function InstructorClient({
         </div>
       </header>
 
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: "22px 20px 60px" }}>
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: `22px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
         {showSyncLog && (
           <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
             <div style={{ padding: "10px 16px", background: "#EFEBDD", fontSize: 13, fontWeight: 700 }}>
@@ -1793,6 +1796,7 @@ export default function InstructorClient({
           </div>
         )}
       </main>
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="calendar" />}
     </div>
   );
 }

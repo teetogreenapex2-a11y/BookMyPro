@@ -5,6 +5,8 @@ import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 import MyProfileEditor from "@/app/components/MyProfileEditor";
+import FakeNativeTabBar from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 type User = {
   name: string | null;
@@ -111,6 +113,7 @@ export default function SettingsClient({
   // avoid getting covered. Detected after mount, same as elsewhere, to
   // avoid a server/client mismatch since the server has no way to know.
   const [isNative, setIsNative] = useState(false);
+  const isSandboxPreview = useSandboxPreview();
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
   }, []);
@@ -1756,13 +1759,14 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
           </div>
         )}
 
-        <div style={{ marginTop: 20, marginBottom: isNative ? 76 : 0, display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ marginTop: 20, marginBottom: isNative || isSandboxPreview ? 76 : 0, display: "flex", alignItems: "center", gap: 12 }}>
           {saved && <span style={{ fontSize: 13, color: "var(--fairway)", fontWeight: 600 }}>Saved</span>}
           <button onClick={save} style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "10px 20px", fontWeight: 700, fontSize: 14 }}>
             Save changes
           </button>
         </div>
       </main>
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="settings" />}
     </div>
   );
 }

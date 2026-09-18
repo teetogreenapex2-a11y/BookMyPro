@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 type Player = { id: string; name: string | null; email: string };
 type Sketch = { id: string; imageUrl: string; label: string | null; playerName: string; updatedAt: string };
 
 export default function SwingSketchListClient({ slug, basePath, apiBase }: { slug: string; basePath: string; apiBase: string }) {
+  const isSandboxPreview = useSandboxPreview();
   const [sketches, setSketches] = useState<Sketch[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +40,7 @@ export default function SwingSketchListClient({ slug, basePath, apiBase }: { slu
         </div>
       </header>
 
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: "0 20px 60px", background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh", paddingTop: 20 }}>
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: `0 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px`, background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh", paddingTop: 20 }}>
         {!pickerOpen ? (
           <button
             onClick={() => setPickerOpen(true)}
@@ -97,6 +100,7 @@ export default function SwingSketchListClient({ slug, basePath, apiBase }: { slu
           </div>
         )}
       </main>
+      {isSandboxPreview && <FakeNativeTabBar basePath={basePath} activeKey="swingsketch" />}
     </div>
   );
 }
