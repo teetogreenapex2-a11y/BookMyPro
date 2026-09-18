@@ -8,6 +8,8 @@ import { FITTING_TYPES, centsToDollars, enabledPackages, enabledFittings, getFit
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 import PushNotificationPrompt from "@/app/components/PushNotificationPrompt";
 import HelpWidget from "@/app/components/HelpWidget";
+import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 import { markHasSignedInOnThisDevice } from "@/lib/deviceHistory";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -81,6 +83,7 @@ export default function BookingClient({
   // at false to match the server, and only updating it after mounting on
   // the client, avoids that entirely.
   const [isNative, setIsNative] = useState(false);
+  const isSandboxPreview = useSandboxPreview();
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
   }, []);
@@ -740,7 +743,7 @@ export default function BookingClient({
               </span>
             </span>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {!isNative && (
+              {!isNative && !isSandboxPreview && (
                 <>
                   <a href={`${basePath}/videos`} style={{
                     fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
@@ -777,7 +780,7 @@ export default function BookingClient({
                   <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#B8862B", border: "1px solid var(--fairway)" }} />
                 )}
               </a>
-              {!isNative && (
+              {!isNative && !isSandboxPreview && (
                 <a href={`${basePath}/settings`} style={{
                   fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                   border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
@@ -1168,7 +1171,7 @@ export default function BookingClient({
         </div>
       </header>
 
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: "22px 20px 60px" }}>
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: `22px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
         {message && (
           <div ref={messageRef} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 16, fontSize: 13 }}>
             {message}{" "}
@@ -1713,6 +1716,7 @@ export default function BookingClient({
           </p>
         )}
       </main>
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="book" role="player" />}
     </div>
   );
 }

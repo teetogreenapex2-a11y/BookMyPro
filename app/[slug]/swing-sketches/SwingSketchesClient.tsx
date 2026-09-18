@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
+import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 type Sketch = {
   id: string;
@@ -22,6 +24,7 @@ export default function SwingSketchesClient({ slug, basePath, apiBase }: { slug:
   // at false to match the server, and only updating it after mounting on
   // the client, avoids that entirely.
   const [isNative, setIsNative] = useState(false);
+  const isSandboxPreview = useSandboxPreview();
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
   }, []);
@@ -43,7 +46,7 @@ export default function SwingSketchesClient({ slug, basePath, apiBase }: { slug:
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span className="display" style={{ fontSize: 18, fontWeight: 700 }}>Swing Sketches</span>
             <div style={{ display: "flex", gap: 10 }}>
-              {!isNative && (
+              {!isNative && !isSandboxPreview && (
                 <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
               )}
               <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>
@@ -58,7 +61,7 @@ export default function SwingSketchesClient({ slug, basePath, apiBase }: { slug:
         </div>
       </header>
 
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: "22px 20px 60px" }}>
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: `22px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
         {loading ? (
           <p style={{ color: "var(--muted)", fontSize: 14 }}>Loading...</p>
         ) : sketches.length === 0 ? (
@@ -111,6 +114,7 @@ export default function SwingSketchesClient({ slug, basePath, apiBase }: { slug:
           </div>
         </div>
       )}
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="swingsketch" role="player" />}
     </div>
   );
 }

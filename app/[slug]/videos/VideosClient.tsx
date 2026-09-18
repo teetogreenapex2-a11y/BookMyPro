@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
+import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 type Instructor = { id: string; name: string | null; email: string };
 type Comment = { id: string; timestampSeconds: number; text: string };
@@ -38,6 +40,7 @@ async function downloadVideo(url: string, filename: string) {
 }
 
 export default function VideosClient({ slug, basePath, apiBase }: { slug: string; basePath: string; apiBase: string }) {
+  const isSandboxPreview = useSandboxPreview();
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,7 +188,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span className="display" style={{ fontSize: 18, fontWeight: 700 }}>Swing videos</span>
             <div style={{ display: "flex", gap: 10 }}>
-              {!isNative && (
+              {!isNative && !isSandboxPreview && (
                 <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
               )}
               <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>
@@ -200,7 +203,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
         </div>
       </header>
 
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: "22px 20px 60px" }}>
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: `22px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
         <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 24 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Submit a video</div>
 
@@ -404,6 +407,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
           </div>
         )}
       </main>
+      {isSandboxPreview && <FakeNativeTabBar basePath={basePath} activeKey="videos" role="player" />}
     </div>
   );
 }
