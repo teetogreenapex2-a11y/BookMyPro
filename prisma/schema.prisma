@@ -912,6 +912,20 @@ model NativeAuthHandoff {
   callbackUrl  String   @default("/")
   createdAt    DateTime @default(now())
   expiresAt    DateTime
+  // The fields below are only populated for the sandbox-invite use of
+  // this same one-time-handoff pattern (see the {slug}/instructors|players
+  // /{id}/sandbox-link routes) - they're left null for the native-app
+  // sign-in handoff, which has no "business" or "recipient" to speak of.
+  // Redemption used to just delete the row outright; now it's marked used
+  // instead, so an owner can see who opened their invite link and when
+  // without weakening the one-time-use guarantee (a used or expired link
+  // still can't be redeemed again - see redeem-sandbox-link).
+  businessId    String?
+  recipientName String?
+  recipientRole String?
+  redeemedAt    DateTime?
+
+  @@index([businessId])
 }
 
 model VerificationToken {

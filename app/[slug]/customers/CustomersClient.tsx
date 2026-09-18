@@ -486,11 +486,11 @@ export default function CustomersClient({
       </header>
 
       <main style={{ maxWidth: 960, margin: "0 auto", padding: `20px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <div className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
             {filtered.length} shown
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 6 }}>
             <button
               onClick={() => { setAddOpen((o) => !o); setAddError(null); }}
               style={{

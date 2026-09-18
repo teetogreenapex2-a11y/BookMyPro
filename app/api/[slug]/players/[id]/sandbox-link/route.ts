@@ -32,6 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const target = await prisma.membership.findFirst({
     where: { userId: params.id, businessId: business.id, role: "player" },
+    include: { user: true },
   });
   if (!target) return NextResponse.json({ error: "Player not found" }, { status: 404 });
 
@@ -50,6 +51,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       sessionToken,
       callbackUrl: `/${params.slug}/book?preview=app`,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      businessId: business.id,
+      recipientName: target.user.name || target.user.email,
+      recipientRole: "player",
     },
   });
 

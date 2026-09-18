@@ -61,6 +61,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       // 7 days is generous room for an invite email to sit unread
       // without leaving a long-lived, un-clicked login link around.
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      businessId: business.id,
+      recipientName: target.user.name || target.user.email,
+      recipientRole: "instructor",
     },
   });
 
