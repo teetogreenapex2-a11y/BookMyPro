@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { milesBetween } from "@/lib/geocoding";
 import { REGION_CITIES, getRegionCity } from "@/lib/regionCities";
 import FindProSearch from "@/app/components/FindProSearch";
+import ProListingLink from "@/app/components/ProListingLink";
 
 const RADIUS_MILES = 30;
 
@@ -76,11 +77,7 @@ export default async function CityFindProPage({ params }: { params: { city: stri
             </h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
               {businesses.map((b) => (
-                <a
-                  key={b.slug}
-                  href={`/${b.slug}/book`}
-                  style={{ display: "block", background: "#FFF", border: "1px solid #E3D9C9", borderRadius: 12, padding: 16, textDecoration: "none", color: "inherit" }}
-                >
+                <ProListingLink key={b.slug} slug={b.slug}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: "#1B3A2F", marginBottom: 4 }}>{b.name}</div>
                     <span style={{ fontSize: 11.5, fontWeight: 700, color: "#8A8571", whiteSpace: "nowrap" }}>
@@ -99,7 +96,7 @@ export default async function CityFindProPage({ params }: { params: { city: stri
                       </span>
                     ))}
                   </div>
-                </a>
+                </ProListingLink>
               ))}
             </div>
           </>
