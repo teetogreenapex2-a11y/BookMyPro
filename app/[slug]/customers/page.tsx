@@ -20,7 +20,9 @@ export default async function CustomersPage({ params }: { params: { slug: string
   const isOwner = membership.role === "owner";
 
   const playerMemberships = await prisma.membership.findMany({
-    where: { businessId: business.id, role: "player" },
+    // Quick sandbox-invite placeholders (see sandbox-links/quick) are not
+    // real customers - keep them off the ledger entirely.
+    where: { businessId: business.id, role: "player", isSandboxProspect: false },
     include: {
       user: {
         include: {

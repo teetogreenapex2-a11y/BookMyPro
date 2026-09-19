@@ -177,6 +177,62 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   const [team, setTeam] = useState<{ id: string; name: string | null; email: string; role: string; [key: string]: any }[]>([]);
   const [pendingRequests, setPendingRequests] = useState<{ id: string; name: string | null; email: string; requestedAt: string }[]>([]);
   const [respondingToRequest, setRespondingToRequest] = useState<string | null>(null);
+  const [generatingSandboxId, setGeneratingSandboxId] = useState<string | null>(null);
+  const [sandboxCopiedId, setSandboxCopiedId] = useState<string | null>(null);
+  async function copySandboxLink(membershipId: string) {
+    setGeneratingSandboxId(membershipId);
+    try {
+      const res = await fetch(`${apiBase}/instructors/${membershipId}/sandbox-link`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "Something went wrong."); return; }
+      await navigator.clipboard.writeText(data.url);
+      setSandboxCopiedId(membershipId);
+      setTimeout(() => setSandboxCopiedId((prev) => (prev === membershipId ? null : prev)), 2500);
+      loadSandboxLinks();
+    } catch {
+      alert("Couldn't copy the link - your browser may be blocking clipboard access.");
+    } finally {
+      setGeneratingSandboxId(null);
+    }
+  }
+
+  const [sandboxLinks, setSandboxLinks] = useState<{ recipientName: string | null; recipientRole: string | null; createdAt: string; expiresAt: string; redeemedAt: string | null }[]>([]);
+  const [sandboxLinksLoaded, setSandboxLinksLoaded] = useState(false);
+  async function loadSandboxLinks() {
+    const res = await fetch(`${apiBase}/sandbox-links`);
+    if (res.ok) {
+      setSandboxLinks(await res.json());
+      setSandboxLinksLoaded(true);
+    }
+  }
+
+  const [quickProspectName, setQuickProspectName] = useState("");
+  const [quickProspectRole, setQuickProspectRole] = useState<"instructor" | "player">("instructor");
+  const [generatingQuickLink, setGeneratingQuickLink] = useState(false);
+  const [quickLinkCopied, setQuickLinkCopied] = useState(false);
+  async function generateQuickSandboxLink() {
+    if (!quickProspectName.trim()) return;
+    setGeneratingQuickLink(true);
+    setQuickLinkCopied(false);
+    try {
+      const res = await fetch(`${apiBase}/sandbox-links/quick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: quickProspectName.trim(), role: quickProspectRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "Something went wrong."); return; }
+      await navigator.clipboard.writeText(data.url);
+      setQuickLinkCopied(true);
+      setQuickProspectName("");
+      setTimeout(() => setQuickLinkCopied(false), 2500);
+      loadSandboxLinks();
+    } catch {
+      alert("Couldn't copy the link - your browser may be blocking clipboard access.");
+    } finally {
+      setGeneratingQuickLink(false);
+    }
+  }
 
   async function loadPendingRequests() {
     const res = await fetch(`${apiBase}/instructor-requests`);
@@ -481,7 +537,10 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       fetch(`${apiBase}/calendar/status`).then((r) => r.json()).then(setGoogleCalStatus).catch(() => {});
       fetch(`${apiBase}/calendar/outlook/status`).then((r) => r.json()).then(setOutlookStatus).catch(() => {});
       loadTeam();
-      if (isOwner) loadPendingRequests();
+      if (isOwner) {
+        loadPendingRequests();
+        loadSandboxLinks();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInstructor, tab, apiBase]);
@@ -1149,6 +1208,22 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                         {togglingActiveId === t.id ? "…" : isInactive ? "Reactivate" : "Remove"}
                       </button>
                     )}
+                    {isOwner && !isInactive && (
+                      <button
+                        onClick={() => copySandboxLink(t.id)}
+                        disabled={generatingSandboxId === t.id}
+                        title="Generate a one-click sandbox sign-in link to paste into an invite email"
+                        style={{
+                          background: sandboxCopiedId === t.id ? "var(--fairway)" : "none",
+                          border: "1px solid var(--border)",
+                          color: sandboxCopiedId === t.id ? "#FFF" : "var(--muted)",
+                          fontSize: 11, fontWeight: 700, padding: "5px 10px", borderRadius: 6, flexShrink: 0,
+                          cursor: generatingSandboxId === t.id ? "default" : "pointer",
+                        }}
+                      >
+                        {generatingSandboxId === t.id ? "…" : sandboxCopiedId === t.id ? "Copied!" : "Copy sandbox link"}
+                      </button>
+                    )}
                     </div>
                   </div>
                   );
@@ -1204,6 +1279,83 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                 )
               )}
             </div>
+
+            {isOwner && (
+              <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Send a sandbox invite to a prospect</div>
+                <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 12px" }}>
+                  For someone who isn't a real team member or customer yet - like a golf pro you're cold-emailing
+                  about BookMyPro. This doesn't add them to your real Team or Customers list.
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  <input
+                    value={quickProspectName}
+                    onChange={(e) => setQuickProspectName(e.target.value)}
+                    placeholder="Prospect's name"
+                    style={{ ...inputStyle, flex: "1 1 180px" }}
+                  />
+                  <select
+                    value={quickProspectRole}
+                    onChange={(e) => setQuickProspectRole(e.target.value as "instructor" | "player")}
+                    style={{ ...inputStyle, flex: "0 0 auto" }}
+                  >
+                    <option value="instructor">Instructor preview</option>
+                    <option value="player">Player preview</option>
+                  </select>
+                  <button
+                    onClick={generateQuickSandboxLink}
+                    disabled={generatingQuickLink || !quickProspectName.trim()}
+                    style={{
+                      background: quickLinkCopied ? "var(--fairway)" : "var(--fairway)", color: "var(--chalk)",
+                      border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700,
+                      cursor: generatingQuickLink ? "default" : "pointer", flex: "0 0 auto",
+                    }}
+                  >
+                    {generatingQuickLink ? "Generating…" : quickLinkCopied ? "Copied!" : "Generate & copy link"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {isOwner && sandboxLinksLoaded && sandboxLinks.length > 0 && (
+              <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Sandbox invite links</div>
+                <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 12px" }}>
+                  Every sandbox link you've generated, most recent first, and whether that person has actually
+                  opened it yet.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {sandboxLinks.map((l, i) => {
+                    const expired = !l.redeemedAt && new Date(l.expiresAt) < new Date();
+                    return (
+                      <div key={i} style={{
+                        display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8,
+                        background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px",
+                      }}>
+                        <div style={{ minWidth: 0 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>{l.recipientName || "Unnamed"}</span>
+                          <span style={{ fontSize: 11, color: "var(--faint)", marginLeft: 6, textTransform: "capitalize" }}>
+                            {l.recipientRole || ""} sandbox
+                          </span>
+                          <div className="mono" style={{ fontSize: 10, color: "var(--faint)", marginTop: 2 }}>
+                            Sent {new Date(l.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, textTransform: "uppercase", borderRadius: 4, padding: "3px 8px", flexShrink: 0,
+                          color: l.redeemedAt ? "#1B3A2F" : expired ? "var(--faint)" : "#9A7A1E",
+                          background: l.redeemedAt ? "var(--open)" : expired ? "#EFEBDD" : "#FBF3DE",
+                        }}>
+                          {l.redeemedAt
+                            ? `Used ${new Date(l.redeemedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+                            : expired ? "Expired, unused" : "Not opened yet"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,

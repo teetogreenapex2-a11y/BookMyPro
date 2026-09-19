@@ -43,19 +43,28 @@ export async function requireMembership(
   return membership;
 }
 
+// The instructor for a business — used anywhere the app currently assumes
+// "the" single instructor (calendar sync, booking confirmations, etc.).
+// Multiple instructors per business isn't modeled yet; this returns the
+// first one found, matching today's single-instructor behavior per business.
+export async function getBusinessInstructor(businessId: string) {
+  const membership = await prisma.membership.findFirst({
+    where: { businessId, role: { in: ["owner", "instructor"] }, googleRefreshToken: { not: null } },
+    // Without this, a business with more than one instructor could have
+    // this pick an arbitrary row - including one holding an old, dead
+    // token from a past connection - instead of whichever instructor's
+    // calendar was actually just (re)connected.
+    orderBy: { updatedAt: "desc" },
+    include: { user: true },
+  });
+  return membership;
+}
+
 // Every staff member (owner or instructor role) a player can choose to book
 // with — a business with multiple instructors on staff shows all of them.
-// includeInactive is for the owner's own Team management view in Settings
-// (see the deactivate/reactivate feature) - the public booking flow never
-// wants a deactivated instructor showing up as a bookable option, so it
-// stays false there.
-export async function getBusinessInstructors(businessId: string, includeInactive = false) {
+export async function getBusinessInstructors(businessId: string) {
   return prisma.membership.findMany({
-    where: {
-      businessId,
-      role: { in: ["owner", "instructor"] },
-      status: includeInactive ? { in: ["active", "inactive"] } : "active",
-    },
+    where: { businessId, role: { in: ["owner", "instructor"] }, status: "active" },
     include: { user: { select: { id: true, name: true, email: true, image: true } } },
     orderBy: { createdAt: "asc" },
   });

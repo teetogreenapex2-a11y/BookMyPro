@@ -194,6 +194,14 @@ model Membership {
   // For test/demo instructor accounts, internal-only staff, etc.
   hiddenFromBooking Boolean @default(false)
 
+  // A throwaway membership created purely to hand a prospective
+  // instructor or player a "quick" sandbox invite link (see
+  // /api/{slug}/sandbox-links/quick) - not a real team member or
+  // customer, and never shown in the real Team or Customers lists. This
+  // is separate from hiddenFromBooking, which is for a genuine team
+  // member (like a real test account) who just shouldn't be bookable.
+  isSandboxProspect Boolean @default(false)
+
   // Google Calendar sync token — set when this member (as an instructor)
   // connects their calendar for this specific business.
   googleRefreshToken String?
