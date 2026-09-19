@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, ensureMembership, getBasePaths } from "@/lib/tenant";
@@ -7,7 +7,6 @@ import BookingClient from "./BookingClient";
 
 export default async function BookPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) notFound();
@@ -18,38 +17,49 @@ export default async function BookPage({ params }: { params: { slug: string } })
   // more than they need to know.
   if (!business.approved) notFound();
 
-  const userId = (session.user as any).id;
+  // Signed-out visitors can still land here to browse who's available and
+  // what open times look like (Apple guideline 5.1.1 - browsing isn't
+  // account-based, so it can't require registration). Everything below
+  // that's actually tied to a specific player - their own Membership, their
+  // purchased packages, their upcoming-lesson credit math - only applies
+  // once someone's actually signed in; BookingClient itself sends a
+  // signed-out visitor to /login the moment they try to do something that
+  // genuinely requires an account, like confirming a real booking.
+  let packagesForClient: any[] = [];
+  if (session) {
+    const userId = (session.user as any).id;
 
-  // First time this player interacts with this business, give them a
-  // "player" Membership automatically — booking with a new golf pro doesn't
-  // require an invite, unlike becoming an owner/instructor.
-  await ensureMembership(userId, business.id, "player");
+    // First time this player interacts with this business, give them a
+    // "player" Membership automatically — booking with a new golf pro doesn't
+    // require an invite, unlike becoming an owner/instructor.
+    await ensureMembership(userId, business.id, "player");
 
-  const packages = await prisma.package.findMany({
-    where: { userId, businessId: business.id },
-    orderBy: { createdAt: "desc" },
-  });
+    const packages = await prisma.package.findMany({
+      where: { userId, businessId: business.id },
+      orderBy: { createdAt: "desc" },
+    });
 
-  // Same reasoning as the instructor's own customer list: the stored
-  // count still decrements the moment a lesson is booked (that's what
-  // actually prevents booking more than what's been paid for), but what
-  // a player sees here adds back any upcoming, not-yet-happened lesson
-  // so the number doesn't visibly drop until that lesson's own time has
-  // genuinely passed.
-  const now = new Date();
-  const lessonBookings = await prisma.booking.findMany({
-    where: { playerId: userId, businessId: business.id, serviceType: "lesson", status: "confirmed", startTime: { gt: now }, packageId: { not: null } },
-    select: { packageId: true },
-  });
-  const upcomingCountByPackage = new Map<string, number>();
-  for (const b of lessonBookings) {
-    if (!b.packageId) continue;
-    upcomingCountByPackage.set(b.packageId, (upcomingCountByPackage.get(b.packageId) || 0) + 1);
+    // Same reasoning as the instructor's own customer list: the stored
+    // count still decrements the moment a lesson is booked (that's what
+    // actually prevents booking more than what's been paid for), but what
+    // a player sees here adds back any upcoming, not-yet-happened lesson
+    // so the number doesn't visibly drop until that lesson's own time has
+    // genuinely passed.
+    const now = new Date();
+    const lessonBookings = await prisma.booking.findMany({
+      where: { playerId: userId, businessId: business.id, serviceType: "lesson", status: "confirmed", startTime: { gt: now }, packageId: { not: null } },
+      select: { packageId: true },
+    });
+    const upcomingCountByPackage = new Map<string, number>();
+    for (const b of lessonBookings) {
+      if (!b.packageId) continue;
+      upcomingCountByPackage.set(b.packageId, (upcomingCountByPackage.get(b.packageId) || 0) + 1);
+    }
+    packagesForClient = packages.map((pkg) => {
+      const upcoming = upcomingCountByPackage.get(pkg.id) || 0;
+      return { ...pkg, rawLessonsRemaining: pkg.lessonsRemaining, lessonsRemaining: Math.min(pkg.lessonsRemaining + upcoming, pkg.lessonsTotal) };
+    });
   }
-  const packagesForClient = packages.map((pkg) => {
-    const upcoming = upcomingCountByPackage.get(pkg.id) || 0;
-    return { ...pkg, rawLessonsRemaining: pkg.lessonsRemaining, lessonsRemaining: Math.min(pkg.lessonsRemaining + upcoming, pkg.lessonsTotal) };
-  });
 
   // If the business hasn't set a custom "Instructor name" in Settings yet,
   // fall back to the actual signed-in instructor/owner's account name, so
@@ -77,6 +87,7 @@ export default async function BookPage({ params }: { params: { slug: string } })
       slug={params.slug}
       basePath={basePath}
       apiBase={apiBase}
+      isSignedIn={!!session}
     />
   );
 }

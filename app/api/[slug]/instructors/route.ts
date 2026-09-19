@@ -3,21 +3,19 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, getBusinessInstructors, getMembership } from "@/lib/tenant";
 
-// GET /api/{slug}/instructors — every signed-in member can see this list
-// (players need it to choose who to book with, instructors need it for the
-// "New booking" form's instructor picker). ?includeInactive=true adds
-// deactivated staff too, for the owner's Team management view in Settings
-// only - anyone else's request for it is silently ignored, since a
-// deactivated instructor showing up as a bookable option would defeat the
-// whole point.
+// GET /api/{slug}/instructors — publicly readable (no sign-in required):
+// the booking page needs to show who's available to book with before a
+// visitor has necessarily created an account, same reasoning as the
+// availability/durations/groups routes. Anyone signed in still gets the
+// exact same shape they always did; ?includeInactive=true still only
+// works for a signed-in owner, for the Team management view in Settings.
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
-  const requesterMembership = await getMembership((session.user as any).id, business.id);
+  const requesterMembership = session ? await getMembership((session.user as any).id, business.id) : null;
   const isStaff = requesterMembership?.role === "owner" || requesterMembership?.role === "instructor";
   const wantsInactive = req.nextUrl.searchParams.get("includeInactive") === "true";
   const includeInactive = wantsInactive && requesterMembership?.role === "owner";
@@ -31,7 +29,9 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const shaped = instructors.map((m) => ({
     id: m.id, // this is the Membership id — what bookings actually reference
     name: m.user.name,
-    email: m.user.email,
+    // Only shared with a signed-in requester - a signed-out visitor
+    // browsing who's available to book with doesn't need staff emails.
+    email: session ? m.user.email : undefined,
     image: m.user.image,
     role: m.role,
     status: m.status,
