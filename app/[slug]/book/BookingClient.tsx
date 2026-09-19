@@ -48,6 +48,7 @@ export default function BookingClient({
   slug,
   basePath,
   apiBase,
+  isSignedIn,
 }: {
   initialPackages: Package[];
   business: { name: string; email: string; lessonRate: string; [key: string]: any };
@@ -55,13 +56,35 @@ export default function BookingClient({
   slug: string;
   basePath: string;
   apiBase: string;
+  // This page is browsable by signed-out visitors now (Apple guideline
+  // 5.1.1 - looking at available coaches and open times isn't
+  // account-based, so it can't require registration). Everything that
+  // genuinely needs an account - confirming a booking, buying a package,
+  // seeing your own upcoming lessons - checks this first and sends a
+  // signed-out visitor to /login instead of running.
+  isSignedIn: boolean;
 }) {
-  // Reaching this page at all proves a real, signed-in account with a
-  // membership - the most reliable place to record that this device has
-  // signed in successfully before, regardless of which method was used.
+  // Sends a signed-out visitor to sign in, with this page as the
+  // callback so they land right back here once they're in. Used to gate
+  // every action below that's inherently tied to a real account - booking,
+  // buying, joining a group, requesting a playing lesson - never the
+  // browsing itself.
+  function requireSignIn(): boolean {
+    if (!isSignedIn) {
+      window.location.href = `/login?callbackUrl=${encodeURIComponent(`${basePath}/book`)}`;
+      return false;
+    }
+    return true;
+  }
+
+  // Reaching this page while signed in proves a real, signed-in account
+  // with a membership - the most reliable place to record that this
+  // device has signed in successfully before, regardless of which method
+  // was used. A signed-out visitor just browsing hasn't signed in at all,
+  // so there's nothing to record for them.
   useEffect(() => {
-    markHasSignedInOnThisDevice();
-  }, []);
+    if (isSignedIn) markHasSignedInOnThisDevice();
+  }, [isSignedIn]);
 
   // Built from the business's real, current hours instead of a fixed
   // list - without this, a business widening its hours in Settings would
@@ -160,6 +183,7 @@ export default function BookingClient({
   const [pushError, setPushError] = useState<string | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
   useEffect(() => {
+    if (!isSignedIn) return;
     function checkUnread() {
       fetch(`${apiBase}/conversations/unread-count`)
         .then((r) => r.json())
@@ -170,9 +194,12 @@ export default function BookingClient({
     const interval = setInterval(checkUnread, 15000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isSignedIn]);
 
   useEffect(() => {
+    // Registering a push token only means anything for a real account -
+    // a signed-out visitor just browsing has nothing to notify.
+    if (!isSignedIn) return;
     if (Capacitor.isNativePlatform()) {
       // Permission being granted at the OS level doesn't guarantee a
       // token was ever actually saved to the backend - this was the
@@ -221,7 +248,7 @@ export default function BookingClient({
       }
       reg.pushManager.getSubscription().then((sub) => setPushStatus(sub ? "on" : "off"));
     }).catch(() => setPushStatus("off"));
-  }, []);
+  }, [isSignedIn]);
 
   async function enablePushNotifications() {
     setPushStatus("enabling");
@@ -313,9 +340,9 @@ export default function BookingClient({
   }
 
   useEffect(() => {
-    loadMyBookings();
+    if (isSignedIn) loadMyBookings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isSignedIn]);
 
   useEffect(() => {
     fetch(`${apiBase}/groups`)
@@ -426,6 +453,7 @@ export default function BookingClient({
   }
 
   async function depositAndBookSlot() {
+    if (!requireSignIn()) return;
     if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
@@ -449,6 +477,7 @@ export default function BookingClient({
   }
 
   async function clubBilledAndBookSlot() {
+    if (!requireSignIn()) return;
     if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
@@ -498,6 +527,7 @@ export default function BookingClient({
   }
 
   async function bookLesson() {
+    if (!requireSignIn()) return;
     if (!selected || !selectedPackage || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
@@ -538,6 +568,7 @@ export default function BookingClient({
   // checkout metadata, so paying both purchases the package AND books that
   // slot with the first credit, all in one step (see the webhook).
   async function submitPlayingLessonRequest() {
+    if (!requireSignIn()) return;
     if (!pendingPlayingLessonHoles || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setSubmittingPlayingLessonRequest(true);
@@ -564,6 +595,7 @@ export default function BookingClient({
   }
 
   async function buyPackageAndBookSlot() {
+    if (!requireSignIn()) return;
     if (!selected || !selectedInstructorId || !contactValid()) return;
     if (!pendingPackageType && !pendingDurationId && !pendingCustomOfferingSlot) return;
     saveProfileFieldsIfProvided();
@@ -592,6 +624,7 @@ export default function BookingClient({
   }
 
   async function joinGroupSession() {
+    if (!requireSignIn()) return;
     if (!selected || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
@@ -612,6 +645,7 @@ export default function BookingClient({
   }
 
   async function bookFitting() {
+    if (!requireSignIn()) return;
     if (!selected || !fittingType || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
@@ -771,16 +805,18 @@ export default function BookingClient({
               }}>
                 Gift Cards
               </a>
-              <a href={`${basePath}/messages`} style={{
-                position: "relative", fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
-                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
-              }}>
-                Messages
-                {unreadMessages > 0 && (
-                  <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#B8862B", border: "1px solid var(--fairway)" }} />
-                )}
-              </a>
-              {!isNative && !isSandboxPreview && (
+              {isSignedIn && (
+                <a href={`${basePath}/messages`} style={{
+                  position: "relative", fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                  border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                }}>
+                  Messages
+                  {unreadMessages > 0 && (
+                    <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#B8862B", border: "1px solid var(--fairway)" }} />
+                  )}
+                </a>
+              )}
+              {isSignedIn && !isNative && !isSandboxPreview && (
                 <a href={`${basePath}/settings`} style={{
                   fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                   border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
@@ -794,12 +830,24 @@ export default function BookingClient({
               }}>
                 Find a Pro
               </a>
-              <button onClick={() => signOut({ callbackUrl: "/login" })} style={{
-                background: "none", color: "#D7DED9", fontSize: 12.5, fontWeight: 600,
-                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
-              }}>
-                Sign out
-              </button>
+              {isSignedIn ? (
+                <button onClick={() => signOut({ callbackUrl: "/login" })} style={{
+                  background: "none", color: "#D7DED9", fontSize: 12.5, fontWeight: 600,
+                  border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                }}>
+                  Sign out
+                </button>
+              ) : (
+                <a
+                  href={`/login?callbackUrl=${encodeURIComponent(`${basePath}/book`)}`}
+                  style={{
+                    background: "none", color: "#D7DED9", fontSize: 12.5, fontWeight: 600, textDecoration: "none",
+                    border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                  }}
+                >
+                  Sign in
+                </a>
+              )}
             </div>
           </div>
           <h1 className="display" style={{ fontSize: 26, margin: "0 0 4px" }}>
