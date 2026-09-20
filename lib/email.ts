@@ -48,6 +48,7 @@ type BookingAlertDetails = {
   priceCents: number;
   isPending: boolean; // true = needs approval, false = instantly confirmed
   reviewUrl?: string; // link to the instructor dashboard, only relevant when pending
+  timezone?: string; // the business's own configured timezone (Business.timezone); falls back to BUSINESS_TIMEZONE for old callers
 };
 
 // Sends the instructor a booking alert — called for both instant-confirmed
@@ -60,7 +61,7 @@ export async function sendBookingNotification(to: string | string[] | null | und
 
   const when = details.startTime.toLocaleString(undefined, {
     weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit",
-    timeZone: BUSINESS_TIMEZONE,
+    timeZone: details.timezone || BUSINESS_TIMEZONE,
   });
   const price = details.priceCents > 0 ? `$${(details.priceCents / 100).toFixed(0)}` : null;
 
