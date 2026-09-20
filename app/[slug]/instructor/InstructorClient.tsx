@@ -75,8 +75,8 @@ async function getFcmTokenWithRetry(FirebaseMessaging: any, attempts = 12, delay
 }
 
 export default function InstructorClient({
-  calendarConnected, calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, viewerName, slug, basePath, apiBase, businessName, businessLogoUrl, openHour, closeHour,
-}: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; viewerName: string | null; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null; openHour: number; closeHour: number }) {
+  calendarConnected, calendarProvider, remoteLessonsEnabled, viewerMembershipId, viewerRole, viewerName, slug, basePath, apiBase, businessName, businessLogoUrl, openHour, closeHour, timezone,
+}: { calendarConnected: boolean; calendarProvider: string; remoteLessonsEnabled: boolean; viewerMembershipId: string; viewerRole: string; viewerName: string | null; slug: string; basePath: string; apiBase: string; businessName: string; businessLogoUrl: string | null; openHour: number; closeHour: number; timezone: string }) {
   // Reaching this page at all proves a real, signed-in account with a
   // membership - the most reliable place to record that this device has
   // signed in successfully before, regardless of which method was used.
@@ -611,7 +611,7 @@ export default function InstructorClient({
     const daySlots: Slot[] = [];
     for (const time of TIMES) {
       const [h, m] = time.split(":").map(Number);
-      const dt = wallClockToUTC(dayDate, h, m);
+      const dt = wallClockToUTC(dayDate, h, m, timezone);
       const slot = slotsByKey[dt.toISOString()];
       if (slot) daySlots.push(slot);
     }
@@ -1429,8 +1429,10 @@ export default function InstructorClient({
                       // Timezone-safe conversion - matches how the slot was
                       // originally stored server-side. Using the browser's
                       // ambiguous local time here (setHours) is exactly what
-                      // caused only 3 of 8 daily slots to ever match.
-                      const dt = wallClockToUTC(dayDate, h, m);
+                      // caused only 3 of 8 daily slots to ever match. Uses
+                      // the business's own configured timezone rather than
+                      // silently defaulting to Eastern.
+                      const dt = wallClockToUTC(dayDate, h, m, timezone);
                       const key = dt.toISOString();
                       const slot = slotsByKey[key];
                       if (!slot) return null;
