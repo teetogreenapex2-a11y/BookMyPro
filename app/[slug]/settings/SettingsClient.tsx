@@ -185,12 +185,19 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       const res = await fetch(`${apiBase}/instructors/${membershipId}/sandbox-link`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) { alert(data.error || "Something went wrong."); return; }
-      await navigator.clipboard.writeText(data.url);
-      setSandboxCopiedId(membershipId);
-      setTimeout(() => setSandboxCopiedId((prev) => (prev === membershipId ? null : prev)), 2500);
+      try {
+        await navigator.clipboard.writeText(data.url);
+        setSandboxCopiedId(membershipId);
+        setTimeout(() => setSandboxCopiedId((prev) => (prev === membershipId ? null : prev)), 2500);
+      } catch {
+        // The link is already generated server-side at this point - only the
+        // clipboard step failed (common on Safari/iOS or with clipboard
+        // permissions blocked). Don't throw the link away, just show it.
+        window.prompt("Couldn't copy automatically - here's the sandbox link, copy it manually:", data.url);
+      }
       loadSandboxLinks();
     } catch {
-      alert("Couldn't copy the link - your browser may be blocking clipboard access.");
+      alert("Something went wrong generating that link. Please try again.");
     } finally {
       setGeneratingSandboxId(null);
     }
@@ -222,13 +229,20 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error || "Something went wrong."); return; }
-      await navigator.clipboard.writeText(data.url);
-      setQuickLinkCopied(true);
-      setQuickProspectName("");
-      setTimeout(() => setQuickLinkCopied(false), 2500);
+      try {
+        await navigator.clipboard.writeText(data.url);
+        setQuickLinkCopied(true);
+        setQuickProspectName("");
+        setTimeout(() => setQuickLinkCopied(false), 2500);
+      } catch {
+        // Same story - the link was already created, only the clipboard
+        // write failed. Show it instead of losing it.
+        window.prompt("Couldn't copy automatically - here's the sandbox link, copy it manually:", data.url);
+        setQuickProspectName("");
+      }
       loadSandboxLinks();
     } catch {
-      alert("Couldn't copy the link - your browser may be blocking clipboard access.");
+      alert("Something went wrong generating that link. Please try again.");
     } finally {
       setGeneratingQuickLink(false);
     }
