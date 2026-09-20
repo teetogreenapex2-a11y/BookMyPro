@@ -9,7 +9,7 @@ const muted = "#5C6459";
 export const metadata: Metadata = {
   title: "Pricing | BookMyPro",
   description:
-    "One flat price per tier - every BookMyPro feature included either way. Monthly at $39.99/mo for a solo pro, or Academy at $49.99/mo + $24.99 per additional instructor for a team.",
+    "One flat price per tier - every BookMyPro feature included either way. Monthly at $39.99/mo for a solo pro, or Academy at $49.99/mo + $24.99 per additional instructor for a team. PGA/LPGA member discounts available.",
   openGraph: {
     title: "BookMyPro Pricing",
     description: "One flat price per tier. No tiered feature restrictions - what you see is what you get.",
@@ -119,6 +119,16 @@ export default function PricingPage() {
             highlighted
           />
         </div>
+        <div style={{
+          maxWidth: 700, margin: "18px auto 0", textAlign: "center", fontSize: 13.5, color: muted,
+          background: "#FFF", border: `1px dashed ${gold}`, borderRadius: 10, padding: "12px 18px",
+        }}>
+          <strong style={{ color: fairway }}>PGA / LPGA member?</strong> Ask about a member discount —{" "}
+          <a href="mailto:teetogreenapex2@gmail.com" style={{ color: gold, fontWeight: 600, textDecoration: "none" }}>
+            contact us
+          </a>{" "}
+          for details.
+        </div>
       </section>
 
       <section style={{ maxWidth: 700, margin: "0 auto", padding: "20px 28px 70px" }}>
@@ -157,12 +167,20 @@ export default function PricingPage() {
               No. It's a month-to-month subscription you can cancel anytime.
             </p>
           </div>
-          <div>
+          <div style={{ marginBottom: 20 }}>
             <div style={{ fontWeight: 700, color: fairway, marginBottom: 6, fontSize: 15 }}>
               What if I add instructors later?
             </div>
             <p style={{ fontSize: 14, color: muted, lineHeight: 1.6, margin: 0 }}>
               You can move from Monthly to Academy whenever your team grows - just reach out and we'll get it switched over.
+            </p>
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, color: fairway, marginBottom: 6, fontSize: 15 }}>
+              Do PGA or LPGA members get a discount?
+            </div>
+            <p style={{ fontSize: 14, color: muted, lineHeight: 1.6, margin: 0 }}>
+              Yes - reach out to <a href="mailto:teetogreenapex2@gmail.com" style={{ color: gold, fontWeight: 600 }}>teetogreenapex2@gmail.com</a> and we'll get you set up.
             </p>
           </div>
         </div>
