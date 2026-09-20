@@ -154,12 +154,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       priceCents: 0,
       isPending: needsApproval,
       reviewUrl: needsApproval ? businessDestination(business.slug, "/instructor") : undefined,
+      timezone: business.timezone,
     });
   }
 
   await sendPushToMembership(instructorMembershipId, {
     title: needsApproval ? "New booking request" : "New booking",
-    body: `${contactName.trim()} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: BUSINESS_TIMEZONE })}`,
+    body: `${contactName.trim()} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: business.timezone || BUSINESS_TIMEZONE })}`,
     url: businessDestination(business.slug, "/instructor"),
   });
 
@@ -174,7 +175,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (playerMembership) {
       await sendPushToMembership(playerMembership.id, {
         title: "Booking confirmed",
-        body: `Your lesson on ${slot.startTime.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: BUSINESS_TIMEZONE })} is confirmed.`,
+        body: `Your lesson on ${slot.startTime.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: business.timezone || BUSINESS_TIMEZONE })} is confirmed.`,
         url: businessDestination(business.slug, "/book"),
       });
     }

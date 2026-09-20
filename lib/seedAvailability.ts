@@ -17,8 +17,9 @@ function buildHourlyTimes(openHour: number, closeHour: number): string[] {
 }
 
 export async function seedInstructorAvailability(businessId: string, instructorMembershipId: string, days = 28) {
-  const business = await prisma.business.findUnique({ where: { id: businessId }, select: { openHour: true, closeHour: true } });
+  const business = await prisma.business.findUnique({ where: { id: businessId }, select: { openHour: true, closeHour: true, timezone: true } });
   const times = buildHourlyTimes(business?.openHour ?? 8, business?.closeHour ?? 17);
+  const timezone = business?.timezone;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -31,7 +32,7 @@ export async function seedInstructorAvailability(businessId: string, instructorM
 
     for (const time of times) {
       const [h, m] = time.split(":").map(Number);
-      const startTime = wallClockToUTC(date, h, m);
+      const startTime = wallClockToUTC(date, h, m, timezone);
       rows.push({ startTime });
     }
   }

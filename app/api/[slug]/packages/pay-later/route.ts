@@ -137,11 +137,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       priceCents: 0,
       isPending: needsApproval,
       reviewUrl: needsApproval ? businessDestination(business.slug, "/instructor") : undefined,
+      timezone: business.timezone,
     });
   }
   await sendPushToMembership(instructorMembershipId, {
     title: "New booking request",
-    body: `${contactName?.trim() || "A player"} - pay at lesson - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`,
+    body: `${contactName?.trim() || "A player"} - pay at lesson - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: business.timezone })}`,
     url: businessDestination(business.slug, "/instructor"),
   });
   await checkAndNotifyLowPackage(result.package.id);

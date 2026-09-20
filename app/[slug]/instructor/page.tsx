@@ -32,6 +32,7 @@ export default async function InstructorPage({ params }: { params: { slug: strin
       apiBase={apiBase}
       openHour={business.openHour}
       closeHour={business.closeHour}
+      timezone={business.timezone}
     />
   );
 }

@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getMembership } from "@/lib/tenant";
+import { seedInstructorAvailability } from "@/lib/seedAvailability";
 
 // POST /api/{slug}/sandbox-links/quick  { name, role: "instructor" | "player" }
 //
@@ -63,6 +64,16 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       hiddenFromBooking: true,
     },
   });
+
+  // Instructor prospects land straight on their own calendar - without
+  // seeding it, that view has a membership but zero Availability rows,
+  // so every hour slot on every day comes up blank. Real instructors get
+  // this same seeding the moment they're added (see instructors/manual) -
+  // a sandbox prospect needs it too, just for their own throwaway
+  // membership rather than the real team.
+  if (role === "instructor") {
+    await seedInstructorAvailability(business.id, prospectMembership.id, business.bookingWindowDays);
+  }
 
   const SESSION_LIFETIME_MS = 14 * 24 * 60 * 60 * 1000; // two weeks, matching the invite email copy
   const sessionToken = randomBytes(32).toString("hex");

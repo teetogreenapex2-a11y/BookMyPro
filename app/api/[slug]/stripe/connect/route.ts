@@ -151,11 +151,12 @@ export async function POST(req: NextRequest) {
                 priceCents: 0,
                 isPending: needsApproval,
                 reviewUrl: needsApproval ? businessDestination(business.slug, "/instructor") : undefined,
+                timezone: business.timezone,
               });
             }
             await sendPushToMembership(meta.instructorMembershipId, {
               title: needsApproval ? "New booking request" : "New booking",
-              body: `${meta.contactName || "A player"} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: BUSINESS_TIMEZONE })}`,
+              body: `${meta.contactName || "A player"} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: business.timezone || BUSINESS_TIMEZONE })}`,
               url: businessDestination(business.slug, "/instructor"),
             });
           }
@@ -235,6 +236,7 @@ export async function POST(req: NextRequest) {
             priceCents: session.amount_total ?? 0,
             isPending: needsApproval,
             reviewUrl: needsApproval ? businessDestination(business.slug, "/instructor") : undefined,
+            timezone: business.timezone,
           });
         }
         await sendPushToMembership(meta.instructorMembershipId, {

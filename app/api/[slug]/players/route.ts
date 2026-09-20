@@ -18,6 +18,12 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
   const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor"]);
   if (!membership) return NextResponse.json({ error: "Instructor access required" }, { status: 403 });
 
+  // A sandbox-prospect membership (see sandbox-links/quick) is a throwaway
+  // account handed to someone who isn't really on the team yet - it should
+  // only ever show them what the app's own screens look like, never a
+  // real business's actual customer list and their contact info.
+  if (membership.isSandboxProspect) return NextResponse.json([]);
+
   const playerMemberships = await prisma.membership.findMany({
     where: { businessId: business.id, role: "player" },
     include: {

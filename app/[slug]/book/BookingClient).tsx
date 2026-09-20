@@ -1485,8 +1485,13 @@ export default function BookingClient({
                       const [h, m] = time.split(":").map(Number);
                       // Timezone-safe conversion - see lib/time.ts. Naive
                       // setHours() here is what caused this same lookup to
-                      // silently miss most slots.
-                      const dt = wallClockToUTC(dayDate, h, m);
+                      // silently miss most slots. Uses the business's own
+                      // configured timezone (Settings > Timezone) instead
+                      // of silently defaulting to Eastern, which is what
+                      // made BookMyPro's calendar disagree with a
+                      // business's real Google Calendar whenever the two
+                      // aren't the same zone.
+                      const dt = wallClockToUTC(dayDate, h, m, business.timezone);
                       const key = dt.toISOString();
                       const slot = slotsByKey[key];
                       if (!slot) return null;
