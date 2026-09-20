@@ -233,9 +233,16 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
               Back to dashboard
             </a>
           </div>
-          <h1 className="display" style={{ fontSize: 24, margin: 0 }}>Review submissions</h1>
-          <a href={`${basePath}/swing-session`} style={{ fontSize: 13, color: "var(--gold)", fontWeight: 700, textDecoration: "none", display: "inline-block", marginTop: 6 }}>
-            Record two angles at once (down-the-line + face-on) &rarr;
+          <h1 className="display" style={{ fontSize: 24, margin: 0, marginBottom: 12 }}>Review submissions</h1>
+          <a
+            href={`${basePath}/swing-session`}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700,
+              color: "var(--chalk)", textDecoration: "none", background: "rgba(246,244,238,0.12)",
+              border: "1px solid var(--gold)", borderRadius: 8, padding: "9px 14px",
+            }}
+          >
+            📐 Record two angles at once (down-the-line + face-on)
           </a>
         </div>
       </header>
