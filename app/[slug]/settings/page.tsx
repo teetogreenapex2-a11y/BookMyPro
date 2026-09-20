@@ -3,7 +3,12 @@ import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getMembership, getBasePaths } from "@/lib/tenant";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import SettingsClient from "./SettingsClient";
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  return businessPageMetadata(params.slug, "Settings");
+}
 
 export default async function SettingsPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);

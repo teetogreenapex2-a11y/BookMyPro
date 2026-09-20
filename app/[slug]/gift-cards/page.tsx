@@ -3,7 +3,12 @@ import { loginRedirectUrl } from "@/lib/businessUrl";
 import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, ensureMembership, getBasePaths } from "@/lib/tenant";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import GiftCardsClient from "./GiftCardsClient";
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  return businessPageMetadata(params.slug, "Gift Cards");
+}
 
 export default async function GiftCardsPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);

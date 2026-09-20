@@ -3,7 +3,12 @@ import { redirect, notFound } from "next/navigation";
 import { Suspense } from "react";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, requireMembership, getBasePaths } from "@/lib/tenant";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import SwingSketchEditorClient from "./SwingSketchEditorClient";
+
+export async function generateMetadata({ params }: { params: { slug: string; id: string } }) {
+  return businessPageMetadata(params.slug, "Swing Sketch");
+}
 
 export default async function SwingSketchEditorPage({ params }: { params: { slug: string; id: string } }) {
   const session = await getServerSession(authOptions);

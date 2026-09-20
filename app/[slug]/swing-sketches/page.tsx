@@ -2,7 +2,12 @@ import { getServerSession } from "next-auth";
 import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, ensureMembership, getBasePaths } from "@/lib/tenant";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import SwingSketchesClient from "./SwingSketchesClient";
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  return businessPageMetadata(params.slug, "My Swing Sketches");
+}
 
 export default async function SwingSketchesPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);

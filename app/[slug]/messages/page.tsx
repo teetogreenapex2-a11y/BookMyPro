@@ -4,7 +4,12 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership, getBasePaths } from "@/lib/tenant";
 import { loginRedirectUrl } from "@/lib/businessUrl";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import ChatThread from "@/app/components/ChatThread";
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  return businessPageMetadata(params.slug, "Messages");
+}
 
 export default async function MessagesPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);

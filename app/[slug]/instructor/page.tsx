@@ -4,7 +4,12 @@ import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, requireMembership, getBasePaths } from "@/lib/tenant";
 import { hasCalendarConnected } from "@/lib/calendar";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import InstructorClient from "./InstructorClient";
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  return businessPageMetadata(params.slug, "Dashboard");
+}
 
 export default async function InstructorPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);

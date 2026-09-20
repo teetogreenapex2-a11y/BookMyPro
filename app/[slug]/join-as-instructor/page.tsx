@@ -3,7 +3,12 @@ import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, getMembership, getBasePaths } from "@/lib/tenant";
 import { loginRedirectUrl } from "@/lib/businessUrl";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import JoinAsInstructorClient from "./JoinAsInstructorClient";
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  return businessPageMetadata(params.slug, "Join as Instructor");
+}
 
 export default async function JoinAsInstructorPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);

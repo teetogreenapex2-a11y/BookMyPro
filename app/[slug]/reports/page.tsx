@@ -2,7 +2,12 @@ import { getServerSession } from "next-auth";
 import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, getMembership, getBasePaths } from "@/lib/tenant";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import ReportsClient from "./ReportsClient";
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  return businessPageMetadata(params.slug, "Reports");
+}
 
 export default async function ReportsPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);

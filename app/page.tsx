@@ -1,10 +1,34 @@
-﻿import { getServerSession } from "next-auth";
+﻿import type { Metadata } from "next";
+import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { businessDestination } from "@/lib/businessUrl";
 import NativeMarketingRedirect from "./components/NativeMarketingRedirect";
 import FindProSearch from "./components/FindProSearch";
+
+// Without this, the homepage fell back to the root layout's metadata -
+// "Tee to Green Golf / Book golf lessons and club fittings" - which is
+// what Google, and any link preview in a cold outreach email, would have
+// shown for BookMyPro's own site instead of BookMyPro itself.
+export const metadata: Metadata = {
+  title: "BookMyPro — Booking Software for Golf Instructors",
+  description:
+    "Players book lessons and fittings straight into your calendar, pay automatically, and send you their swing for review — all from a page with your own name on it.",
+  openGraph: {
+    title: "BookMyPro — Booking Software for Golf Instructors",
+    description: "Your tee sheet, finally organized. Booking, payments, and swing review in one place.",
+    url: "https://bookmypro.app",
+    siteName: "BookMyPro",
+    images: ["/logo.jpg"],
+  },
+  twitter: {
+    card: "summary",
+    title: "BookMyPro — Booking Software for Golf Instructors",
+    description: "Your tee sheet, finally organized.",
+    images: ["/logo.jpg"],
+  },
+};
 
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
@@ -130,7 +154,10 @@ function MarketingPage() {
       {/* Header */}
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "22px 28px", maxWidth: 1120, margin: "0 auto" }}>
         <div className="mono" style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", color: "#B8862B" }}>BOOKMYPRO</div>
-        <a href="/login" style={{ fontSize: 14, fontWeight: 600, color: "#1B3A2F", textDecoration: "none" }}>Sign in</a>
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <a href="/pricing" style={{ fontSize: 14, fontWeight: 600, color: "#1B3A2F", textDecoration: "none" }}>Pricing</a>
+          <a href="/login" style={{ fontSize: 14, fontWeight: 600, color: "#1B3A2F", textDecoration: "none" }}>Sign in</a>
+        </div>
       </header>
 
       {/* Hero */}
@@ -237,6 +264,93 @@ function MarketingPage() {
         </div>
       </section>
 
+      {/* Full feature breakdown - the same content as /features, just public now */}
+      <section style={{ maxWidth: 1120, margin: "0 auto", padding: "0 28px 80px" }}>
+        <div className="mono" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", color: "#B8862B", marginBottom: 10, textAlign: "center" }}>
+          THE FULL RUNDOWN
+        </div>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, color: "#1B3A2F", textAlign: "center", margin: "0 0 44px" }}>
+          Everything on both sides of the app
+        </h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 36 }}>
+          <div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: "#1B3A2F", borderBottom: "2px solid #B8862B", paddingBottom: 10, marginBottom: 20 }}>
+              For You (Instructor / Owner)
+            </div>
+            <FeatureGroup title="Setup & Branding" items={[
+              "Guided onboarding wizard - business info, pricing, team, calendar, and payment setup in one flow",
+              "Custom booking page with your own URL",
+              "Upload your own business logo, shown throughout your booking page",
+              "List your business in the public \"Find a Pro\" directory, with real distance-based search",
+              "Multi-instructor support - add other instructors, each with their own calendar and pricing",
+            ]} />
+            <FeatureGroup title="Calendar & Bookings" items={[
+              "Visual weekly calendar - tap to open/close time slots",
+              "Two-way sync with Google Calendar or Outlook",
+              "24-hour minimum lead time for player-initiated bookings",
+              "Optional approval step for new bookings",
+              "Create a booking manually for any customer, new or existing",
+              "Sell a new lesson package and book a lesson in one motion, or sell it alone for them to schedule later",
+            ]} />
+            <FeatureGroup title="Payments" items={[
+              "Accept payments directly via Stripe or Square - your own account, your own money",
+              "\"Pay at lesson\" option for club pros billed through their club",
+              "Sell lesson packages and club fittings with your own pricing",
+              "Sell gift cards",
+              "Run a small shop for products",
+              "Klarna offered alongside card payment - pay in full or in installments",
+            ]} />
+            <FeatureGroup title="Remote Lessons & Video Tools" items={[
+              "Built-in video call for remote lessons",
+              "Combined video call + Swing Sketch session page",
+              "Swing Sketch - draw directly on a swing photo to illustrate technique",
+              "Review player-submitted swing videos with timestamped comments",
+              "Upload your own footage and attach it to a player's history",
+              "Download any video; old ones clean up automatically after 90 days",
+            ]} />
+            <FeatureGroup title="Customers & Notifications" items={[
+              "Full customer list with search and golf profiles",
+              "Push notifications for new bookings, video submissions, and low packages",
+              "In-app messaging with players, with read receipts and timestamps",
+            ]} />
+            <FeatureGroup title="Credibility & Team" items={[
+              "Your own bio and photo, shown on your public booking page and the \"Meet Our Instructors\" page",
+              "Star ratings and written reviews from players after completed lessons",
+              "Owners can manage bios and photos for their whole team",
+              "Private staff messaging between owners and instructors, separate from player chats",
+            ]} last />
+          </div>
+          <div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: "#1B3A2F", borderBottom: "2px solid #B8862B", paddingBottom: 10, marginBottom: 20 }}>
+              For Your Players
+            </div>
+            <FeatureGroup title="Finding & Booking" items={[
+              "Find a Pro - search by real distance or city",
+              "Browse instructor bios, photos, and star ratings before booking",
+              "Sign in with Google, or a password-free email link",
+              "Book a lesson or club fitting online in a few taps",
+              "Remote or in-person options",
+              "Buy a lesson package or pay-as-you-go",
+            ]} />
+            <FeatureGroup title="During & After Lessons" items={[
+              "Join a remote lesson's video call directly from the app",
+              "Submit swing videos for review",
+              "Get feedback as timestamped comments",
+              "Receive Swing Sketches",
+              "View all upcoming sessions in one place",
+              "Leave a star rating and review after a completed lesson",
+            ]} />
+            <FeatureGroup title="Payments & Extras" items={[
+              "Buy gift cards",
+              "Shop your products",
+              "Download their own swing videos",
+              "Pay with card, or with Klarna where offered",
+              "Push notifications for confirmations, feedback, and low packages",
+            ]} last />
+          </div>
+        </div>
+      </section>
+
       {/* How it works */}
       <section style={{ background: "#EFEBDD", padding: "70px 28px" }}>
         <div style={{ maxWidth: 1120, margin: "0 auto" }}>
@@ -286,6 +400,19 @@ function MarketingPage() {
           <span>&copy; {new Date().getFullYear()} BookMyPro</span>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function FeatureGroup({ title, items, last }: { title: string; items: string[]; last?: boolean }) {
+  return (
+    <div style={{ marginBottom: last ? 0 : 20 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#1B3A2F", marginBottom: 8 }}>{title}</div>
+      <ul style={{ margin: 0, paddingLeft: 20 }}>
+        {items.map((item) => (
+          <li key={item} style={{ fontSize: 13.5, color: "#5C6459", marginBottom: 5, lineHeight: 1.5 }}>{item}</li>
+        ))}
+      </ul>
     </div>
   );
 }

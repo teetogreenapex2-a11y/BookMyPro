@@ -2,7 +2,13 @@ import "./globals.css";
 import Providers from "./providers";
 import type { Viewport } from "next";
 
+// A fallback only - most business-scoped pages should really carry their
+// own metadata (their actual business name, not this one), but that's a
+// separate, larger fix. metadataBase just gives every page's relative
+// OG/twitter image URLs (like BookMyPro's own homepage) something to
+// resolve against.
 export const metadata = {
+  metadataBase: new URL("https://bookmypro.app"),
   title: "Tee to Green Golf",
   description: "Book golf lessons and club fittings",
 };

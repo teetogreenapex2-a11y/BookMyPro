@@ -3,7 +3,12 @@ import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, requireMembership, getBasePaths } from "@/lib/tenant";
 import { loginRedirectUrl } from "@/lib/businessUrl";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import MessagesInboxClient from "./MessagesInboxClient";
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  return businessPageMetadata(params.slug, "Messages");
+}
 
 export default async function InstructorMessagesPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);

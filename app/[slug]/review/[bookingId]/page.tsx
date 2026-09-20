@@ -3,7 +3,12 @@ import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, ensureMembership, getBasePaths } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import ReviewFormClient from "./ReviewFormClient";
+
+export async function generateMetadata({ params }: { params: { slug: string; bookingId: string } }) {
+  return businessPageMetadata(params.slug, "Leave a Review");
+}
 
 export default async function ReviewPage({ params }: { params: { slug: string; bookingId: string } }) {
   const session = await getServerSession(authOptions);
