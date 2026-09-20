@@ -13,6 +13,22 @@ echo Installing BookMyPro update files from %DL%
 echo into %CD%
 echo.
 
+rem --- Calendar timezone fix (original delivery) ---
+call :copyfile "bookings-route*.ts" "app\api\[slug]\bookings\route.ts"
+call :copyfile "club-billed-route*.ts" "app\api\[slug]\packages\club-billed\route.ts"
+call :copyfile "pay-later-route*.ts" "app\api\[slug]\packages\pay-later\route.ts"
+call :copyfile "stripe-connect-route*.ts" "app\api\[slug]\stripe\connect\route.ts"
+call :copyfile "square-webhook-route*.ts" "app\api\square\webhook\route.ts"
+call :copyfile "stripe-webhook-route*.ts" "app\api\stripe\webhook\route.ts"
+call :copyfile "email*.ts" "lib\email.ts"
+call :copyfile "seedAvailability*.ts" "lib\seedAvailability.ts"
+call :copyfile "BookingClient*.tsx" "app\[slug]\book\BookingClient.tsx"
+call :copyfile "InstructorClient*.tsx" "app\[slug]\instructor\InstructorClient.tsx"
+
+rem --- Sandbox invite fix ---
+call :copyfile "players-route*.ts" "app\api\[slug]\players\route.ts"
+call :copyfile "sandbox-quick-route*.ts" "app\api\[slug]\sandbox-links\quick\route.ts"
+
 rem --- SEO / pricing page delivery ---
 call :copyfile "layout*.tsx" "app\layout.tsx"
 call :copyfile "homepage-page*.tsx" "app\page.tsx"
