@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
+import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 type Comment = { id: string; timestampSeconds: number; text: string };
 type Submission = {
@@ -64,6 +66,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
   }, []);
+  const isSandboxPreview = useSandboxPreview();
 
   function loadPlayers() {
     fetch(`${apiBase}/players`).then((r) => r.json()).then((list) => setPlayers(Array.isArray(list) ? list : [])).catch(() => {});
@@ -247,7 +250,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
         </div>
       </header>
 
-      <main style={{ maxWidth: 800, margin: "0 auto", padding: "0 20px 60px", background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh" }}>
+      <main style={{ maxWidth: 800, margin: "0 auto", padding: `0 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px`, background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh" }}>
         <div style={{ paddingTop: 20 }}>
           <button
             onClick={() => { setUploadOpen((o) => !o); setUploadError(null); }}
@@ -516,6 +519,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
           </div>
         </div>
       </main>
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="videos" />}
     </div>
   );
 }

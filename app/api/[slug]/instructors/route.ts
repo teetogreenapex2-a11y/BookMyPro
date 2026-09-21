@@ -25,6 +25,14 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   // all - owner/instructor accounts still see everyone, since they're the
   // ones who'd need to manage or work alongside a hidden entry.
   if (!isStaff) instructors = instructors.filter((m) => !m.hiddenFromBooking);
+  // A sandbox prospect (see sandbox-links/quick) is a throwaway preview
+  // account, not a real hire - it shouldn't see the real team's names and
+  // emails in Settings any more than it should see real customers (see the
+  // same gate in players/route.ts). It only sees itself, same as a brand
+  // new instructor would with no other teammates yet.
+  if (requesterMembership?.isSandboxProspect) {
+    instructors = instructors.filter((m) => m.id === requesterMembership.id);
+  }
 
   const shaped = instructors.map((m) => ({
     id: m.id, // this is the Membership id — what bookings actually reference

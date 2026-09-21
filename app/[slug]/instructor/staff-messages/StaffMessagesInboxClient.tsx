@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 type ConversationSummary = { id: string; otherName: string; otherRole: string; lastMessageAt: string; lastMessagePreview: string; unreadCount: number };
 type StaffMember = { id: string; name: string; role: string };
@@ -13,6 +15,7 @@ export default function StaffMessagesInboxClient({ apiBase, basePath }: { apiBas
   const [directory, setDirectory] = useState<StaffMember[]>([]);
   const [starting, setStarting] = useState(false);
   const [isNative, setIsNative] = useState(false);
+  const isSandboxPreview = useSandboxPreview();
 
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
@@ -51,7 +54,7 @@ export default function StaffMessagesInboxClient({ apiBase, basePath }: { apiBas
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F6F4EE", padding: `20px 20px ${isNative ? 92 : 20}px`, fontFamily: "sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#F6F4EE", padding: `20px 20px ${isNative ? 92 : isSandboxPreview ? 20 + FAKE_TAB_BAR_HEIGHT : 20}px`, fontFamily: "sans-serif" }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
           <a href={`${basePath}/instructor`} style={{ color: "#1B3A2F", textDecoration: "none", fontSize: 20 }}>&larr;</a>
@@ -135,6 +138,7 @@ export default function StaffMessagesInboxClient({ apiBase, basePath }: { apiBas
           </div>
         )}
       </div>
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="calendar" />}
     </div>
   );
 }

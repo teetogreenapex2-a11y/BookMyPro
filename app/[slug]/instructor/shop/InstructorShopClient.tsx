@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import type { CSSProperties } from "react";
+import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 type Variant = { id: string; label: string; stockQuantity: number };
 type Product = {
@@ -37,6 +39,7 @@ export default function InstructorShopClient({ slug, basePath, apiBase }: { slug
   const [variantRows, setVariantRows] = useState<{ label: string; stockQuantity: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const isSandboxPreview = useSandboxPreview();
 
   function load() {
     fetch(`${apiBase}/products`).then((r) => r.json()).then((list) => setProducts(Array.isArray(list) ? list : []));
@@ -137,7 +140,7 @@ export default function InstructorShopClient({ slug, basePath, apiBase }: { slug
         </div>
       </header>
 
-      <main style={{ maxWidth: 800, margin: "0 auto", padding: "20px 20px 60px", background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh" }}>
+      <main style={{ maxWidth: 800, margin: "0 auto", padding: `20px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px`, background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh" }}>
         {loading ? (
           <p style={{ fontSize: 13, color: "var(--faint)" }}>Loading…</p>
         ) : tab === "products" ? (
@@ -239,6 +242,7 @@ export default function InstructorShopClient({ slug, basePath, apiBase }: { slug
           </>
         )}
       </main>
+      {isSandboxPreview && <FakeNativeTabBar basePath={basePath} activeKey="calendar" />}
     </div>
   );
 }

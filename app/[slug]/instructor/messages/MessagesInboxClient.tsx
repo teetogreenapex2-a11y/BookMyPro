@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 type ConversationSummary = { id: string; playerName: string; lastMessageAt: string; lastMessagePreview: string; unreadCount: number };
 
 export default function MessagesInboxClient({ apiBase, basePath }: { apiBase: string; basePath: string }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const isSandboxPreview = useSandboxPreview();
 
   useEffect(() => {
     load();
@@ -21,7 +24,7 @@ export default function MessagesInboxClient({ apiBase, basePath }: { apiBase: st
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F6F4EE", padding: 20, fontFamily: "sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#F6F4EE", padding: `20px 20px ${isSandboxPreview ? 20 + FAKE_TAB_BAR_HEIGHT : 20}px`, fontFamily: "sans-serif" }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
           <a href={`${basePath}/instructor`} style={{ color: "#1B3A2F", textDecoration: "none", fontSize: 20 }}>&larr;</a>
@@ -61,6 +64,7 @@ export default function MessagesInboxClient({ apiBase, basePath }: { apiBase: st
           </div>
         )}
       </div>
+      {isSandboxPreview && <FakeNativeTabBar basePath={basePath} activeKey="calendar" />}
     </div>
   );
 }
