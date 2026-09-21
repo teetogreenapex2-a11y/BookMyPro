@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifySquareWebhookSignature, getSquareOrder } from "@/lib/square";
 import { findPackage, findFitting } from "@/lib/pricing";
+import { blockOverlappingSlots } from "@/lib/availabilityOverlap";
 import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
 import { getInstructorById, ensureMembership, getBookingNotificationRecipients } from "@/lib/tenant";
@@ -159,11 +160,12 @@ export async function POST(req: NextRequest) {
               priceCents: 0,
               isPending: needsApproval,
               reviewUrl: needsApproval ? businessDestination(business.slug, "/instructor") : undefined,
+              timezone: business.timezone,
             });
           }
           await sendPushToMembership(pending.instructorMembershipId, {
             title: needsApproval ? "New booking request" : "New booking",
-            body: `${pending.contactName || "A player"} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: BUSINESS_TIMEZONE })}`,
+            body: `${pending.contactName || "A player"} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: business.timezone || BUSINESS_TIMEZONE })}`,
             url: businessDestination(business.slug, "/instructor"),
           });
         }
@@ -271,11 +273,12 @@ export async function POST(req: NextRequest) {
               priceCents: 0,
               isPending: needsApproval,
               reviewUrl: needsApproval ? businessDestination(business.slug, "/instructor") : undefined,
+              timezone: business.timezone,
             });
           }
           await sendPushToMembership(pending.instructorMembershipId, {
             title: needsApproval ? "New booking request" : "New booking",
-            body: `${pending.contactName || "A player"} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: BUSINESS_TIMEZONE })} - deposit paid, balance due at lesson`,
+            body: `${pending.contactName || "A player"} - ${slot.startTime.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: business.timezone || BUSINESS_TIMEZONE })} - deposit paid, balance due at lesson`,
             url: businessDestination(business.slug, "/instructor"),
           });
         }
@@ -302,7 +305,7 @@ export async function POST(req: NextRequest) {
 
       const booking = await prisma.$transaction(async (tx) => {
         await tx.availability.update({ where: { id: slot.id }, data: { status: availabilityStatus } });
-        return tx.booking.create({
+        const created = await tx.booking.create({
           data: {
             businessId,
             playerId: pending.userId,
@@ -319,6 +322,17 @@ export async function POST(req: NextRequest) {
             contactEmail: pending.contactEmail,
           },
         });
+        if (pending.instructorMembershipId) {
+          await blockOverlappingSlots(tx, {
+            businessId,
+            instructorMembershipId: pending.instructorMembershipId,
+            startTime: slot.startTime,
+            durationMinutes: fitting.durationMin,
+            primarySlotId: slot.id,
+            bookingId: created.id,
+          });
+        }
+        return created;
       });
 
       if (!needsApproval) {
@@ -353,6 +367,7 @@ export async function POST(req: NextRequest) {
           priceCents: payment.amount_money?.amount ?? 0,
           isPending: needsApproval,
           reviewUrl: needsApproval ? businessDestination(business.slug, "/instructor") : undefined,
+          timezone: business.timezone,
         });
       }
       await sendPushToMembership(pending.instructorMembershipId, {
@@ -408,6 +423,7 @@ export async function POST(req: NextRequest) {
           contactEmail: pending.contactEmail,
           priceCents: payment.amount_money?.amount ?? 0,
           isPending: false,
+          timezone: business.timezone,
         });
       }
       await sendPushToMembership(pending.instructorMembershipId, {

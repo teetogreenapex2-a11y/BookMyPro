@@ -7,6 +7,7 @@ import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
 import { findFitting, getFittingPriceCents, isFittingEnabled, findPackage, getPackagePriceCents } from "@/lib/pricing";
 import { checkAndNotifyLowPackage } from "@/lib/pushNotifications";
+import { blockOverlappingSlots } from "@/lib/availabilityOverlap";
 
 // POST /api/{slug}/bookings/manual  { availabilityId, serviceType, fittingType?, playerId, packageId?, instructorMembershipId }
 // Owner/instructor only — for walk-ins, phone bookings, or anything the
@@ -135,6 +136,17 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         contactEmail: player.user.email,
       },
     });
+
+    if (serviceType === "fitting" && fitting) {
+      await blockOverlappingSlots(tx, {
+        businessId: business.id,
+        instructorMembershipId,
+        startTime: slot.startTime,
+        durationMinutes: fitting.durationMin,
+        primarySlotId: slot.id,
+        bookingId: created.id,
+      });
+    }
 
     return { booking: created, packageId: bookingPackageId };
   });

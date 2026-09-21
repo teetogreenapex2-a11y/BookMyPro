@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership, getBusinessInstructors } from "@/lib/tenant";
 import { seedInstructorAvailability } from "@/lib/seedAvailability";
 import { geocodeLocation } from "@/lib/geocoding";
+import { titleCase, formatState } from "@/lib/format";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const business = await getBusinessBySlug(params.slug);
@@ -37,6 +38,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   ];
   const data: Record<string, unknown> = {};
   for (const key of allowed) if (key in body) data[key] = body[key];
+
+  // Clean up city/state as they're saved - a pro typing "chapel hill " with
+  // no capitalization (or a trailing space) into a plain text field
+  // shouldn't show up looking like that everywhere the directory displays
+  // it later. The same trim+capitalize is applied at display time too, for
+  // rows saved before this existed.
+  if (typeof data.city === "string") data.city = titleCase(data.city);
+  if (typeof data.state === "string") data.state = formatState(data.state);
 
   // City/state/zip changed - geocode it so distance-based search actually
   // has something to work with. Runs once here rather than per search,

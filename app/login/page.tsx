@@ -123,6 +123,15 @@ function LoginPageInner() {
 
       window.location.href = callbackUrl;
     } catch (err: any) {
+      // The plugin rejects with code "USER_CANCELLED" when someone just
+      // backs out of the account picker (closes it, taps away, etc.) -
+      // that's not a failure, it's the same as changing your mind at a
+      // login screen, and showing a raw error with a "Copy error" button
+      // for simply cancelling was alarming testers for no reason. Only a
+      // genuine failure below this still surfaces anything.
+      if (err?.code === "USER_CANCELLED") {
+        return;
+      }
       console.error("Native Google sign-in failed:", err);
       // Temporarily showing the real, specific error instead of a
       // generic message - there's no easy way to inspect the JavaScript

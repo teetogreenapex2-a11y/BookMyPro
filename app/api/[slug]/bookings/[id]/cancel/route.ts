@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getInstructorById, getMembership } from "@/lib/tenant";
 import { deleteEvent } from "@/lib/calendar";
+import { reopenOverlapBlockedSlots } from "@/lib/availabilityOverlap";
 
 export async function POST(
   req: NextRequest,
@@ -41,6 +42,7 @@ export async function POST(
     if (booking.packageId) {
       await tx.package.update({ where: { id: booking.packageId }, data: { lessonsRemaining: { increment: 1 } } });
     }
+    await reopenOverlapBlockedSlots(tx, booking.id);
   });
 
   if (calendarMembership && booking.googleCalendarEventId) {

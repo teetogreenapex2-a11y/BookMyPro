@@ -25,9 +25,51 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <TabBarSync />
       <NativeAuthListener />
+      <AndroidBackButtonHandler />
       {children}
     </SessionProvider>
   );
+}
+
+// With no listener registered at all, Capacitor's own default handling of
+// the Android hardware back button kicks in - and with nothing telling it
+// otherwise, that default is to minimize/exit the app rather than step
+// back through the WebView's navigation history. That's exactly the bug:
+// tapping Back from a pro's booking page (reached via a plain link from
+// search, not client-side routing) dropped straight to the home screen
+// instead of returning to the search results the person just came from.
+// Capacitor's own `canGoBack` on the event reflects the WebView's real
+// navigation stack, so this defers to normal back-navigation whenever
+// there's somewhere to go, and only exits when there genuinely isn't.
+function AndroidBackButtonHandler() {
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let removeListener: (() => void) | undefined;
+    let cancelled = false;
+
+    (async () => {
+      const { App } = await import("@capacitor/app");
+      const handle = await App.addListener("backButton", ({ canGoBack }) => {
+        if (canGoBack) {
+          window.history.back();
+        } else {
+          App.exitApp();
+        }
+      });
+      if (cancelled) {
+        handle.remove();
+      } else {
+        removeListener = () => handle.remove();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      removeListener?.();
+    };
+  }, []);
+
+  return null;
 }
 
 // Catches the Universal Link that brings a person back into the app

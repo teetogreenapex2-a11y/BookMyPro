@@ -64,7 +64,13 @@ export default function HelpWidget({ apiBase }: { apiBase: string }) {
       <button
         onClick={() => setOpen(true)}
         style={{
-          position: "fixed", bottom: buttonBottom, right: 20, zIndex: 150,
+          // Bottom-LEFT, not right - on the booking page, the calendar's
+          // own Prev/Next week buttons sit at the right edge of their row,
+          // and whenever that row scrolled near the bottom of the screen
+          // this fixed button was landing right on top of "Next",
+          // un-tappable. The left corner doesn't have any competing
+          // right-aligned controls to collide with.
+          position: "fixed", bottom: buttonBottom, left: 20, zIndex: 150,
           background: "#1B3A2F", color: "#F6F4EE", border: "none", borderRadius: 999,
           padding: "12px 18px", fontWeight: 700, fontSize: 14, boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
           display: "flex", alignItems: "center", gap: 6,

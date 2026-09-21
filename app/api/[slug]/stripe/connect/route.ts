@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { findPackage, findFitting } from "@/lib/pricing";
+import { blockOverlappingSlots } from "@/lib/availabilityOverlap";
 import { createEvent } from "@/lib/calendar";
 import { createVideoCallRoom } from "@/lib/dailyVideo";
 import { getInstructorById, ensureMembership, getBookingNotificationRecipients } from "@/lib/tenant";
@@ -183,7 +184,7 @@ export async function POST(req: NextRequest) {
 
         const booking = await prisma.$transaction(async (tx) => {
           await tx.availability.update({ where: { id: slot.id }, data: { status: availabilityStatus } });
-          return tx.booking.create({
+          const created = await tx.booking.create({
             data: {
               businessId,
               playerId: meta.userId,
@@ -200,6 +201,17 @@ export async function POST(req: NextRequest) {
               contactEmail: meta.contactEmail || null,
             },
           });
+          if (meta.instructorMembershipId) {
+            await blockOverlappingSlots(tx, {
+              businessId,
+              instructorMembershipId: meta.instructorMembershipId,
+              startTime: slot.startTime,
+              durationMinutes: fitting.durationMin,
+              primarySlotId: slot.id,
+              bookingId: created.id,
+            });
+          }
+          return created;
         });
 
         // Only sync to the calendar immediately if this didn't need
