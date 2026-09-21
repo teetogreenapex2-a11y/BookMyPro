@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatCityState } from "@/lib/format";
 
 type Listing = {
   slug: string;
@@ -105,12 +106,17 @@ export default function FindProSearch() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && search()}
           placeholder="City, state, or zip"
-          style={{ flex: 1, border: "1px solid #E3D9C9", borderRadius: 8, padding: "10px 14px", fontSize: 14 }}
+          // minWidth: 0 overrides a flex item's default min-width of "auto",
+          // which otherwise refuses to let this input shrink below its own
+          // content size - on a narrow phone screen that pushed the Search
+          // button straight off the edge instead of the input just getting
+          // narrower, which is what flex: 1 was supposed to accomplish.
+          style={{ flex: 1, minWidth: 0, border: "1px solid #E3D9C9", borderRadius: 8, padding: "10px 14px", fontSize: 14 }}
         />
         <button
           onClick={search}
           disabled={loading}
-          style={{ background: "#1B3A2F", color: "#F6F4EE", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 14, fontWeight: 700 }}
+          style={{ flexShrink: 0, background: "#1B3A2F", color: "#F6F4EE", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 14, fontWeight: 700 }}
         >
           {loading ? "Searching..." : "Search"}
         </button>
@@ -163,15 +169,24 @@ export default function FindProSearch() {
             </div>
             {(b.city || b.state) && (
               <div style={{ fontSize: 12.5, color: "#8A8571", marginBottom: 8 }}>
-                {[b.city, b.state].filter(Boolean).join(", ")}
+                {formatCityState(b.city, b.state)}
               </div>
             )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {b.memberships.map((m, i) => (
-                <span key={i} style={{ fontSize: 11.5, background: "#E3D9C9", borderRadius: 20, padding: "3px 10px" }}>
-                  {m.user.name || "Instructor"}{m.specialty ? ` - ${m.specialty}` : ""}
-                </span>
-              ))}
+              {b.memberships
+                // A solo pro's business is often just named after
+                // themselves ("Rick Stitzer") - for that one-instructor
+                // case, repeating their name again right below the
+                // heading just looks like a duplicate. Their specialty
+                // (if they have one) is still worth showing on its own.
+                .filter((m) => !(b.memberships.length === 1 && (m.user.name || "").trim().toLowerCase() === b.name.trim().toLowerCase()) || m.specialty)
+                .map((m, i) => (
+                  <span key={i} style={{ fontSize: 11.5, background: "#E3D9C9", borderRadius: 20, padding: "3px 10px" }}>
+                    {b.memberships.length === 1 && (m.user.name || "").trim().toLowerCase() === b.name.trim().toLowerCase()
+                      ? m.specialty
+                      : `${m.user.name || "Instructor"}${m.specialty ? ` - ${m.specialty}` : ""}`}
+                  </span>
+                ))}
             </div>
           </a>
         ))}

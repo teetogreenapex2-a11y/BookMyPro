@@ -6,6 +6,7 @@ import { milesBetween } from "@/lib/geocoding";
 import { REGION_CITIES, getRegionCity } from "@/lib/regionCities";
 import FindProSearch from "@/app/components/FindProSearch";
 import ProListingLink from "@/app/components/ProListingLink";
+import { formatCityState } from "@/lib/format";
 
 const RADIUS_MILES = 30;
 
@@ -86,15 +87,19 @@ export default async function CityFindProPage({ params }: { params: { city: stri
                   </div>
                   {(b.city || b.state) && (
                     <div style={{ fontSize: 12.5, color: "#8A8571", marginBottom: 8 }}>
-                      {[b.city, b.state].filter(Boolean).join(", ")}
+                      {formatCityState(b.city, b.state)}
                     </div>
                   )}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {b.memberships.map((m, i) => (
-                      <span key={i} style={{ fontSize: 11.5, background: "#E3D9C9", borderRadius: 20, padding: "3px 10px" }}>
-                        {m.user.name || "Instructor"}{m.specialty ? ` - ${m.specialty}` : ""}
-                      </span>
-                    ))}
+                    {b.memberships
+                      .filter((m) => !(b.memberships.length === 1 && (m.user.name || "").trim().toLowerCase() === b.name.trim().toLowerCase()) || m.specialty)
+                      .map((m, i) => (
+                        <span key={i} style={{ fontSize: 11.5, background: "#E3D9C9", borderRadius: 20, padding: "3px 10px" }}>
+                          {b.memberships.length === 1 && (m.user.name || "").trim().toLowerCase() === b.name.trim().toLowerCase()
+                            ? m.specialty
+                            : `${m.user.name || "Instructor"}${m.specialty ? ` - ${m.specialty}` : ""}`}
+                        </span>
+                      ))}
                   </div>
                 </ProListingLink>
               ))}

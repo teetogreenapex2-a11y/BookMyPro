@@ -48,6 +48,7 @@ export default function BookingClient({
   slug,
   basePath,
   apiBase,
+  isSignedIn,
 }: {
   initialPackages: Package[];
   business: { name: string; email: string; lessonRate: string; [key: string]: any };
@@ -55,13 +56,35 @@ export default function BookingClient({
   slug: string;
   basePath: string;
   apiBase: string;
+  // This page is browsable by signed-out visitors now (Apple guideline
+  // 5.1.1 - looking at available coaches and open times isn't
+  // account-based, so it can't require registration). Everything that
+  // genuinely needs an account - confirming a booking, buying a package,
+  // seeing your own upcoming lessons - checks this first and sends a
+  // signed-out visitor to /login instead of running.
+  isSignedIn: boolean;
 }) {
-  // Reaching this page at all proves a real, signed-in account with a
-  // membership - the most reliable place to record that this device has
-  // signed in successfully before, regardless of which method was used.
+  // Sends a signed-out visitor to sign in, with this page as the
+  // callback so they land right back here once they're in. Used to gate
+  // every action below that's inherently tied to a real account - booking,
+  // buying, joining a group, requesting a playing lesson - never the
+  // browsing itself.
+  function requireSignIn(): boolean {
+    if (!isSignedIn) {
+      window.location.href = `/login?callbackUrl=${encodeURIComponent(`${basePath}/book`)}`;
+      return false;
+    }
+    return true;
+  }
+
+  // Reaching this page while signed in proves a real, signed-in account
+  // with a membership - the most reliable place to record that this
+  // device has signed in successfully before, regardless of which method
+  // was used. A signed-out visitor just browsing hasn't signed in at all,
+  // so there's nothing to record for them.
   useEffect(() => {
-    markHasSignedInOnThisDevice();
-  }, []);
+    if (isSignedIn) markHasSignedInOnThisDevice();
+  }, [isSignedIn]);
 
   // Built from the business's real, current hours instead of a fixed
   // list - without this, a business widening its hours in Settings would
@@ -113,7 +136,16 @@ export default function BookingClient({
   const [submittingPlayingLessonRequest, setSubmittingPlayingLessonRequest] = useState(false);
   const [playingLessonRequestSent, setPlayingLessonRequestSent] = useState(false);
   const [pendingDurationPackageId, setPendingDurationPackageId] = useState<string | null>(null);
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  // Anchored to today, not the calendar week's Monday - startOfWeek() would
+  // often put several already-past days at the front of the very first
+  // view (e.g. opening on a Friday showed Mon-Thu already gone), making
+  // the whole week look empty/broken until someone clicked "Next". A
+  // rolling 7-day window starting today is never stale on first load.
+  const [weekStart, setWeekStart] = useState(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  });
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Slot | null>(null);
@@ -160,6 +192,7 @@ export default function BookingClient({
   const [pushError, setPushError] = useState<string | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
   useEffect(() => {
+    if (!isSignedIn) return;
     function checkUnread() {
       fetch(`${apiBase}/conversations/unread-count`)
         .then((r) => r.json())
@@ -170,9 +203,12 @@ export default function BookingClient({
     const interval = setInterval(checkUnread, 15000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isSignedIn]);
 
   useEffect(() => {
+    // Registering a push token only means anything for a real account -
+    // a signed-out visitor just browsing has nothing to notify.
+    if (!isSignedIn) return;
     if (Capacitor.isNativePlatform()) {
       // Permission being granted at the OS level doesn't guarantee a
       // token was ever actually saved to the backend - this was the
@@ -221,7 +257,7 @@ export default function BookingClient({
       }
       reg.pushManager.getSubscription().then((sub) => setPushStatus(sub ? "on" : "off"));
     }).catch(() => setPushStatus("off"));
-  }, []);
+  }, [isSignedIn]);
 
   async function enablePushNotifications() {
     setPushStatus("enabling");
@@ -313,9 +349,9 @@ export default function BookingClient({
   }
 
   useEffect(() => {
-    loadMyBookings();
+    if (isSignedIn) loadMyBookings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isSignedIn]);
 
   useEffect(() => {
     fetch(`${apiBase}/groups`)
@@ -426,6 +462,7 @@ export default function BookingClient({
   }
 
   async function depositAndBookSlot() {
+    if (!requireSignIn()) return;
     if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
@@ -449,6 +486,7 @@ export default function BookingClient({
   }
 
   async function clubBilledAndBookSlot() {
+    if (!requireSignIn()) return;
     if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
@@ -498,6 +536,7 @@ export default function BookingClient({
   }
 
   async function bookLesson() {
+    if (!requireSignIn()) return;
     if (!selected || !selectedPackage || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
@@ -538,6 +577,7 @@ export default function BookingClient({
   // checkout metadata, so paying both purchases the package AND books that
   // slot with the first credit, all in one step (see the webhook).
   async function submitPlayingLessonRequest() {
+    if (!requireSignIn()) return;
     if (!pendingPlayingLessonHoles || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setSubmittingPlayingLessonRequest(true);
@@ -564,6 +604,7 @@ export default function BookingClient({
   }
 
   async function buyPackageAndBookSlot() {
+    if (!requireSignIn()) return;
     if (!selected || !selectedInstructorId || !contactValid()) return;
     if (!pendingPackageType && !pendingDurationId && !pendingCustomOfferingSlot) return;
     saveProfileFieldsIfProvided();
@@ -592,6 +633,7 @@ export default function BookingClient({
   }
 
   async function joinGroupSession() {
+    if (!requireSignIn()) return;
     if (!selected || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
@@ -612,6 +654,7 @@ export default function BookingClient({
   }
 
   async function bookFitting() {
+    if (!requireSignIn()) return;
     if (!selected || !fittingType || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
     setConfirming(true);
@@ -678,9 +721,29 @@ export default function BookingClient({
   // exact size (as a single lesson, or as a package with that lesson
   // count) belong in the second dropdown - each with its own real price
   // for that specific combination.
+  const todayStart = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+
   const durationsForLessonsCount = pendingLessonsCount === 1
     ? durations
     : durations.filter((d) => d.packages.some((p) => p.lessonsCount === pendingLessonsCount));
+
+  // The first dropdown only picks a pack SIZE ("3-pack"), before the
+  // second dropdown narrows it down to a specific lesson length - but with
+  // nothing to compare against yet, that first step showed no price at
+  // all (unlike the fitting picker, which shows its price right away).
+  // This gives each size a real number to show: the price outright when
+  // every duration charges the same for it, or "from $X" (the cheapest)
+  // when durations differ - either way, never just a bare label.
+  function priceHintForLessonsCount(count: number): string {
+    const matching = count === 1 ? durations : durations.filter((d) => d.packages.some((p) => p.lessonsCount === count));
+    const prices = matching.map((d) =>
+      count === 1 ? d.singlePriceCents : d.packages.find((p) => p.lessonsCount === count)!.priceCents
+    );
+    if (prices.length === 0) return "";
+    const min = Math.min(...prices);
+    const allSame = prices.every((p) => p === min);
+    return allSame ? ` - ${centsToDollars(min)}` : ` - from ${centsToDollars(min)}`;
+  }
 
   // An instructor's custom offerings (see Membership.customOffering1-6 in
   // schema.prisma) - standalone, flat-priced items with no duration or
@@ -711,6 +774,26 @@ export default function BookingClient({
     : null;
   // Either an owned package with credits, or a tier chosen to buy - either is enough to pick a slot, but only once an instructor is chosen too.
   const canPickLessonSlot = !!selectedInstructorId && ((!!selectedPackage && (selectedPackage.rawLessonsRemaining ?? selectedPackage.lessonsRemaining) > 0) || !!pendingPackageType || !!pendingDurationId || !!pendingCustomOfferingSlot);
+  // The Confirm/Pay & Confirm button used to just sit disabled with no
+  // explanation when something was missing - to someone who hadn't
+  // noticed a required field, tapping it looked like the app did nothing
+  // at all. This works out which specific thing to fix first, in the
+  // order a player would naturally fill the form in, so the button can
+  // stay clickable and actually say what's wrong instead of just refusing.
+  function bookingIssue(): string | null {
+    if (!selectedInstructorId) return "Choose an instructor first.";
+    if (service === "lesson") {
+      if (!canPickLessonSlot) return "Choose a lesson option above first.";
+      if (!selected) return "Pick an open time slot on the calendar.";
+    } else {
+      if (!fittingType) return "Choose a fitting type first.";
+      if (!selected) return "Pick an open time slot on the calendar.";
+    }
+    if (!contact.name.trim()) return "Enter your name to continue.";
+    if (!contact.phone.trim()) return "Enter your phone number to continue.";
+    if (!isValidEmail(contact.email)) return "Enter a valid email address to continue.";
+    return null;
+  }
   const isBuyingPackage = !selectedPackage && (!!pendingPackageType || !!pendingDurationId || !!pendingCustomOfferingSlot);
   const pendingCustomOfferingInfo = selectedCustomOffering
     ? { label: selectedCustomOffering.name!, priceCents: selectedCustomOffering.priceCents ?? 0 }
@@ -771,16 +854,18 @@ export default function BookingClient({
               }}>
                 Gift Cards
               </a>
-              <a href={`${basePath}/messages`} style={{
-                position: "relative", fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
-                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
-              }}>
-                Messages
-                {unreadMessages > 0 && (
-                  <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#B8862B", border: "1px solid var(--fairway)" }} />
-                )}
-              </a>
-              {!isNative && !isSandboxPreview && (
+              {isSignedIn && (
+                <a href={`${basePath}/messages`} style={{
+                  position: "relative", fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                  border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                }}>
+                  Messages
+                  {unreadMessages > 0 && (
+                    <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#B8862B", border: "1px solid var(--fairway)" }} />
+                  )}
+                </a>
+              )}
+              {isSignedIn && !isNative && !isSandboxPreview && (
                 <a href={`${basePath}/settings`} style={{
                   fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                   border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
@@ -794,12 +879,24 @@ export default function BookingClient({
               }}>
                 Find a Pro
               </a>
-              <button onClick={() => signOut({ callbackUrl: "/login" })} style={{
-                background: "none", color: "#D7DED9", fontSize: 12.5, fontWeight: 600,
-                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
-              }}>
-                Sign out
-              </button>
+              {isSignedIn ? (
+                <button onClick={() => signOut({ callbackUrl: "/login" })} style={{
+                  background: "none", color: "#D7DED9", fontSize: 12.5, fontWeight: 600,
+                  border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                }}>
+                  Sign out
+                </button>
+              ) : (
+                <a
+                  href={`/login?callbackUrl=${encodeURIComponent(`${basePath}/book`)}`}
+                  style={{
+                    background: "none", color: "#D7DED9", fontSize: 12.5, fontWeight: 600, textDecoration: "none",
+                    border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+                  }}
+                >
+                  Sign in
+                </a>
+              )}
             </div>
           </div>
           <h1 className="display" style={{ fontSize: 26, margin: "0 0 4px" }}>
@@ -989,7 +1086,7 @@ export default function BookingClient({
                     >
                       <option value="" disabled>Choose an option…</option>
                       {availableLessonsCounts.map((count) => (
-                        <option key={count} value={count}>{count === 1 ? "Single lesson" : `${count}-pack`}</option>
+                        <option key={count} value={count}>{count === 1 ? "Single lesson" : `${count}-pack`}{priceHintForLessonsCount(count)}</option>
                       ))}
                       {activeCustomOfferings.map((o) => (
                         <option key={`custom-${o.slot}`} value={`custom-${o.slot}`}>{o.name} - {centsToDollars(o.priceCents ?? 0)}</option>
@@ -1416,7 +1513,13 @@ export default function BookingClient({
             {new Date(weekStart.getTime() + 6 * DAY_MS).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => setWeekStart(new Date(weekStart.getTime() - 7 * DAY_MS))} style={navBtnStyle}>Prev</button>
+            <button
+              onClick={() => setWeekStart(new Date(weekStart.getTime() - 7 * DAY_MS))}
+              disabled={weekStart.getTime() <= todayStart.getTime()}
+              style={{ ...navBtnStyle, opacity: weekStart.getTime() <= todayStart.getTime() ? 0.4 : 1 }}
+            >
+              Prev
+            </button>
             <button onClick={() => setWeekStart(new Date(weekStart.getTime() + 7 * DAY_MS))} style={navBtnStyle}>Next</button>
           </div>
         </div>
@@ -1437,8 +1540,13 @@ export default function BookingClient({
                       const [h, m] = time.split(":").map(Number);
                       // Timezone-safe conversion - see lib/time.ts. Naive
                       // setHours() here is what caused this same lookup to
-                      // silently miss most slots.
-                      const dt = wallClockToUTC(dayDate, h, m);
+                      // silently miss most slots. Uses the business's own
+                      // configured timezone (Settings > Timezone) instead
+                      // of silently defaulting to Eastern, which is what
+                      // made BookMyPro's calendar disagree with a
+                      // business's real Google Calendar whenever the two
+                      // aren't the same zone.
+                      const dt = wallClockToUTC(dayDate, h, m, business.timezone);
                       const key = dt.toISOString();
                       const slot = slotsByKey[key];
                       if (!slot) return null;
@@ -1462,19 +1570,34 @@ export default function BookingClient({
                         : slot.bookedIsRemote
                         ? "var(--remote)"
                         : "var(--fairway)";
+                      // An "open" slot that can't be picked right now (too
+                      // soon, or a service/instructor hasn't been chosen
+                      // yet) was falling into the same closed/greyed-out
+                      // look as a slot the instructor genuinely blocked -
+                      // a player had no way to tell "not available" from
+                      // "available, just pick a service first". Open slots
+                      // now always keep the open color; only their opacity
+                      // drops while they're not yet pickable, so they read
+                      // as available-but-not-ready rather than unavailable.
+                      const background = isSelected
+                        ? "var(--gold)"
+                        : slot.isGroup
+                        ? (isGroupJoinable ? "#E4E1FF" : "#5A4FCF")
+                        : isBooked ? bookedBg
+                        : isPending ? "#FBF3DE"
+                        : isOpen ? "var(--open)"
+                        : "var(--closed)";
                       return (
                         <button
                           key={time}
                           disabled={!canPick}
                           onClick={() => setSelected(isSelected ? null : slot)}
+                          title={isOpen && !canPick ? (isTooSoon ? "Too close to book online - contact the instructor directly" : "Choose a service above to book this time") : undefined}
                           style={{
                             padding: "8px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                             border: isPending ? "1px dashed #B8862B" : "none",
-                            background: isSelected
-                              ? "var(--gold)"
-                              : slot.isGroup
-                              ? (isGroupJoinable ? "#E4E1FF" : "#5A4FCF")
-                              : canPick ? "var(--open)" : isBooked ? bookedBg : isPending ? "#FBF3DE" : "var(--closed)",
+                            background,
+                            opacity: isOpen && !canPick ? 0.5 : 1,
                             color: isSelected ? "#FFF" : (isBooked || (slot.isGroup && !isGroupJoinable)) ? "var(--chalk)" : "var(--ink)",
                             cursor: canPick ? "pointer" : "default",
                           }}
@@ -1659,8 +1782,12 @@ export default function BookingClient({
             </div>
 
             <button
-              onClick={service === "lesson" ? (isBuyingPackage ? buyPackageAndBookSlot : bookLesson) : bookFitting}
-              disabled={confirming || !contactValid() || !selectedInstructorId || (service === "lesson" && !canPickLessonSlot)}
+              onClick={() => {
+                const issue = bookingIssue();
+                if (issue) { setMessage(issue); return; }
+                (service === "lesson" ? (isBuyingPackage ? buyPackageAndBookSlot : bookLesson) : bookFitting)();
+              }}
+              disabled={confirming}
               style={{
                 width: "100%", background: "var(--gold)", color: "var(--fairway)", border: "none", borderRadius: 8,
                 padding: "10px 18px", fontWeight: 700, fontSize: 14,
@@ -1672,8 +1799,12 @@ export default function BookingClient({
 
             {service === "lesson" && isBuyingPackage && !pendingDurationId && business.allowPayLater && (
               <button
-                onClick={depositAndBookSlot}
-                disabled={confirming || !contactValid() || !selectedInstructorId}
+                onClick={() => {
+                  const issue = bookingIssue();
+                  if (issue) { setMessage(issue); return; }
+                  depositAndBookSlot();
+                }}
+                disabled={confirming}
                 style={{
                   width: "100%", background: "none", color: "var(--chalk)", border: "1px dashed rgba(255,255,255,0.4)",
                   borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 14, marginTop: 8,
@@ -1686,8 +1817,12 @@ export default function BookingClient({
 
             {service === "lesson" && isBuyingPackage && !pendingDurationId && business.allowClubBilling && (
               <button
-                onClick={clubBilledAndBookSlot}
-                disabled={confirming || !contactValid() || !selectedInstructorId}
+                onClick={() => {
+                  const issue = bookingIssue();
+                  if (issue) { setMessage(issue); return; }
+                  clubBilledAndBookSlot();
+                }}
+                disabled={confirming}
                 style={{
                   width: "100%", background: "none", color: "var(--chalk)", border: "1px dashed rgba(255,255,255,0.4)",
                   borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 14, marginTop: 8,
@@ -1739,12 +1874,4 @@ function urlBase64ToUint8Array(base64String: string) {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
-}
-
-function startOfWeek(d: Date) {
-  const date = new Date(d);
-  const day = date.getDay();
-  date.setDate(date.getDate() - ((day + 6) % 7));
-  date.setHours(0, 0, 0, 0);
-  return date;
 }
