@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getBusinessBySlug, getBusinessInstructors, getMembership } from "@/lib/tenant";
+import { getBusinessBySlug, getBusinessInstructors, getInstructorById, getMembership } from "@/lib/tenant";
 
 // GET /api/{slug}/instructors — publicly readable (no sign-in required):
 // the booking page needs to show who's available to book with before a
@@ -20,18 +20,25 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const wantsInactive = req.nextUrl.searchParams.get("includeInactive") === "true";
   const includeInactive = wantsInactive && requesterMembership?.role === "owner";
 
-  let instructors = await getBusinessInstructors(business.id, includeInactive);
-  // A player (or anyone not on staff) never sees a hidden instructor at
-  // all - owner/instructor accounts still see everyone, since they're the
-  // ones who'd need to manage or work alongside a hidden entry.
-  if (!isStaff) instructors = instructors.filter((m) => !m.hiddenFromBooking);
+  let instructors;
   // A sandbox prospect (see sandbox-links/quick) is a throwaway preview
   // account, not a real hire - it shouldn't see the real team's names and
   // emails in Settings any more than it should see real customers (see the
   // same gate in players/route.ts). It only sees itself, same as a brand
   // new instructor would with no other teammates yet.
+  //
+  // getBusinessInstructors always excludes sandbox-prospect rows entirely
+  // (see lib/tenant.ts), including the requester's own - so it can't be
+  // filtered down to "just them", it has to be fetched separately.
   if (requesterMembership?.isSandboxProspect) {
-    instructors = instructors.filter((m) => m.id === requesterMembership.id);
+    const self = await getInstructorById(business.id, requesterMembership.id);
+    instructors = self ? [self] : [];
+  } else {
+    instructors = await getBusinessInstructors(business.id, includeInactive);
+    // A player (or anyone not on staff) never sees a hidden instructor at
+    // all - owner/instructor accounts still see everyone, since they're the
+    // ones who'd need to manage or work alongside a hidden entry.
+    if (!isStaff) instructors = instructors.filter((m) => !m.hiddenFromBooking);
   }
 
   const shaped = instructors.map((m) => ({

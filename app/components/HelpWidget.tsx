@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 // A simple, floating "Help" button and question panel - genuinely just
 // answers questions and points someone to the right screen, it never
@@ -12,6 +15,18 @@ export default function HelpWidget({ apiBase }: { apiBase: string }) {
   const [answer, setAnswer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  // The button sits bottom-right by default, but that's exactly where the
+  // real native app's tab bar (and its sandbox-preview stand-in, see
+  // FakeNativeTabBar) already puts the Settings tab - without this, the
+  // Help button sits right on top of it, un-tappable. Lifting the button
+  // above whichever bar is actually showing keeps both reachable.
+  const isSandboxPreview = useSandboxPreview();
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
+  const clearsTabBar = isNative || isSandboxPreview;
+  const buttonBottom = clearsTabBar ? 20 + FAKE_TAB_BAR_HEIGHT : 20;
 
   async function ask() {
     const q = question.trim();
@@ -49,7 +64,7 @@ export default function HelpWidget({ apiBase }: { apiBase: string }) {
       <button
         onClick={() => setOpen(true)}
         style={{
-          position: "fixed", bottom: 20, right: 20, zIndex: 150,
+          position: "fixed", bottom: buttonBottom, right: 20, zIndex: 150,
           background: "#1B3A2F", color: "#F6F4EE", border: "none", borderRadius: 999,
           padding: "12px 18px", fontWeight: 700, fontSize: 14, boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
           display: "flex", alignItems: "center", gap: 6,
