@@ -179,6 +179,11 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   const [respondingToRequest, setRespondingToRequest] = useState<string | null>(null);
   const [generatingSandboxId, setGeneratingSandboxId] = useState<string | null>(null);
   const [sandboxCopiedId, setSandboxCopiedId] = useState<string | null>(null);
+  // window.prompt's pre-filled default text isn't reliable on every
+  // browser (some show it blank), so a failed clipboard copy falls back
+  // to showing the link in an on-page selectable box instead - this holds
+  // that link while it's showing.
+  const [manualSandboxLink, setManualSandboxLink] = useState<string | null>(null);
   async function copySandboxLink(membershipId: string) {
     setGeneratingSandboxId(membershipId);
     try {
@@ -193,7 +198,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
         // The link is already generated server-side at this point - only the
         // clipboard step failed (common on Safari/iOS or with clipboard
         // permissions blocked). Don't throw the link away, just show it.
-        window.prompt("Couldn't copy automatically - here's the sandbox link, copy it manually:", data.url);
+        setManualSandboxLink(data.url);
       }
       loadSandboxLinks();
     } catch {
@@ -237,7 +242,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       } catch {
         // Same story - the link was already created, only the clipboard
         // write failed. Show it instead of losing it.
-        window.prompt("Couldn't copy automatically - here's the sandbox link, copy it manually:", data.url);
+        setManualSandboxLink(data.url);
         setQuickProspectName("");
       }
       loadSandboxLinks();
@@ -1293,6 +1298,29 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                 )
               )}
             </div>
+
+            {isOwner && manualSandboxLink && (
+              <div style={{ background: "#FFF9EC", border: "1px solid var(--gold)", borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Your sandbox link is ready</div>
+                <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 10px" }}>
+                  Couldn't copy it automatically - tap the box below, select all, and copy it manually.
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    readOnly
+                    value={manualSandboxLink}
+                    onFocus={(e) => e.currentTarget.select()}
+                    style={{ ...inputStyle, flex: 1, fontSize: 12 }}
+                  />
+                  <button
+                    onClick={() => setManualSandboxLink(null)}
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
 
             {isOwner && (
               <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
