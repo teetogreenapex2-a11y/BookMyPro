@@ -53,7 +53,7 @@ export default function HelpWidget({ apiBase }: { apiBase: string }) {
           // the status bar/notch on the native app (viewportFit: "cover"
           // in app/layout.tsx is what makes that value non-zero there);
           // it's just 0 on the regular website, so this is a no-op there.
-          position: "fixed", top: "calc(20px + env(safe-area-inset-top, 0px))", right: 20, zIndex: 150,
+          position: "fixed", top: "calc(4px + env(safe-area-inset-top, 0px))", right: 20, zIndex: 150,
           background: "#1B3A2F", color: "#F6F4EE", border: "none", borderRadius: 999,
           padding: "12px 18px", fontWeight: 700, fontSize: 14, boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
           display: "flex", alignItems: "center", gap: 6,
