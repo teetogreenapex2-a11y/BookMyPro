@@ -47,6 +47,9 @@ export async function createConnectedAccount(email: string) {
     body: JSON.stringify({
       contact_email: email,
       dashboard: "full",
+      // Required before Stripe will accept the merchant configuration at
+      // all - every connected business here operates in the US.
+      identity: { country: "us" },
       configuration: {
         merchant: {
           // Requesting card_payments is enough - v2 auto-activates payout
