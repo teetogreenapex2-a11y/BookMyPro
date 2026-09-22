@@ -1004,7 +1004,18 @@ export default function InstructorClient({
         </div>
       </header>
 
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: `22px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
+      {/* The review and note panels render at the very bottom of this page,
+          below the whole calendar grid - when either is open they're the
+          last thing in the document. With only the usual small bottom
+          padding, the page runs out of room to scroll before the panel's
+          top can actually reach the top of the screen (there's nothing
+          left below it to scroll past), so the auto-scroll above stops
+          short and cuts off whatever's at the bottom of the panel - the
+          note field, Cancel/Save buttons. Reserving a big chunk of extra
+          space below while either panel is open guarantees there's always
+          enough room to scroll the whole thing into view, regardless of
+          screen size; it disappears again once the panel closes. */}
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: `22px 20px ${(reviewingBooking || noteSlot) ? "70vh" : (isNative || isSandboxPreview) ? `${60 + FAKE_TAB_BAR_HEIGHT}px` : "60px"}` }}>
         {showSyncLog && (
           <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
             <div style={{ padding: "10px 16px", background: "#EFEBDD", fontSize: 13, fontWeight: 700 }}>

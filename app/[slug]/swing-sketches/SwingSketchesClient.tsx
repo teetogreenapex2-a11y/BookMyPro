@@ -61,7 +61,7 @@ export default function SwingSketchesClient({ slug, basePath, apiBase }: { slug:
         </div>
       </header>
 
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: `22px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: `22px 20px ${(isNative || isSandboxPreview) ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
         {loading ? (
           <p style={{ color: "var(--muted)", fontSize: 14 }}>Loading...</p>
         ) : sketches.length === 0 ? (

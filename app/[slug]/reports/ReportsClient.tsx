@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
+import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 type InstructorFigure = { instructorMembershipId: string; name: string; revenueCents: number; count: number };
 type PeriodFigures = {
@@ -27,6 +30,16 @@ export default function ReportsClient({
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isSandboxPreview = useSandboxPreview();
+  // This page only ever checked for a sandbox preview, never whether it
+  // was actually running in the native app - so on a real device it got
+  // only the small web amount of bottom padding, with nothing reserved
+  // for the app's own tab bar, and the bottom of the page sat right
+  // underneath it with no way to scroll it fully into view.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
 
   useEffect(() => {
     load();
@@ -104,7 +117,7 @@ export default function ReportsClient({
         </div>
       </header>
 
-      <main style={{ maxWidth: 560, margin: "0 auto", padding: "20px 20px 60px" }}>
+      <main style={{ maxWidth: 560, margin: "0 auto", padding: `20px 20px ${(isNative || isSandboxPreview) ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
         {loading ? (
           <p style={{ color: "var(--muted)" }}>Loading…</p>
         ) : error ? (
@@ -122,6 +135,7 @@ export default function ReportsClient({
           </>
         ) : null}
       </main>
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="calendar" />}
     </div>
   );
 }

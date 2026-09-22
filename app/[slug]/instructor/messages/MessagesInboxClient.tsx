@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
 import { useSandboxPreview } from "@/lib/sandboxPreview";
 
@@ -10,6 +11,15 @@ export default function MessagesInboxClient({ apiBase, basePath }: { apiBase: st
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const isSandboxPreview = useSandboxPreview();
+  // This page only ever checked for a sandbox preview, never whether it
+  // was actually running in the native app - so on a real device it got
+  // only the small web amount of bottom padding, with nothing reserved
+  // for the app's own tab bar, and the last conversation in the list sat
+  // right underneath it with no way to scroll it fully into view.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
 
   useEffect(() => {
     load();
@@ -24,7 +34,7 @@ export default function MessagesInboxClient({ apiBase, basePath }: { apiBase: st
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F6F4EE", padding: `20px 20px ${isSandboxPreview ? 20 + FAKE_TAB_BAR_HEIGHT : 20}px`, fontFamily: "sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#F6F4EE", padding: `20px 20px ${isNative ? 92 : isSandboxPreview ? 20 + FAKE_TAB_BAR_HEIGHT : 20}px`, fontFamily: "sans-serif" }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
           <a href={`${basePath}/instructor`} style={{ color: "#1B3A2F", textDecoration: "none", fontSize: 20 }}>&larr;</a>
@@ -64,7 +74,7 @@ export default function MessagesInboxClient({ apiBase, basePath }: { apiBase: st
           </div>
         )}
       </div>
-      {isSandboxPreview && <FakeNativeTabBar basePath={basePath} activeKey="calendar" />}
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="calendar" />}
     </div>
   );
 }

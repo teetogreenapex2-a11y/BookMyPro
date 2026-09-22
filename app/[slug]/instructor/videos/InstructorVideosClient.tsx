@@ -250,7 +250,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
         </div>
       </header>
 
-      <main style={{ maxWidth: 800, margin: "0 auto", padding: `0 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px`, background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh" }}>
+      <main style={{ maxWidth: 800, margin: "0 auto", padding: `0 20px ${(isNative || isSandboxPreview) ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px`, background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh" }}>
         <div style={{ paddingTop: 20 }}>
           <button
             onClick={() => { setUploadOpen((o) => !o); setUploadError(null); }}

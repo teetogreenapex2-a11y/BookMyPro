@@ -1268,7 +1268,7 @@ export default function BookingClient({
         </div>
       </header>
 
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: `22px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: `22px 20px ${(isNative || isSandboxPreview) ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
         {message && (
           <div ref={messageRef} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 16, fontSize: 13 }}>
             {message}{" "}

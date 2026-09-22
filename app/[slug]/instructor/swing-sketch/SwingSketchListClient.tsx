@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { Capacitor } from "@capacitor/core";
 import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
 import { useSandboxPreview } from "@/lib/sandboxPreview";
 
@@ -10,6 +11,15 @@ type Sketch = { id: string; imageUrl: string; label: string | null; playerName: 
 
 export default function SwingSketchListClient({ slug, basePath, apiBase }: { slug: string; basePath: string; apiBase: string }) {
   const isSandboxPreview = useSandboxPreview();
+  // This page only ever checked for a sandbox preview, never whether it
+  // was actually running in the native app - so on a real device it got
+  // only the small web amount of bottom padding, with nothing reserved
+  // for the app's own tab bar, and the last sketch in the list sat right
+  // underneath it with no way to scroll it fully into view.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
   const [sketches, setSketches] = useState<Sketch[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +50,7 @@ export default function SwingSketchListClient({ slug, basePath, apiBase }: { slu
         </div>
       </header>
 
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: `0 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px`, background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh", paddingTop: 20 }}>
+      <main style={{ maxWidth: 720, margin: "0 auto", padding: `0 20px ${(isNative || isSandboxPreview) ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px`, background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh", paddingTop: 20 }}>
         {!pickerOpen ? (
           <button
             onClick={() => setPickerOpen(true)}
@@ -100,7 +110,7 @@ export default function SwingSketchListClient({ slug, basePath, apiBase }: { slu
           </div>
         )}
       </main>
-      {isSandboxPreview && <FakeNativeTabBar basePath={basePath} activeKey="swingsketch" />}
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="swingsketch" />}
     </div>
   );
 }

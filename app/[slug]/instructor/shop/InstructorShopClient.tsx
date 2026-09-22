@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import type { CSSProperties } from "react";
+import { Capacitor } from "@capacitor/core";
 import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
 import { useSandboxPreview } from "@/lib/sandboxPreview";
 
@@ -40,6 +41,15 @@ export default function InstructorShopClient({ slug, basePath, apiBase }: { slug
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const isSandboxPreview = useSandboxPreview();
+  // This page only ever checked for a sandbox preview, never whether it
+  // was actually running in the native app - so on a real device it got
+  // only the small web amount of bottom padding, with nothing reserved
+  // for the app's own tab bar, and the bottom of the page sat right
+  // underneath it with no way to scroll it fully into view.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
 
   function load() {
     fetch(`${apiBase}/products`).then((r) => r.json()).then((list) => setProducts(Array.isArray(list) ? list : []));
@@ -140,7 +150,7 @@ export default function InstructorShopClient({ slug, basePath, apiBase }: { slug
         </div>
       </header>
 
-      <main style={{ maxWidth: 800, margin: "0 auto", padding: `20px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px`, background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh" }}>
+      <main style={{ maxWidth: 800, margin: "0 auto", padding: `20px 20px ${(isNative || isSandboxPreview) ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px`, background: "var(--chalk)", borderRadius: "16px 16px 0 0", minHeight: "60vh" }}>
         {loading ? (
           <p style={{ fontSize: 13, color: "var(--faint)" }}>Loading…</p>
         ) : tab === "products" ? (
@@ -242,7 +252,7 @@ export default function InstructorShopClient({ slug, basePath, apiBase }: { slug
           </>
         )}
       </main>
-      {isSandboxPreview && <FakeNativeTabBar basePath={basePath} activeKey="calendar" />}
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="calendar" />}
     </div>
   );
 }
