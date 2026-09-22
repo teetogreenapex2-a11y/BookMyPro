@@ -169,7 +169,7 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       setDisconnectingGoogleCal(false);
     }
   }
-  const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; chargesEnabled: boolean; detailsSubmitted?: boolean; error?: boolean } | null>(null);
+  const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; chargesEnabled: boolean; detailsSubmitted?: boolean; error?: boolean; needsReconnect?: boolean } | null>(null);
   const [squareStatus, setSquareStatus] = useState<{ connected: boolean; expired: boolean; error?: boolean } | null>(null);
   const [googleCalStatus, setGoogleCalStatus] = useState<{ connected: boolean; error?: boolean } | null>(null);
   const [disconnectingGoogleCal, setDisconnectingGoogleCal] = useState(false);
@@ -872,14 +872,18 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: stripeStatus.connected ? "#C99A2E" : "#B23A3A" }} />
                     <span style={{ fontSize: 13, fontWeight: 600 }}>
-                      {stripeStatus.connected ? "Setup incomplete — payments aren't accepted yet" : "Not connected — payments won't work until this is set up"}
+                      {stripeStatus.needsReconnect
+                        ? "Connection lost — Stripe disconnected this account, reconnect to keep accepting payments"
+                        : stripeStatus.connected
+                        ? "Setup incomplete — payments aren't accepted yet"
+                        : "Not connected — payments won't work until this is set up"}
                     </span>
                   </div>
                   <a href={`${apiBase}/stripe/connect`} style={{
                     display: "inline-block", background: "var(--fairway)", color: "var(--chalk)", fontWeight: 700,
                     fontSize: 13, padding: "8px 14px", borderRadius: 8, textDecoration: "none",
                   }}>
-                    {stripeStatus.connected ? "Finish Stripe setup" : "Connect Stripe"}
+                    {stripeStatus.needsReconnect ? "Reconnect Stripe" : stripeStatus.connected ? "Finish Stripe setup" : "Connect Stripe"}
                   </a>
                 </div>
               )}
