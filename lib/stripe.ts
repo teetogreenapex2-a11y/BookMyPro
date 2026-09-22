@@ -28,10 +28,14 @@ export async function createConnectedAccount(email: string) {
   // directly. stripe-node@16 (the version installed here) has no v2 client,
   // hence the raw fetch rather than an SDK method.
   //
-  // dashboard: "express" + fees_collector/losses_collector: "application" is
-  // v2's equivalent of the old `type: "express"` Express account: your
-  // platform (not Stripe) is on the hook for a connected account's negative
-  // balance, same as before. See
+  // dashboard: "express" only works when the *platform* carries a connected
+  // account's losses (`losses_collector: "application"`) - and this
+  // platform isn't (yet) approved by Stripe for that: it rejects
+  // "application" outright with account_creation_losses_collector_unavailable,
+  // insisting Stripe itself carry the risk instead ("stripe"). Since
+  // "stripe"-carried losses isn't compatible with the Express dashboard,
+  // connected accounts get the full Stripe Dashboard instead until this
+  // platform is approved for platform-carried losses. See
   // https://docs.stripe.com/connect/accounts-v2/connected-account-configuration
   const res = await fetch("https://api.stripe.com/v2/core/accounts", {
     method: "POST",
@@ -42,7 +46,7 @@ export async function createConnectedAccount(email: string) {
     },
     body: JSON.stringify({
       contact_email: email,
-      dashboard: "express",
+      dashboard: "full",
       configuration: {
         merchant: {
           // Requesting card_payments is enough - v2 auto-activates payout
@@ -55,8 +59,12 @@ export async function createConnectedAccount(email: string) {
       },
       defaults: {
         responsibilities: {
-          fees_collector: "application",
-          losses_collector: "application",
+          // No platform fee is charged today (see README - not yet wired
+          // up), so "stripe" here just means Stripe deducts its normal
+          // processing fee from the connected account directly, matching
+          // existing checkout code that never sets application_fee_amount.
+          fees_collector: "stripe",
+          losses_collector: "stripe",
         },
       },
     }),
