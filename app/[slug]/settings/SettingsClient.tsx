@@ -169,11 +169,11 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
       setDisconnectingGoogleCal(false);
     }
   }
-  const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; chargesEnabled: boolean; detailsSubmitted?: boolean } | null>(null);
-  const [squareStatus, setSquareStatus] = useState<{ connected: boolean; expired: boolean } | null>(null);
-  const [googleCalStatus, setGoogleCalStatus] = useState<{ connected: boolean } | null>(null);
+  const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; chargesEnabled: boolean; detailsSubmitted?: boolean; error?: boolean } | null>(null);
+  const [squareStatus, setSquareStatus] = useState<{ connected: boolean; expired: boolean; error?: boolean } | null>(null);
+  const [googleCalStatus, setGoogleCalStatus] = useState<{ connected: boolean; error?: boolean } | null>(null);
   const [disconnectingGoogleCal, setDisconnectingGoogleCal] = useState(false);
-  const [outlookStatus, setOutlookStatus] = useState<{ connected: boolean } | null>(null);
+  const [outlookStatus, setOutlookStatus] = useState<{ connected: boolean; error?: boolean } | null>(null);
   const [team, setTeam] = useState<{ id: string; name: string | null; email: string; role: string; [key: string]: any }[]>([]);
   const [pendingRequests, setPendingRequests] = useState<{ id: string; name: string | null; email: string; requestedAt: string }[]>([]);
   const [respondingToRequest, setRespondingToRequest] = useState<string | null>(null);
@@ -549,12 +549,38 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
     }
   }
 
+  // A failed fetch here used to be swallowed by an empty .catch(), so the
+  // status state stayed null forever and the page showed "Checking
+  // status..." with no way out — even though the server had already
+  // answered (or failed to). Now a failure sets an explicit error flag so
+  // the UI can show a real message and a way to retry instead of hanging.
+  function loadStripeStatus() {
+    setStripeStatus(null);
+    fetch(`${apiBase}/stripe/status`).then((r) => r.json()).then(setStripeStatus)
+      .catch(() => setStripeStatus({ connected: false, chargesEnabled: false, error: true }));
+  }
+  function loadSquareStatus() {
+    setSquareStatus(null);
+    fetch(`${apiBase}/square/status`).then((r) => r.json()).then(setSquareStatus)
+      .catch(() => setSquareStatus({ connected: false, expired: false, error: true }));
+  }
+  function loadGoogleCalStatus() {
+    setGoogleCalStatus(null);
+    fetch(`${apiBase}/calendar/status`).then((r) => r.json()).then(setGoogleCalStatus)
+      .catch(() => setGoogleCalStatus({ connected: false, error: true }));
+  }
+  function loadOutlookStatus() {
+    setOutlookStatus(null);
+    fetch(`${apiBase}/calendar/outlook/status`).then((r) => r.json()).then(setOutlookStatus)
+      .catch(() => setOutlookStatus({ connected: false, error: true }));
+  }
+
   useEffect(() => {
     if (isInstructor && tab === "business") {
-      fetch(`${apiBase}/stripe/status`).then((r) => r.json()).then(setStripeStatus).catch(() => {});
-      fetch(`${apiBase}/square/status`).then((r) => r.json()).then(setSquareStatus).catch(() => {});
-      fetch(`${apiBase}/calendar/status`).then((r) => r.json()).then(setGoogleCalStatus).catch(() => {});
-      fetch(`${apiBase}/calendar/outlook/status`).then((r) => r.json()).then(setOutlookStatus).catch(() => {});
+      loadStripeStatus();
+      loadSquareStatus();
+      loadGoogleCalStatus();
+      loadOutlookStatus();
       loadTeam();
       if (isOwner) {
         loadPendingRequests();
@@ -786,6 +812,18 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               {biz.paymentProvider === "square" ? (
                 squareStatus === null ? (
                   <p style={{ fontSize: 13, color: "var(--faint)" }}>Checking status…</p>
+                ) : squareStatus.error ? (
+                  <div>
+                    <p style={{ fontSize: 13, color: "#B23A3A", margin: "0 0 8px" }}>
+                      Couldn't check Square's status right now.
+                    </p>
+                    <button onClick={loadSquareStatus} style={{
+                      background: "none", border: "1px solid var(--border)", borderRadius: 8,
+                      padding: "7px 12px", fontSize: 12.5, fontWeight: 700, color: "var(--ink)",
+                    }}>
+                      Try again
+                    </button>
+                  </div>
                 ) : squareStatus.connected && !squareStatus.expired ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3E7A56" }} />
@@ -812,6 +850,18 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                 )
               ) : stripeStatus === null ? (
                 <p style={{ fontSize: 13, color: "var(--faint)" }}>Checking status…</p>
+              ) : stripeStatus.error ? (
+                <div>
+                  <p style={{ fontSize: 13, color: "#B23A3A", margin: "0 0 8px" }}>
+                    Couldn't check Stripe's status right now.
+                  </p>
+                  <button onClick={loadStripeStatus} style={{
+                    background: "none", border: "1px solid var(--border)", borderRadius: 8,
+                    padding: "7px 12px", fontSize: 12.5, fontWeight: 700, color: "var(--ink)",
+                  }}>
+                    Try again
+                  </button>
+                </div>
               ) : stripeStatus.chargesEnabled ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3E7A56" }} />
@@ -861,6 +911,18 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
               {biz.calendarProvider === "outlook" ? (
                 outlookStatus === null ? (
                   <p style={{ fontSize: 13, color: "var(--faint)" }}>Checking status…</p>
+                ) : outlookStatus.error ? (
+                  <div>
+                    <p style={{ fontSize: 13, color: "#B23A3A", margin: "0 0 8px" }}>
+                      Couldn't check Outlook's status right now.
+                    </p>
+                    <button onClick={loadOutlookStatus} style={{
+                      background: "none", border: "1px solid var(--border)", borderRadius: 8,
+                      padding: "7px 12px", fontSize: 12.5, fontWeight: 700, color: "var(--ink)",
+                    }}>
+                      Try again
+                    </button>
+                  </div>
                 ) : outlookStatus.connected ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3E7A56" }} />
@@ -882,6 +944,18 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                 )
               ) : googleCalStatus === null ? (
                 <p style={{ fontSize: 13, color: "var(--faint)" }}>Checking status…</p>
+              ) : googleCalStatus.error ? (
+                <div>
+                  <p style={{ fontSize: 13, color: "#B23A3A", margin: "0 0 8px" }}>
+                    Couldn't check Google Calendar's status right now.
+                  </p>
+                  <button onClick={loadGoogleCalStatus} style={{
+                    background: "none", border: "1px solid var(--border)", borderRadius: 8,
+                    padding: "7px 12px", fontSize: 12.5, fontWeight: 700, color: "var(--ink)",
+                  }}>
+                    Try again
+                  </button>
+                </div>
               ) : googleCalStatus.connected ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3E7A56" }} />
