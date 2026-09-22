@@ -27,7 +27,10 @@ export async function createConnectedAccount(email: string) {
     controller: {
       stripe_dashboard: { type: "express" },
       fees: { payer: "application" },
-      losses: { payments: "stripe" },
+      // Stripe requires the platform (not Stripe) to carry losses whenever
+      // the connected account uses the Express dashboard - "stripe" here
+      // is only valid for the fully Stripe-hosted "none" dashboard type.
+      losses: { payments: "application" },
     },
     email,
     capabilities: {
