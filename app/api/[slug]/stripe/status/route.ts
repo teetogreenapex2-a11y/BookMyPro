@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
-import { getAccountStatus } from "@/lib/stripe";
+import { getAccountStatus, isAccountAccessError } from "@/lib/stripe";
+import { prisma } from "@/lib/prisma";
 
 // GET /api/{slug}/stripe/status — used by Settings to show whether payments
 // are actually ready to accept money yet (an Express account can exist
@@ -21,6 +22,20 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
     return NextResponse.json({ connected: false, chargesEnabled: false });
   }
 
-  const status = await getAccountStatus(business.stripeAccountId);
-  return NextResponse.json({ connected: true, ...status });
+  try {
+    const status = await getAccountStatus(business.stripeAccountId);
+    return NextResponse.json({ connected: true, ...status });
+  } catch (err: any) {
+    if (isAccountAccessError(err)) {
+      // Stripe has cut the platform off from this specific account - most
+      // often because the merchant disconnected the app from their own
+      // Stripe dashboard, or the account was closed. Clear the stale id so
+      // "Connect Stripe" mints a fresh account instead of retrying a dead
+      // one forever.
+      await prisma.business.update({ where: { id: business.id }, data: { stripeAccountId: null } });
+      return NextResponse.json({ connected: false, chargesEnabled: false, needsReconnect: true });
+    }
+    console.error("Failed to load Stripe account status:", err);
+    return NextResponse.json({ error: "Couldn't check Stripe's status right now." }, { status: 500 });
+  }
 }

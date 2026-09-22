@@ -49,6 +49,15 @@ export async function getAccountStatus(accountId: string) {
   };
 }
 
+// True when Stripe is saying the platform's API key simply can't reach this
+// connected account anymore - the merchant disconnected the app from their
+// own Stripe dashboard, or the account was closed. Not a transient failure:
+// retrying with the same account id will keep failing, so callers should
+// treat this as "the stored account id is dead" rather than "try again".
+export function isAccountAccessError(err: any) {
+  return err?.code === "account_invalid" || err?.type === "StripePermissionError";
+}
+
 // --- Platform billing (BookMyPro's own subscription revenue) ---
 // Deliberately separate section from everything above - every function
 // above either creates or acts on a business's own connected account
