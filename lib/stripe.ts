@@ -15,30 +15,62 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_place
 // { stripeAccount: business.stripeAccountId } as a request option), so the
 // connected account is the merchant of record.
 
+// Stripe API version for the v2 Core Accounts REST call below - separate
+// from the v1 `apiVersion` on the SDK client above, since v1 and v2 are
+// versioned independently.
+const STRIPE_V2_VERSION = "2026-08-26.dahlia";
+
 export async function createConnectedAccount(email: string) {
-  // Stripe retired creating Express accounts via the plain `type: "express"`
-  // shorthand for platforms on the newer Connect setup - it now requires
-  // spelling out who carries losses/fees and how the dashboard is exposed
-  // via `controller`, instead of inferring all of that from `type`. This is
-  // the direct replacement for the old `type: "express"` call, not a
-  // behavior change: same Express dashboard, same platform-pays-fees /
-  // platform-eats-losses model as before.
-  const account = await stripe.accounts.create({
-    controller: {
-      stripe_dashboard: { type: "express" },
-      fees: { payer: "application" },
-      // Stripe requires the platform (not Stripe) to carry losses whenever
-      // the connected account uses the Express dashboard - "stripe" here
-      // is only valid for the fully Stripe-hosted "none" dashboard type.
-      losses: { payments: "application" },
+  // This platform's Connect setup no longer allows creating accounts
+  // through the v1 Accounts API at all (every combination of the old
+  // `type`/`controller` fields got rejected, ending with Stripe's own
+  // message to switch to Accounts v2) - so this calls the v2 REST endpoint
+  // directly. stripe-node@16 (the version installed here) has no v2 client,
+  // hence the raw fetch rather than an SDK method.
+  //
+  // dashboard: "express" + fees_collector/losses_collector: "application" is
+  // v2's equivalent of the old `type: "express"` Express account: your
+  // platform (not Stripe) is on the hook for a connected account's negative
+  // balance, same as before. See
+  // https://docs.stripe.com/connect/accounts-v2/connected-account-configuration
+  const res = await fetch("https://api.stripe.com/v2/core/accounts", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+      "Stripe-Version": STRIPE_V2_VERSION,
+      "Content-Type": "application/json",
     },
-    email,
-    capabilities: {
-      card_payments: { requested: true },
-      transfers: { requested: true },
-    },
+    body: JSON.stringify({
+      contact_email: email,
+      dashboard: "express",
+      configuration: {
+        merchant: {
+          // Requesting card_payments is enough - v2 auto-activates payout
+          // capability (`stripe_balance.payouts`) alongside it, there's no
+          // separate "transfers" capability to request like in v1.
+          capabilities: {
+            card_payments: { requested: true },
+          },
+        },
+      },
+      defaults: {
+        responsibilities: {
+          fees_collector: "application",
+          losses_collector: "application",
+        },
+      },
+    }),
   });
-  return account.id;
+
+  const data = await res.json();
+  if (!res.ok) {
+    const err: any = new Error(data?.error?.message || "Failed to create Stripe account");
+    err.code = data?.error?.code;
+    err.type = data?.error?.type;
+    err.raw = data?.error;
+    throw err;
+  }
+  return data.id as string;
 }
 
 // Account Links are per-session and don't need to be pre-registered
