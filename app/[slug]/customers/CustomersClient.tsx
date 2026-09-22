@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
 import { useSandboxPreview } from "@/lib/sandboxPreview";
 import "./customers.css";
@@ -34,6 +35,15 @@ export default function CustomersClient({
   customers: initialCustomers, slug, basePath, apiBase, isOwner, instructors,
 }: { customers: Customer[]; slug: string; basePath: string; apiBase: string; isOwner: boolean; instructors: Instructor[] }) {
   const isSandboxPreview = useSandboxPreview();
+  // This page never checked whether it was actually running in the native
+  // app - only whether it was a sandbox preview - so on a real device the
+  // list got only the small web amount of bottom padding, with nothing
+  // reserved for the real app's tab bar. The last customer ended up
+  // sitting right underneath it, uncoverable by scrolling any further.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(Capacitor.isNativePlatform());
+  }, []);
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "remaining">("name");
   const [instructorFilter, setInstructorFilter] = useState<string>("all");
@@ -485,7 +495,7 @@ export default function CustomersClient({
         </div>
       </header>
 
-      <main style={{ maxWidth: 960, margin: "0 auto", padding: `20px 20px ${isSandboxPreview ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
+      <main style={{ maxWidth: 960, margin: "0 auto", padding: `20px 20px ${(isNative || isSandboxPreview) ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <div className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
             {filtered.length} shown
@@ -1024,7 +1034,7 @@ export default function CustomersClient({
           </div>
         )}
       </main>
-      {isSandboxPreview && <FakeNativeTabBar basePath={basePath} activeKey="customers" />}
+      {isSandboxPreview && !isNative && <FakeNativeTabBar basePath={basePath} activeKey="customers" />}
     </div>
   );
 }
