@@ -16,8 +16,19 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_place
 // connected account is the merchant of record.
 
 export async function createConnectedAccount(email: string) {
+  // Stripe retired creating Express accounts via the plain `type: "express"`
+  // shorthand for platforms on the newer Connect setup - it now requires
+  // spelling out who carries losses/fees and how the dashboard is exposed
+  // via `controller`, instead of inferring all of that from `type`. This is
+  // the direct replacement for the old `type: "express"` call, not a
+  // behavior change: same Express dashboard, same platform-pays-fees /
+  // platform-eats-losses model as before.
   const account = await stripe.accounts.create({
-    type: "express",
+    controller: {
+      stripe_dashboard: { type: "express" },
+      fees: { payer: "application" },
+      losses: { payments: "stripe" },
+    },
     email,
     capabilities: {
       card_payments: { requested: true },
