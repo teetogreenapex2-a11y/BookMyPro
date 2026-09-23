@@ -7,9 +7,19 @@ import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
 // DELETE /api/{slug}/players/{id}  ?force=true to proceed despite a warning
 // Removes the player's Membership at this business only - their User
 // account, and every booking/package/gift card/video tied to it, stay
-// completely intact. This just takes them off the active customer list;
-// it does not touch financial or booking history, which a real business
-// needs to keep regardless of whether someone's still an active customer.
+// completely intact (those key off userId, not membershipId). This just
+// takes them off the active customer list; it does not touch financial
+// or booking history, which a real business needs to keep regardless of
+// whether someone's still an active customer.
+//
+// A few things DO key off membershipId though, and have no cascade
+// delete set up in the schema: their message thread with the business
+// (Conversation/Message), and their push notification registrations
+// (PushSubscription/FcmToken). Deleting the Membership before cleaning
+// those up throws a foreign key constraint error (Prisma P2003) - this
+// used to be unhandled, so any customer who'd ever messaged the business
+// or had notifications enabled in the app couldn't be deleted at all,
+// failing with a raw 500 and no useful error.
 export async function DELETE(req: NextRequest, { params }: { params: { slug: string; id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
@@ -43,7 +53,18 @@ export async function DELETE(req: NextRequest, { params }: { params: { slug: str
     }
   }
 
-  await prisma.membership.delete({ where: { id: playerMembership.id } });
+  await prisma.$transaction([
+    prisma.pushSubscription.deleteMany({ where: { membershipId: playerMembership.id } }),
+    prisma.fcmToken.deleteMany({ where: { membershipId: playerMembership.id } }),
+    // Every message in this player's conversation with the business,
+    // whichever side sent it, plus the conversation itself - the
+    // fallback senderMembershipId clause is just in case any message
+    // this membership sent somehow isn't in that one conversation.
+    prisma.message.deleteMany({ where: { conversation: { playerMembershipId: playerMembership.id } } }),
+    prisma.message.deleteMany({ where: { senderMembershipId: playerMembership.id } }),
+    prisma.conversation.deleteMany({ where: { playerMembershipId: playerMembership.id } }),
+    prisma.membership.delete({ where: { id: playerMembership.id } }),
+  ]);
   return NextResponse.json({ deleted: true });
 }
 
