@@ -23,7 +23,7 @@ type Customer = {
   aiAnalysisEnabled: boolean;
 };
 
-type Instructor = { id: string; name: string };
+type Instructor = { id: string; name: string; membershipIds: string[] };
 
 type UpgradeTier = { id: string; label: string; lessons: number; priceCents: number };
 
@@ -397,13 +397,14 @@ export default function CustomersClient({
       (c) => !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
     );
     if (instructorFilter !== "all") {
-      rows = rows.filter((c) => c.packages.some((p) => p.instructorMembershipId === instructorFilter));
+      const ids = instructors.find((i) => i.id === instructorFilter)?.membershipIds || [instructorFilter];
+      rows = rows.filter((c) => c.packages.some((p) => !!p.instructorMembershipId && ids.includes(p.instructorMembershipId)));
     }
     rows = [...rows].sort((a, b) =>
       sortBy === "name" ? a.name.localeCompare(b.name) : b.totalLessonsRemaining - a.totalLessonsRemaining
     );
     return rows;
-  }, [customers, query, sortBy, instructorFilter]);
+  }, [customers, query, sortBy, instructorFilter, instructors]);
 
   const totalLessonsOutstanding = useMemo(
     () => customers.reduce((sum, c) => sum + c.totalLessonsRemaining, 0),

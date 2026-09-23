@@ -4,7 +4,12 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership, getBasePaths } from "@/lib/tenant";
 import { findPackage, findFitting, enabledPackages } from "@/lib/pricing";
+import { businessPageMetadata } from "@/lib/pageMetadata";
 import CustomersClient from "./CustomersClient";
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  return businessPageMetadata(params.slug, "Customers");
+}
 
 export default async function CustomersPage({ params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
@@ -125,7 +130,10 @@ export default async function CustomersPage({ params }: { params: { slug: string
 
     return {
       id: p.id,
-      name: p.name || "—",
+      // Empty, not "—": the client already shows a "No name set - click
+      // to add" prompt and email-based initials for a blank name, and a
+      // literal dash defeated both (cards showed "—" with a "–" avatar).
+      name: p.name || "",
       email: p.email,
       phone: p.phone || "—",
       packages,
@@ -137,6 +145,27 @@ export default async function CustomersPage({ params }: { params: { slug: string
     };
   });
 
+  // Filter chips: real, active staff only. instructorMemberships above is
+  // deliberately unfiltered (old packages still need their instructor's
+  // name/pricing looked up), but used directly for the chips it listed
+  // every sandbox-prospect placeholder plus duplicate memberships for the
+  // same person. Group by user so one chip covers all of a person's
+  // memberships, and filter packages against every one of those ids.
+  const chipMap = new Map<string, { id: string; name: string; membershipIds: string[] }>();
+  for (const m of instructorMemberships) {
+    if (m.isSandboxProspect || m.status !== "active") continue;
+    const existing = chipMap.get(m.userId);
+    if (existing) existing.membershipIds.push(m.id);
+    else chipMap.set(m.userId, { id: m.userId, name: m.user.name || m.user.email || "Instructor", membershipIds: [m.id] });
+  }
+  // Packages tied to a duplicate/inactive membership of the same person
+  // should still match that person's chip.
+  for (const m of instructorMemberships) {
+    const chip = chipMap.get(m.userId);
+    if (chip && !chip.membershipIds.includes(m.id)) chip.membershipIds.push(m.id);
+  }
+  const filterChips = Array.from(chipMap.values());
+
   return (
     <CustomersClient
       customers={customers}
@@ -144,7 +173,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
       basePath={basePath}
       apiBase={apiBase}
       isOwner={isOwner}
-      instructors={isOwner ? instructorMemberships.map((m) => ({ id: m.id, name: m.user.name || m.user.email })) : []}
+      instructors={isOwner ? filterChips : []}
     />
   );
 }
