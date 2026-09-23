@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import SwingCanvas, { SwingCanvasHandle } from "@/components/SwingCanvas";
-import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles, getShoulderWidth } from "@/lib/poseDetection";
+import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles, getShoulderWidth, getHipWidth } from "@/lib/poseDetection";
 import type { PoseAngle, Point } from "@/lib/poseDetection";
 import PoseAngleBadges from "@/components/PoseAngleBadges";
 
@@ -302,6 +302,9 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
   const lastAngleUpdateRef = useRef(0);
   const headReferenceRef = useRef<Point | null>(null);
   const maxShoulderWidthRef = useRef<number | null>(null);
+  const maxHipWidthRef = useRef<number | null>(null);
+  const hipReferenceRef = useRef<Point | null>(null);
+  const spineAngleReferenceRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = videoElRef.current;
@@ -317,6 +320,9 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
     let cancelled = false;
     headReferenceRef.current = null; // fresh reference each time the overlay is turned on
     maxShoulderWidthRef.current = null;
+    maxHipWidthRef.current = null;
+    hipReferenceRef.current = null;
+    spineAngleReferenceRef.current = null;
 
     (async () => {
       const landmarker = await getVideoPoseLandmarker();
@@ -342,15 +348,36 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
               if (sw && (!maxShoulderWidthRef.current || sw > maxShoulderWidthRef.current)) {
                 maxShoulderWidthRef.current = sw;
               }
+              const hw = getHipWidth(points);
+              if (hw && (!maxHipWidthRef.current || hw > maxHipWidthRef.current)) {
+                maxHipWidthRef.current = hw;
+              }
               const headRadiusOverride = maxShoulderWidthRef.current ? maxShoulderWidthRef.current * 0.3 : null;
               drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#EAE3D0", 3, headRadiusOverride);
               if (!headReferenceRef.current && points[12]) {
                 headReferenceRef.current = points[12];
               }
+              if (!hipReferenceRef.current && points[6] && points[7]) {
+                hipReferenceRef.current = { x: (points[6].x + points[7].x) / 2, y: (points[6].y + points[7].y) / 2 };
+              }
               const now = performance.now();
               if (now - lastAngleUpdateRef.current > 200) {
                 lastAngleUpdateRef.current = now;
-                setPoseAngles(computePoseAngles(points, lowConfidenceIndices, headReferenceRef.current));
+                const angles = computePoseAngles(points, lowConfidenceIndices, headReferenceRef.current, {
+                  maxShoulderWidth: maxShoulderWidthRef.current,
+                  maxHipWidth: maxHipWidthRef.current,
+                  hipReference: hipReferenceRef.current,
+                  spineAngleReference: spineAngleReferenceRef.current,
+                });
+                // Capture the address-position spine angle the first time
+                // it's measured, the same way headReference is captured
+                // above - so Posture change has a baseline to compare
+                // against on every later frame.
+                if (spineAngleReferenceRef.current == null) {
+                  const spineAngle = angles.find((a) => a.label === "Spine angle");
+                  if (spineAngle) spineAngleReferenceRef.current = spineAngle.value;
+                }
+                setPoseAngles(angles);
               }
             }
           }
@@ -381,7 +408,13 @@ function VideoTile({ participant, muted, showOverlay }: { participant: Participa
         <div style={{ position: "absolute", bottom: 6, left: 6, right: 6 }}>
           <PoseAngleBadges angles={poseAngles} dark />
           <button
-            onClick={() => { headReferenceRef.current = null; }}
+            onClick={() => {
+              headReferenceRef.current = null;
+              hipReferenceRef.current = null;
+              spineAngleReferenceRef.current = null;
+              maxShoulderWidthRef.current = null;
+              maxHipWidthRef.current = null;
+            }}
             style={{
               background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.3)", color: "#D7DED9",
               borderRadius: 6, padding: "3px 8px", fontSize: 10, fontWeight: 600,

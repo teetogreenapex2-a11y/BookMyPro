@@ -3,19 +3,117 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
+import { getVideoPoseLandmarker, extractPoseLandmarks, drawPoseSkeleton, computePoseAngles, getShoulderWidth, getHipWidth } from "@/lib/poseDetection";
+import type { PoseAngle, Point } from "@/lib/poseDetection";
+import PoseAngleBadges from "@/components/PoseAngleBadges";
 import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
 import { useSandboxPreview } from "@/lib/sandboxPreview";
 
 type Comment = { id: string; timestampSeconds: number; text: string };
 type Submission = {
   id: string; videoUrl: string; title: string | null; playerNote: string | null;
-  status: string; submittedAt: string; playerName: string; comments: Comment[];
+  status: string; submittedAt: string; playerName: string; playerId: string; comments: Comment[];
+  swingSessionId: string | null; angle: string | null;
 };
 
 function formatTimestamp(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+type ListEntryUnion =
+  | { kind: "single"; submission: { id: string; title: string | null; playerName: string } }
+  | { kind: "pair"; swingSessionId: string; a: { playerName: string }; b: { playerName: string } };
+
+function ListEntryButton({
+  entry, isSelected, onSelect, dimmed,
+}: { entry: ListEntryUnion; isSelected: boolean; onSelect: () => void; dimmed?: boolean }) {
+  const label = entry.kind === "single" ? (entry.submission.title || "Untitled video") : "🎥🎥 Two-camera swing";
+  const playerName = entry.kind === "single" ? entry.submission.playerName : entry.a.playerName;
+  return (
+    <button
+      onClick={onSelect}
+      style={{
+        textAlign: "left", background: isSelected ? "var(--open)" : "#FFF",
+        border: isSelected ? "1px solid var(--fairway)" : "1px solid var(--border)",
+        borderRadius: 8, padding: "8px 12px", opacity: dimmed ? 0.8 : 1,
+      }}
+    >
+      <div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div>
+      <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{playerName}</div>
+    </button>
+  );
+}
+
+function SwingSessionPairView({
+  videos, onReviewIndividually,
+}: { videos: Submission[]; onReviewIndividually: (id: string) => void }) {
+  const refA = useRef<HTMLVideoElement | null>(null);
+  const refB = useRef<HTMLVideoElement | null>(null);
+
+  // Ordered consistently (down-the-line first) regardless of which
+  // camera happened to upload first.
+  const sorted = [...videos].sort((a, b) => (a.angle === "down_the_line" ? -1 : 1));
+  const [a, b] = sorted;
+  if (!a || !b) return <p style={{ fontSize: 13, color: "var(--faint)" }}>Both angles aren't available for this swing yet.</p>;
+
+  function playBoth() {
+    refA.current?.play();
+    refB.current?.play();
+  }
+  function pauseBoth() {
+    refA.current?.pause();
+    refB.current?.pause();
+  }
+
+  function angleLabel(v: Submission) {
+    if (v.angle === "down_the_line") return "Down the line";
+    if (v.angle === "face_on") return "Face on";
+    return v.title || "Untitled";
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Two-camera swing</div>
+      <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 12 }}>
+        {a.playerName} - {new Date(a.submittedAt).toLocaleDateString()}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        <button
+          onClick={playBoth}
+          style={{ flex: 1, background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 700 }}
+        >
+          ▶ Play both
+        </button>
+        <button
+          onClick={pauseBoth}
+          style={{ flex: 1, background: "var(--card)", color: "var(--fairway)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 0", fontSize: 13, fontWeight: 700 }}
+        >
+          Pause both
+        </button>
+      </div>
+      <p style={{ fontSize: 11, color: "var(--faint)", margin: "-6px 0 14px" }}>
+        Started together, but each phone recorded independently, so they may drift out of sync over a longer clip - scrub each one individually if needed.
+      </p>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {[{ v: a, ref: refA }, { v: b, ref: refB }].map(({ v, ref }) => (
+          <div key={v.id} style={{ flex: "1 1 240px", minWidth: 200 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>{angleLabel(v)}</div>
+            <video ref={ref} src={v.videoUrl} crossOrigin="anonymous" controls playsInline style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }} />
+            <button
+              onClick={() => onReviewIndividually(v.id)}
+              style={{ marginTop: 6, background: "none", border: "none", color: "var(--gold)", fontWeight: 700, fontSize: 12, padding: 0 }}
+            >
+              Review this angle individually &rarr;
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // See VideosClient.tsx for why this fetches the file rather than using a
@@ -39,6 +137,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedSwingSessionId, setSelectedSwingSessionId] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
   const [posting, setPosting] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -57,6 +156,29 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   const [reviewFile, setReviewFile] = useState<File | null>(null);
   const [reviewUrl, setReviewUrl] = useState<string | null>(null);
   const reviewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [aiAnalysisEnabled, setAiAnalysisEnabled] = useState(false);
+  const [showPoseOverlay, setShowPoseOverlay] = useState(false);
+  const [reviewPoseAngles, setReviewPoseAngles] = useState<PoseAngle[]>([]);
+  const reviewLastAngleUpdateRef = useRef(0);
+  const reviewHeadReferenceRef = useRef<Point | null>(null);
+  const reviewMaxShoulderWidthRef = useRef<number | null>(null);
+  const reviewMaxHipWidthRef = useRef<number | null>(null);
+  const reviewHipReferenceRef = useRef<Point | null>(null);
+  const reviewSpineAngleReferenceRef = useRef<number | null>(null);
+  const poseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const poseLoopRef = useRef<number | null>(null);
+  const [selectedAiEnabled, setSelectedAiEnabled] = useState(false);
+  const [selectedShowPoseOverlay, setSelectedShowPoseOverlay] = useState(false);
+  const [selectedPoseError, setSelectedPoseError] = useState<string | null>(null);
+  const [selectedPoseAngles, setSelectedPoseAngles] = useState<PoseAngle[]>([]);
+  const selectedLastAngleUpdateRef = useRef(0);
+  const selectedHeadReferenceRef = useRef<Point | null>(null);
+  const selectedMaxShoulderWidthRef = useRef<number | null>(null);
+  const selectedMaxHipWidthRef = useRef<number | null>(null);
+  const selectedHipReferenceRef = useRef<Point | null>(null);
+  const selectedSpineAngleReferenceRef = useRef<number | null>(null);
+  const selectedPoseOverlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const selectedPoseLoopRef = useRef<number | null>(null);
   // Checking Capacitor.isNativePlatform() directly during render caused a
   // hydration mismatch (the server always renders as if it's not native,
   // since it has no way to know) - starting this state at false to match
@@ -71,6 +193,98 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   function loadPlayers() {
     fetch(`${apiBase}/players`).then((r) => r.json()).then((list) => setPlayers(Array.isArray(list) ? list : [])).catch(() => {});
   }
+
+  useEffect(() => {
+    if (!uploadPlayerId) { setAiAnalysisEnabled(false); return; }
+    fetch(`${apiBase}/players/${uploadPlayerId}/ai-analysis`)
+      .then((r) => r.json())
+      .then((data) => setAiAnalysisEnabled(!!data.enabled))
+      .catch(() => setAiAnalysisEnabled(false));
+  }, [uploadPlayerId, apiBase]);
+
+  useEffect(() => {
+    if (!showPoseOverlay) return;
+    let cancelled = false;
+    reviewHeadReferenceRef.current = null; // fresh reference each time the overlay is turned on
+    reviewMaxShoulderWidthRef.current = null;
+    reviewMaxHipWidthRef.current = null;
+    reviewHipReferenceRef.current = null;
+    reviewSpineAngleReferenceRef.current = null;
+
+    (async () => {
+      const landmarker = await getVideoPoseLandmarker();
+      if (cancelled) return;
+
+      function loop() {
+        if (cancelled) return;
+        const video = reviewVideoRef.current;
+        const canvas = poseOverlayCanvasRef.current;
+        if (video && canvas && !video.paused && !video.ended && video.readyState >= 2) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            // Keep the overlay canvas sized to match the video's actual
+            // displayed dimensions, which can change (e.g. on rotation).
+            if (canvas.width !== video.clientWidth || canvas.height !== video.clientHeight) {
+              canvas.width = video.clientWidth;
+              canvas.height = video.clientHeight;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const result = landmarker.detectForVideo(video, performance.now());
+            const rawLandmarks = result?.landmarks?.[0];
+            if (rawLandmarks) {
+              const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
+              const sw = getShoulderWidth(points);
+              if (sw && (!reviewMaxShoulderWidthRef.current || sw > reviewMaxShoulderWidthRef.current)) {
+                reviewMaxShoulderWidthRef.current = sw;
+              }
+              const hw = getHipWidth(points);
+              if (hw && (!reviewMaxHipWidthRef.current || hw > reviewMaxHipWidthRef.current)) {
+                reviewMaxHipWidthRef.current = hw;
+              }
+              const headRadiusOverride = reviewMaxShoulderWidthRef.current ? reviewMaxShoulderWidthRef.current * 0.3 : null;
+              drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#EAE3D0", 3, headRadiusOverride);
+              // The first head position seen after turning the overlay on
+              // becomes the reference point everything else compares
+              // against - in practice, wherever playback happened to be
+              // when this was switched on.
+              if (!reviewHeadReferenceRef.current && points[12]) {
+                reviewHeadReferenceRef.current = points[12];
+              }
+              if (!reviewHipReferenceRef.current && points[6] && points[7]) {
+                reviewHipReferenceRef.current = { x: (points[6].x + points[7].x) / 2, y: (points[6].y + points[7].y) / 2 };
+              }
+              const now = performance.now();
+              if (now - reviewLastAngleUpdateRef.current > 200) {
+                reviewLastAngleUpdateRef.current = now;
+                const angles = computePoseAngles(points, lowConfidenceIndices, reviewHeadReferenceRef.current, {
+                  maxShoulderWidth: reviewMaxShoulderWidthRef.current,
+                  maxHipWidth: reviewMaxHipWidthRef.current,
+                  hipReference: reviewHipReferenceRef.current,
+                  spineAngleReference: reviewSpineAngleReferenceRef.current,
+                });
+                if (reviewSpineAngleReferenceRef.current == null) {
+                  const spineAngle = angles.find((a) => a.label === "Spine angle");
+                  if (spineAngle) reviewSpineAngleReferenceRef.current = spineAngle.value;
+                }
+                setReviewPoseAngles(angles);
+              }
+            }
+          }
+        }
+        poseLoopRef.current = requestAnimationFrame(loop);
+      }
+      poseLoopRef.current = requestAnimationFrame(loop);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (poseLoopRef.current) cancelAnimationFrame(poseLoopRef.current);
+      poseLoopRef.current = null;
+      const canvas = poseOverlayCanvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+  }, [showPoseOverlay]);
 
   async function recordVideo() {
     if (!uploadPlayerId) {
@@ -98,6 +312,8 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
     if (reviewUrl) URL.revokeObjectURL(reviewUrl);
     setReviewFile(null);
     setReviewUrl(null);
+    setShowPoseOverlay(false);
+    setReviewPoseAngles([]);
   }
 
   async function saveReview() {
@@ -167,8 +383,142 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   }, []);
 
   const selected = submissions.find((s) => s.id === selectedId) || null;
-  const pending = submissions.filter((s) => s.status === "pending");
-  const reviewed = submissions.filter((s) => s.status === "reviewed");
+
+  // A two-camera pair (same swingSessionId) collapses into a single list
+  // entry rather than showing as two separate, seemingly-unrelated
+  // videos - a lone video (swingSessionId null, the common case) passes
+  // through unchanged.
+  type ListEntry = { kind: "single"; submission: Submission } | { kind: "pair"; swingSessionId: string; a: Submission; b: Submission };
+  function groupForList(items: Submission[]): ListEntry[] {
+    const seen = new Set<string>();
+    const entries: ListEntry[] = [];
+    for (const s of items) {
+      if (seen.has(s.id)) continue;
+      if (s.swingSessionId) {
+        const partner = items.find((o) => o.id !== s.id && o.swingSessionId === s.swingSessionId);
+        if (partner) {
+          seen.add(s.id);
+          seen.add(partner.id);
+          entries.push({ kind: "pair", swingSessionId: s.swingSessionId, a: s, b: partner });
+          continue;
+        }
+      }
+      seen.add(s.id);
+      entries.push({ kind: "single", submission: s });
+    }
+    return entries;
+  }
+
+  const pending = groupForList(submissions.filter((s) => s.status === "pending"));
+  const reviewed = groupForList(submissions.filter((s) => s.status === "reviewed"));
+
+  useEffect(() => {
+    if (!selected) { setSelectedAiEnabled(false); return; }
+    fetch(`${apiBase}/players/${selected.playerId}/ai-analysis`)
+      .then((r) => r.json())
+      .then((data) => setSelectedAiEnabled(!!data.enabled))
+      .catch(() => setSelectedAiEnabled(false));
+    setSelectedShowPoseOverlay(false); // reset when switching to a different submission
+    setSelectedPoseError(null);
+    setSelectedPoseAngles([]);
+  }, [selected?.playerId, apiBase]);
+
+  useEffect(() => {
+    if (!selectedShowPoseOverlay) return;
+    let cancelled = false;
+    selectedHeadReferenceRef.current = null; // fresh reference each time the overlay is turned on
+    selectedMaxShoulderWidthRef.current = null;
+    selectedMaxHipWidthRef.current = null;
+    selectedHipReferenceRef.current = null;
+    selectedSpineAngleReferenceRef.current = null;
+    // Turn/sway only mean anything filmed face-on - the camera has to be
+    // looking at the golfer's front for rotation to visibly narrow the
+    // shoulders/hips the way those measurements assume. From the
+    // down-the-line angle that same rotation doesn't foreshorten the same
+    // way, so the numbers would just be noise; posture change works fine
+    // from either angle (arguably reads clearer down-the-line, if
+    // anything), so that one's never suppressed here.
+    const isDownTheLine = selected?.angle === "down_the_line";
+
+    (async () => {
+      const landmarker = await getVideoPoseLandmarker();
+      if (cancelled) return;
+
+      function loop() {
+        if (cancelled) return;
+        const video = videoRef.current;
+        const canvas = selectedPoseOverlayCanvasRef.current;
+        if (video && canvas && !video.paused && !video.ended && video.readyState >= 2) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            if (canvas.width !== video.clientWidth || canvas.height !== video.clientHeight) {
+              canvas.width = video.clientWidth;
+              canvas.height = video.clientHeight;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            try {
+              const result = landmarker.detectForVideo(video, performance.now());
+              const rawLandmarks = result?.landmarks?.[0];
+              if (rawLandmarks) {
+                const { points, lowConfidenceIndices } = extractPoseLandmarks(rawLandmarks, canvas.width, canvas.height);
+                const sw = getShoulderWidth(points);
+                if (!isDownTheLine && sw && (!selectedMaxShoulderWidthRef.current || sw > selectedMaxShoulderWidthRef.current)) {
+                  selectedMaxShoulderWidthRef.current = sw;
+                }
+                const hw = getHipWidth(points);
+                if (!isDownTheLine && hw && (!selectedMaxHipWidthRef.current || hw > selectedMaxHipWidthRef.current)) {
+                  selectedMaxHipWidthRef.current = hw;
+                }
+                const headRadiusOverride = selectedMaxShoulderWidthRef.current ? selectedMaxShoulderWidthRef.current * 0.3 : null;
+                drawPoseSkeleton(ctx, points, lowConfidenceIndices, "#EAE3D0", 3, headRadiusOverride);
+                if (!selectedHeadReferenceRef.current && points[12]) {
+                  selectedHeadReferenceRef.current = points[12];
+                }
+                if (!isDownTheLine && !selectedHipReferenceRef.current && points[6] && points[7]) {
+                  selectedHipReferenceRef.current = { x: (points[6].x + points[7].x) / 2, y: (points[6].y + points[7].y) / 2 };
+                }
+                const now = performance.now();
+                if (now - selectedLastAngleUpdateRef.current > 200) {
+                  selectedLastAngleUpdateRef.current = now;
+                  const angles = computePoseAngles(points, lowConfidenceIndices, selectedHeadReferenceRef.current, {
+                    maxShoulderWidth: isDownTheLine ? null : selectedMaxShoulderWidthRef.current,
+                    maxHipWidth: isDownTheLine ? null : selectedMaxHipWidthRef.current,
+                    hipReference: isDownTheLine ? null : selectedHipReferenceRef.current,
+                    spineAngleReference: selectedSpineAngleReferenceRef.current,
+                  });
+                  if (selectedSpineAngleReferenceRef.current == null) {
+                    const spineAngle = angles.find((a) => a.label === "Spine angle");
+                    if (spineAngle) selectedSpineAngleReferenceRef.current = spineAngle.value;
+                  }
+                  setSelectedPoseAngles(angles);
+                }
+              }
+            } catch (err) {
+              // A failure here (e.g. the video's source blocking the
+              // pixel read) will fail identically on every single frame -
+              // stop immediately and show it, rather than silently
+              // retrying forever with nothing ever appearing.
+              console.error("Pose detection on this video failed:", err);
+              setSelectedPoseError(err instanceof Error ? err.message : String(err));
+              cancelled = true;
+              return;
+            }
+          }
+        }
+        selectedPoseLoopRef.current = requestAnimationFrame(loop);
+      }
+      selectedPoseLoopRef.current = requestAnimationFrame(loop);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (selectedPoseLoopRef.current) cancelAnimationFrame(selectedPoseLoopRef.current);
+      selectedPoseLoopRef.current = null;
+      const canvas = selectedPoseOverlayCanvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+  }, [selectedShowPoseOverlay, selected?.angle]);
 
   async function deleteVideo() {
     if (!selected) return;
@@ -264,14 +614,50 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
 
           {reviewFile && reviewUrl && (
             <div style={{ background: "#000", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <video
-                ref={reviewVideoRef}
-                src={reviewUrl}
-                controls
-                autoPlay
-                playsInline
-                style={{ width: "100%", borderRadius: 8, display: "block", marginBottom: 12 }}
-              />
+              <div style={{ position: "relative", marginBottom: 12 }}>
+                <video
+                  ref={reviewVideoRef}
+                  src={reviewUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  style={{ width: "100%", borderRadius: 8, display: "block" }}
+                />
+                <canvas
+                  ref={poseOverlayCanvasRef}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}
+                />
+              </div>
+              {aiAnalysisEnabled && (
+                <button
+                  onClick={() => setShowPoseOverlay((v) => !v)}
+                  style={{
+                    width: "100%", marginBottom: 12, background: showPoseOverlay ? "var(--gold)" : "rgba(255,255,255,0.1)",
+                    color: showPoseOverlay ? "var(--fairway)" : "#FFF", border: "1px solid rgba(255,255,255,0.3)",
+                    borderRadius: 8, padding: "8px 0", fontSize: 12, fontWeight: 700,
+                  }}
+                >
+                  {showPoseOverlay ? "🤖 Body position: on" : "🤖 Show body position"}
+                </button>
+              )}
+              <PoseAngleBadges angles={reviewPoseAngles} dark />
+              {showPoseOverlay && (
+                <button
+                  onClick={() => {
+                    reviewHeadReferenceRef.current = null;
+                    reviewHipReferenceRef.current = null;
+                    reviewSpineAngleReferenceRef.current = null;
+                    reviewMaxShoulderWidthRef.current = null;
+                    reviewMaxHipWidthRef.current = null;
+                  }}
+                  style={{
+                    marginBottom: 12, background: "none", border: "1px solid rgba(255,255,255,0.3)", color: "#D7DED9",
+                    borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600,
+                  }}
+                >
+                  Reset reference point (pause at address, then tap this)
+                </button>
+              )}
               <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                 {[1, 0.5, 0.25].map((rate) => (
                   <button
@@ -336,18 +722,43 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }}
                 />
                 {uploadError && <p style={{ fontSize: 12, color: "#B23A3A", margin: 0 }}>{uploadError}</p>}
-                {isNative && (
-                  <button
-                    onClick={recordVideo}
-                    disabled={recording || uploading}
+                {isNative ? (
+                  <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: "1px solid var(--fairway)" }}>
+                    <button
+                      onClick={recordVideo}
+                      disabled={recording || uploading}
+                      style={{
+                        flex: 1, background: "var(--card)", color: "var(--fairway)", border: "none",
+                        padding: "10px 12px", fontSize: 13, fontWeight: 700,
+                        opacity: recording || uploading ? 0.7 : 1,
+                      }}
+                    >
+                      {recording ? "Opening camera..." : "🎥 Record a video"}
+                    </button>
+                    <a
+                      href={`${basePath}/swing-session`}
+                      title="Record two camera angles at once - down-the-line + face-on"
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                        padding: "10px 14px", background: "var(--card)", color: "var(--fairway)",
+                        textDecoration: "none", fontSize: 13, fontWeight: 700,
+                        borderLeft: "1px solid var(--fairway)", whiteSpace: "nowrap",
+                      }}
+                    >
+                      📐 2 cams
+                    </a>
+                  </div>
+                ) : (
+                  <a
+                    href={`${basePath}/swing-session`}
                     style={{
-                      width: "100%", background: "var(--card)", color: "var(--fairway)", border: "1px solid var(--fairway)",
-                      borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 700,
-                      opacity: recording || uploading ? 0.7 : 1,
+                      display: "block", textAlign: "center", background: "var(--card)", color: "var(--fairway)",
+                      border: "1px solid var(--fairway)", borderRadius: 8, padding: "10px 16px", fontSize: 13,
+                      fontWeight: 700, textDecoration: "none",
                     }}
                   >
-                    {recording ? "Opening camera..." : "🎥 Record a new video"}
-                  </button>
+                    📐 Record two camera angles at once
+                  </a>
                 )}
                 <label style={{ display: "inline-block", textAlign: "center", background: "var(--gold)", color: "var(--fairway)", borderRadius: 8, padding: "10px 16px", fontWeight: 700, fontSize: 13, cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}>
                   {uploading ? "Uploading..." : "Choose video file"}
@@ -378,19 +789,16 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                       PENDING ({pending.length})
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 }}>
-                      {pending.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => setSelectedId(s.id)}
-                          style={{
-                            textAlign: "left", background: selectedId === s.id ? "var(--open)" : "#FFF",
-                            border: selectedId === s.id ? "1px solid var(--fairway)" : "1px solid var(--border)",
-                            borderRadius: 8, padding: "8px 12px",
+                      {pending.map((entry) => (
+                        <ListEntryButton
+                          key={entry.kind === "single" ? entry.submission.id : entry.swingSessionId}
+                          entry={entry}
+                          isSelected={entry.kind === "single" ? selectedId === entry.submission.id : selectedSwingSessionId === entry.swingSessionId}
+                          onSelect={() => {
+                            if (entry.kind === "single") { setSelectedId(entry.submission.id); setSelectedSwingSessionId(null); }
+                            else { setSelectedSwingSessionId(entry.swingSessionId); setSelectedId(null); }
                           }}
-                        >
-                          <div style={{ fontSize: 13, fontWeight: 700 }}>{s.title || "Untitled video"}</div>
-                          <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{s.playerName}</div>
-                        </button>
+                        />
                       ))}
                     </div>
                   </>
@@ -401,19 +809,17 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                       REVIEWED ({reviewed.length})
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {reviewed.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => setSelectedId(s.id)}
-                          style={{
-                            textAlign: "left", background: selectedId === s.id ? "var(--open)" : "#FFF",
-                            border: selectedId === s.id ? "1px solid var(--fairway)" : "1px solid var(--border)",
-                            borderRadius: 8, padding: "8px 12px", opacity: 0.8,
+                      {reviewed.map((entry) => (
+                        <ListEntryButton
+                          key={entry.kind === "single" ? entry.submission.id : entry.swingSessionId}
+                          entry={entry}
+                          isSelected={entry.kind === "single" ? selectedId === entry.submission.id : selectedSwingSessionId === entry.swingSessionId}
+                          onSelect={() => {
+                            if (entry.kind === "single") { setSelectedId(entry.submission.id); setSelectedSwingSessionId(null); }
+                            else { setSelectedSwingSessionId(entry.swingSessionId); setSelectedId(null); }
                           }}
-                        >
-                          <div style={{ fontSize: 13, fontWeight: 700 }}>{s.title || "Untitled video"}</div>
-                          <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{s.playerName}</div>
-                        </button>
+                          dimmed
+                        />
                       ))}
                     </div>
                   </>
@@ -423,7 +829,12 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
           </div>
 
           <div style={{ flex: "2 1 400px", minWidth: 300 }}>
-            {!selected ? (
+            {selectedSwingSessionId ? (
+              <SwingSessionPairView
+                videos={submissions.filter((s) => s.swingSessionId === selectedSwingSessionId)}
+                onReviewIndividually={(id) => { setSelectedId(id); setSelectedSwingSessionId(null); }}
+              />
+            ) : !selected ? (
               <p style={{ fontSize: 13, color: "var(--faint)" }}>Pick a video from the list to review it.</p>
             ) : (
               <div>
@@ -436,7 +847,48 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                     "{selected.playerNote}"
                   </p>
                 )}
-                <video ref={videoRef} src={selected.videoUrl} controls style={{ width: "100%", borderRadius: 8, background: "#000", marginBottom: 6 }} />
+                <div style={{ position: "relative", marginBottom: 6 }}>
+                  <video ref={videoRef} src={selected.videoUrl} crossOrigin="anonymous" controls playsInline style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }} />
+                  <canvas
+                    ref={selectedPoseOverlayCanvasRef}
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}
+                  />
+                </div>
+                {selectedAiEnabled && (
+                  <button
+                    onClick={() => { setSelectedPoseError(null); setSelectedShowPoseOverlay((v) => !v); }}
+                    style={{
+                      width: "100%", marginBottom: 10, background: selectedShowPoseOverlay ? "var(--gold)" : "var(--card)",
+                      color: selectedShowPoseOverlay ? "var(--fairway)" : "var(--fairway)", border: "1px solid var(--border)",
+                      borderRadius: 8, padding: "8px 0", fontSize: 12, fontWeight: 700,
+                    }}
+                  >
+                    {selectedShowPoseOverlay ? "🤖 Body position: on" : "🤖 Show body position"}
+                  </button>
+                )}
+                {selectedPoseError && (
+                  <p style={{ fontSize: 11.5, color: "#B23A3A", margin: "-4px 0 10px" }}>
+                    Couldn't analyze this video: {selectedPoseError}
+                  </p>
+                )}
+                <PoseAngleBadges angles={selectedPoseAngles} />
+                {selectedShowPoseOverlay && (
+                  <button
+                    onClick={() => {
+                      selectedHeadReferenceRef.current = null;
+                      selectedHipReferenceRef.current = null;
+                      selectedSpineAngleReferenceRef.current = null;
+                      selectedMaxShoulderWidthRef.current = null;
+                      selectedMaxHipWidthRef.current = null;
+                    }}
+                    style={{
+                      marginBottom: 10, background: "none", border: "1px solid var(--border)", color: "var(--faint)",
+                      borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600,
+                    }}
+                  >
+                    Reset reference point (pause at address, then tap this)
+                  </button>
+                )}
                 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                   <button
                     onClick={() => stepFrame(-1)}

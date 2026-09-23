@@ -112,6 +112,13 @@ export function getShoulderWidth(points: Point[]): number | null {
   return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
 }
 
+// Same idea as getShoulderWidth, for the hips - used the same way, to
+// track a running maximum for the golf-specific "turn" measurements below.
+export function getHipWidth(points: Point[]): number | null {
+  if (!points[6] || !points[7]) return null;
+  return Math.hypot(points[7].x - points[6].x, points[7].y - points[6].y);
+}
+
 export function drawPoseSkeleton(
   ctx: CanvasRenderingContext2D,
   points: Point[],
@@ -249,7 +256,35 @@ function interiorAngle(a: Point, vertex: Point, b: Point): number {
   return Math.acos(cos) * (180 / Math.PI);
 }
 
-export type PoseAngle = { label: string; value: number; unit: "°" | "%"; uncertain: boolean };
+export type PoseAngle = { label: string; value: number; unit: "°" | "%"; uncertain: boolean; flagged?: boolean };
+
+// Golf-specific measurements below need a "reference" from earlier in the
+// same swing (address position, essentially), the same way headReference
+// already does for Head movement - a single frame alone can't say how
+// much someone has turned or shifted, only where they are right now.
+// A caller tracks these across frames (see the maxShoulderWidthRef /
+// maxHipWidthRef pattern already used for head sizing) and passes
+// whatever it has; each measurement below simply doesn't appear until
+// its own reference is available, same "no reference, no reading" rule
+// Head movement already follows.
+export type SwingReferences = {
+  // Running maximum shoulder/hip width ever seen this swing. Address -
+  // square to the camera - is normally when a golfer's shoulders and
+  // hips are at their widest on-screen; as they turn away from the
+  // camera during the backswing, the same real width foreshortens to a
+  // narrower on-screen distance. That narrowing is what "Shoulder turn"
+  // and "Hip turn" below actually measure - not a true 3D rotation
+  // (this is a single 2D camera, there's no real depth to measure),
+  // but a reasonable stand-in that needs no extra data beyond what's
+  // already tracked for the head-size lock.
+  maxShoulderWidth?: number | null;
+  maxHipWidth?: number | null;
+  // Hip midpoint captured at address, for Hip sway below - same pattern
+  // as headReference for Head movement.
+  hipReference?: Point | null;
+  // Spine angle captured at address, for Posture change below.
+  spineAngleReference?: number | null;
+};
 
 // Same "flag, don't hide" approach as the skeleton itself - a measurement
 // computed from a low-confidence joint is still shown, just marked
@@ -265,10 +300,12 @@ export type PoseAngle = { label: string; value: number; unit: "°" | "%"; uncert
 export function computePoseAngles(
   points: Point[],
   lowConfidenceIndices: number[],
-  headReference?: Point | null
+  headReference?: Point | null,
+  swingRefs?: SwingReferences
 ): PoseAngle[] {
   const lowConf = new Set(lowConfidenceIndices);
   const results: PoseAngle[] = [];
+  let spineAngleThisFrame: number | null = null;
 
   if (points[0] && points[1]) {
     results.push({
@@ -289,9 +326,10 @@ export function computePoseAngles(
   if (points[0] && points[1] && points[6] && points[7]) {
     const shoulderMid = { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 };
     const hipMid = { x: (points[6].x + points[7].x) / 2, y: (points[6].y + points[7].y) / 2 };
+    spineAngleThisFrame = tiltFromVertical(hipMid, shoulderMid);
     results.push({
       label: "Spine angle",
-      value: Math.round(tiltFromVertical(hipMid, shoulderMid)),
+      value: Math.round(spineAngleThisFrame),
       unit: "°",
       uncertain: lowConf.has(0) || lowConf.has(1) || lowConf.has(6) || lowConf.has(7),
     });
@@ -369,6 +407,91 @@ export function computePoseAngles(
         uncertain: lowConf.has(12),
       });
     }
+  }
+
+  // ---- Golf-specific, reference-dependent measurements ------------------
+  // Everything below needs an address-position reference from swingRefs
+  // and simply doesn't appear without one - same rule Head movement
+  // already follows for headReference.
+  let shoulderTurn: number | null = null;
+  let hipTurn: number | null = null;
+
+  if (swingRefs?.maxShoulderWidth && points[0] && points[1]) {
+    const currentWidth = getShoulderWidth(points);
+    if (currentWidth != null) {
+      const ratio = Math.max(-1, Math.min(1, currentWidth / swingRefs.maxShoulderWidth));
+      shoulderTurn = Math.acos(ratio) * (180 / Math.PI);
+      results.push({
+        label: "Shoulder turn",
+        value: Math.round(shoulderTurn),
+        unit: "°",
+        uncertain: lowConf.has(0) || lowConf.has(1),
+      });
+    }
+  }
+  if (swingRefs?.maxHipWidth && points[6] && points[7]) {
+    const currentWidth = getHipWidth(points);
+    if (currentWidth != null) {
+      const ratio = Math.max(-1, Math.min(1, currentWidth / swingRefs.maxHipWidth));
+      hipTurn = Math.acos(ratio) * (180 / Math.PI);
+      results.push({
+        label: "Hip turn",
+        value: Math.round(hipTurn),
+        unit: "°",
+        uncertain: lowConf.has(6) || lowConf.has(7),
+      });
+    }
+  }
+  // "X-Factor" - how much further the shoulders have turned than the
+  // hips. A bigger gap is the coiled, stored-up rotation instructors
+  // look for at the top of the backswing; a gap near zero usually means
+  // the hips and shoulders turned together instead ("all arms" swings
+  // tend to show this).
+  if (shoulderTurn != null && hipTurn != null) {
+    results.push({
+      label: "X-Factor",
+      value: Math.round(shoulderTurn - hipTurn),
+      unit: "°",
+      uncertain: lowConf.has(0) || lowConf.has(1) || lowConf.has(6) || lowConf.has(7),
+    });
+  }
+
+  // Hip sway - lateral hip drift from address, same technique as Head
+  // movement above but for the hips, scaled against shoulder width so it
+  // reads the same regardless of camera distance. A rough stand-in for
+  // weight shift: a big sideways hip slide (rather than a turn) away
+  // from the target during the backswing is the classic "sway" fault.
+  if (swingRefs?.hipReference && points[0] && points[1] && points[6] && points[7]) {
+    const shoulderDist = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+    if (shoulderDist > 0) {
+      const hipMid = { x: (points[6].x + points[7].x) / 2, y: (points[6].y + points[7].y) / 2 };
+      // Signed, not just distance - which direction matters for sway,
+      // unlike head movement where any drift is worth flagging equally.
+      const sway = ((hipMid.x - swingRefs.hipReference.x) / shoulderDist) * 100;
+      results.push({
+        label: "Hip sway",
+        value: Math.round(sway),
+        unit: "%",
+        uncertain: lowConf.has(6) || lowConf.has(7),
+      });
+    }
+  }
+
+  // Posture change - how much the spine angle has moved from address.
+  // A golfer standing up out of their posture during the downswing
+  // ("early extension") shows up here as spine angle dropping toward
+  // vertical (a large negative change); flagged rather than just shown,
+  // since this specific direction/size of change is a known fault worth
+  // calling out rather than leaving the instructor to notice the number.
+  if (swingRefs?.spineAngleReference != null && spineAngleThisFrame != null) {
+    const change = spineAngleThisFrame - swingRefs.spineAngleReference;
+    results.push({
+      label: "Posture change",
+      value: Math.round(change),
+      unit: "°",
+      uncertain: lowConf.has(0) || lowConf.has(1) || lowConf.has(6) || lowConf.has(7),
+      flagged: change < -12,
+    });
   }
 
   return results;
