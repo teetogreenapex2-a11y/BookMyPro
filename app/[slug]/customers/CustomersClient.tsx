@@ -79,18 +79,24 @@ export default function CustomersClient({
 
   async function deleteCustomer(customerId: string, force = false) {
     setDeletingId(customerId);
-    const res = await fetch(`${apiBase}/players/${customerId}${force ? "?force=true" : ""}`, { method: "DELETE" });
-    const data = await res.json();
-    setDeletingId(null);
-    if (res.status === 409 && data.warning) {
-      const confirmed = window.confirm(data.message + "\n\nDelete anyway?");
-      if (confirmed) await deleteCustomer(customerId, true);
-      return;
-    }
-    if (res.ok) {
-      setCustomers((prev) => prev.filter((c) => c.id !== customerId));
-    } else {
-      alert(data.error || "Something went wrong.");
+    try {
+      const res = await fetch(`${apiBase}/players/${customerId}${force ? "?force=true" : ""}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data.warning) {
+        setDeletingId(null);
+        const confirmed = window.confirm(data.message + "\n\nDelete anyway?");
+        if (confirmed) await deleteCustomer(customerId, true);
+        return;
+      }
+      if (res.ok) {
+        setCustomers((prev) => prev.filter((c) => c.id !== customerId));
+      } else {
+        alert(data.error || "Something went wrong - that customer wasn't deleted.");
+      }
+    } catch {
+      alert("Something went wrong - that customer wasn't deleted. Please try again.");
+    } finally {
+      setDeletingId(null);
     }
   }
 

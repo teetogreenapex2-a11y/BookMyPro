@@ -208,13 +208,27 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
     }
   }
 
-  const [sandboxLinks, setSandboxLinks] = useState<{ recipientName: string | null; recipientRole: string | null; createdAt: string; expiresAt: string; redeemedAt: string | null }[]>([]);
+  const [sandboxLinks, setSandboxLinks] = useState<{ membershipId: string | null; isSandboxProspect: boolean; recipientName: string | null; recipientRole: string | null; createdAt: string; expiresAt: string; redeemedAt: string | null }[]>([]);
   const [sandboxLinksLoaded, setSandboxLinksLoaded] = useState(false);
   async function loadSandboxLinks() {
     const res = await fetch(`${apiBase}/sandbox-links`);
     if (res.ok) {
       setSandboxLinks(await res.json());
       setSandboxLinksLoaded(true);
+    }
+  }
+
+  const [deletingSandboxId, setDeletingSandboxId] = useState<string | null>(null);
+  async function deleteSandboxProspect(membershipId: string) {
+    if (!window.confirm("Delete this sandbox prospect? This removes their invite and throwaway account for good.")) return;
+    setDeletingSandboxId(membershipId);
+    const res = await fetch(`${apiBase}/sandbox-links/${membershipId}`, { method: "DELETE" });
+    setDeletingSandboxId(null);
+    if (res.ok) {
+      setSandboxLinks((prev) => prev.filter((l) => l.membershipId !== membershipId));
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Something went wrong.");
     }
   }
 
@@ -1470,6 +1484,20 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                             ? `Used ${new Date(l.redeemedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
                             : expired ? "Expired, unused" : "Not opened yet"}
                         </span>
+                        {l.isSandboxProspect && l.membershipId && (
+                          <button
+                            onClick={() => deleteSandboxProspect(l.membershipId!)}
+                            disabled={deletingSandboxId === l.membershipId}
+                            title="Delete this sandbox prospect"
+                            style={{
+                              width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 12, color: "#B23A3A", background: "#FBE9E9",
+                              border: "none", borderRadius: 6, cursor: "pointer", flexShrink: 0,
+                            }}
+                          >
+                            {deletingSandboxId === l.membershipId ? "â€¦" : "âœ•"}
+                          </button>
+                        )}
                       </div>
                     );
                   })}
