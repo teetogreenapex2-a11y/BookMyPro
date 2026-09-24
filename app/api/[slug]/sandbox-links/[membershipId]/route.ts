@@ -46,13 +46,31 @@ export async function DELETE(req: Request, { params }: { params: { slug: string;
   });
   const tokens = sessions.map((s) => s.sessionToken);
 
-  await prisma.$transaction([
-    ...(tokens.length ? [prisma.nativeAuthHandoff.deleteMany({ where: { sessionToken: { in: tokens } } })] : []),
-    prisma.membership.delete({ where: { id: target.id } }),
-    // Deleting the User cascades its Session row(s) automatically (see
-    // the onDelete: Cascade on Session.user in schema.prisma).
-    prisma.user.delete({ where: { id: target.userId } }),
-  ]);
+  try {
+    await prisma.$transaction([
+      ...(tokens.length ? [prisma.nativeAuthHandoff.deleteMany({ where: { sessionToken: { in: tokens } } })] : []),
+      // Same foreign keys that block deleting a real customer's
+      // Membership (see /api/{slug}/players/{id}) apply just as much
+      // here - a prospect who actually opened the redeemed link could
+      // have registered for push notifications or been messaged during
+      // the demo, and none of those rows cascade on their own. Without
+      // this cleanup, prisma.membership.delete below throws a P2003
+      // foreign key error that this route previously left unhandled,
+      // surfacing to the owner as a bare "Something went wrong."
+      prisma.pushSubscription.deleteMany({ where: { membershipId: target.id } }),
+      prisma.fcmToken.deleteMany({ where: { membershipId: target.id } }),
+      prisma.message.deleteMany({ where: { conversation: { playerMembershipId: target.id } } }),
+      prisma.message.deleteMany({ where: { senderMembershipId: target.id } }),
+      prisma.conversation.deleteMany({ where: { playerMembershipId: target.id } }),
+      prisma.membership.delete({ where: { id: target.id } }),
+      // Deleting the User cascades its Session row(s) automatically (see
+      // the onDelete: Cascade on Session.user in schema.prisma).
+      prisma.user.delete({ where: { id: target.userId } }),
+    ]);
+  } catch (err) {
+    console.error("Failed to delete sandbox prospect:", err);
+    return NextResponse.json({ error: "Something went wrong deleting that prospect. Please try again." }, { status: 500 });
+  }
 
   return NextResponse.json({ deleted: true });
 }
