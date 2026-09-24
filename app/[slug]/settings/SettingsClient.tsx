@@ -1404,6 +1404,20 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                     onFocus={(e) => e.currentTarget.select()}
                     style={{ ...inputStyle, flex: 1, fontSize: 12 }}
                   />
+                  {/* The input above is read-only text, not a hyperlink - tapping
+                      it just focuses the field (and pops the keyboard's own
+                      autofill suggestions on a phone), it was never going to
+                      navigate anywhere. This is the actual clickable way to
+                      open the link directly from here instead of copy-pasting
+                      it into a browser by hand. */}
+                  <a
+                    href={manualSandboxLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, flexShrink: 0, color: "inherit", textDecoration: "none", display: "flex", alignItems: "center" }}
+                  >
+                    Open
+                  </a>
                   <button
                     onClick={() => setManualSandboxLink(null)}
                     style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, flexShrink: 0 }}
