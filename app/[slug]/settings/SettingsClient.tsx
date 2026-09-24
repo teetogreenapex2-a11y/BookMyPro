@@ -184,28 +184,57 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   // to showing the link in an on-page selectable box instead - this holds
   // that link while it's showing.
   const [manualSandboxLink, setManualSandboxLink] = useState<string | null>(null);
-  async function copySandboxLink(membershipId: string) {
+
+  // Safari (and any WebKit-based iOS browser) only allows
+  // navigator.clipboard writes when they're started synchronously inside a
+  // user gesture like a click handler - by the time an `await fetch(...)`
+  // resolves, it no longer counts as "still inside" that click and throws,
+  // even though the write itself is perfectly fine. That used to send every
+  // single link on an iPhone into the manual copy-paste box below, not just
+  // ones where copying genuinely failed. Passing a Promise into
+  // ClipboardItem instead keeps the write tied to this synchronous call,
+  // while still letting the actual link text resolve later once the fetch
+  // above it finishes.
+  function writeClipboardWhenReady(textPromise: Promise<string>): Promise<void> {
+    if (typeof ClipboardItem !== "undefined") {
+      const item = new ClipboardItem({
+        "text/plain": textPromise.then((text) => new Blob([text], { type: "text/plain" })),
+      });
+      return navigator.clipboard.write([item]);
+    }
+    // Old browsers without ClipboardItem support at all - this path never
+    // had Safari's timing restriction to work around in the first place.
+    return textPromise.then((text) => navigator.clipboard.writeText(text));
+  }
+
+  function copySandboxLink(membershipId: string) {
     setGeneratingSandboxId(membershipId);
-    try {
+    const linkPromise = (async () => {
       const res = await fetch(`${apiBase}/instructors/${membershipId}/sandbox-link`, { method: "POST" });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || "Something went wrong."); return; }
-      try {
-        await navigator.clipboard.writeText(data.url);
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      return data.url as string;
+    })();
+
+    writeClipboardWhenReady(linkPromise)
+      .then(() => {
         setSandboxCopiedId(membershipId);
         setTimeout(() => setSandboxCopiedId((prev) => (prev === membershipId ? null : prev)), 2500);
-      } catch {
-        // The link is already generated server-side at this point - only the
-        // clipboard step failed (common on Safari/iOS or with clipboard
-        // permissions blocked). Don't throw the link away, just show it.
-        setManualSandboxLink(data.url);
-      }
-      loadSandboxLinks();
-    } catch {
-      alert("Something went wrong generating that link. Please try again.");
-    } finally {
-      setGeneratingSandboxId(null);
-    }
+      })
+      .catch(async () => {
+        // Either the clipboard write itself failed (permissions blocked,
+        // older browser) or the fetch/generation failed - either way, if we
+        // do have a real link by now, don't throw it away, just show it.
+        try {
+          setManualSandboxLink(await linkPromise);
+        } catch (err: any) {
+          alert(err?.message || "Something went wrong generating that link. Please try again.");
+        }
+      })
+      .finally(() => {
+        loadSandboxLinks();
+        setGeneratingSandboxId(null);
+      });
   }
 
   const [sandboxLinks, setSandboxLinks] = useState<{ membershipId: string | null; isSandboxProspect: boolean; recipientName: string | null; recipientRole: string | null; createdAt: string; expiresAt: string; redeemedAt: string | null }[]>([]);
@@ -236,35 +265,43 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
   const [quickProspectRole, setQuickProspectRole] = useState<"instructor" | "player">("instructor");
   const [generatingQuickLink, setGeneratingQuickLink] = useState(false);
   const [quickLinkCopied, setQuickLinkCopied] = useState(false);
-  async function generateQuickSandboxLink() {
+  function generateQuickSandboxLink() {
     if (!quickProspectName.trim()) return;
     setGeneratingQuickLink(true);
     setQuickLinkCopied(false);
-    try {
+    const name = quickProspectName.trim();
+    const role = quickProspectRole;
+    const linkPromise = (async () => {
       const res = await fetch(`${apiBase}/sandbox-links/quick`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: quickProspectName.trim(), role: quickProspectRole }),
+        body: JSON.stringify({ name, role }),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || "Something went wrong."); return; }
-      try {
-        await navigator.clipboard.writeText(data.url);
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      return data.url as string;
+    })();
+
+    // See the comment on writeClipboardWhenReady above copySandboxLink -
+    // same Safari clipboard-timing issue applies here.
+    writeClipboardWhenReady(linkPromise)
+      .then(() => {
         setQuickLinkCopied(true);
         setQuickProspectName("");
         setTimeout(() => setQuickLinkCopied(false), 2500);
-      } catch {
-        // Same story - the link was already created, only the clipboard
-        // write failed. Show it instead of losing it.
-        setManualSandboxLink(data.url);
-        setQuickProspectName("");
-      }
-      loadSandboxLinks();
-    } catch {
-      alert("Something went wrong generating that link. Please try again.");
-    } finally {
-      setGeneratingQuickLink(false);
-    }
+      })
+      .catch(async () => {
+        try {
+          setManualSandboxLink(await linkPromise);
+          setQuickProspectName("");
+        } catch (err: any) {
+          alert(err?.message || "Something went wrong generating that link. Please try again.");
+        }
+      })
+      .finally(() => {
+        loadSandboxLinks();
+        setGeneratingQuickLink(false);
+      });
   }
 
   async function loadPendingRequests() {
