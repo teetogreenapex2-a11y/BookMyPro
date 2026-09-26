@@ -1811,7 +1811,7 @@ export default function BookingClient({
                   opacity: confirming || !contactValid() || !selectedInstructorId ? 0.6 : 1,
                 }}
               >
-                Pay {centsToDollars(Math.floor((pendingPackageInfo?.priceCents || 0) / 2))} now, rest at your lesson
+                Pay {centsToDollars(Math.floor((pendingPurchaseInfo?.priceCents || 0) / 2))} now, rest at your lesson
               </button>
             )}
 
