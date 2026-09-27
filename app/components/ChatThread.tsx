@@ -49,8 +49,26 @@ export default function ChatThread({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
+  // Scrolling right away isn't enough when the newest message has an image
+  // in it - the browser doesn't know the image's height until it finishes
+  // loading, so this scroll can land short of the real bottom once the
+  // image pops in a moment later and pushes everything else down. A second
+  // scroll after layout has settled (and again from each image's own load
+  // event, below) covers that.
+  function scrollToBottom(behavior: ScrollBehavior = "smooth") {
+    // block: "end" is the actual fix here - scrollIntoView defaults to
+    // "start", which aligns this (empty, zero-height) marker to the TOP
+    // of the scrollable area rather than the bottom. Since the marker
+    // sits right after the very last message, that default can push the
+    // real last message up out of view entirely - looking exactly like
+    // "it doesn't scroll to the last message," for text and images alike.
+    bottomRef.current?.scrollIntoView({ behavior, block: "end" });
+  }
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToBottom();
+    const settle = setTimeout(() => scrollToBottom(), 150);
+    return () => clearTimeout(settle);
   }, [messages.length]);
 
   async function load() {
@@ -143,6 +161,7 @@ export default function ChatThread({
                   <img
                     src={m.imageUrl}
                     alt=""
+                    onLoad={() => { if (i === messages.length - 1) scrollToBottom("auto"); }}
                     style={{ display: "block", maxWidth: "100%", borderRadius: 10, marginBottom: m.body ? 6 : 0 }}
                   />
                 )}
