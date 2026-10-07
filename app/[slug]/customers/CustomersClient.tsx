@@ -256,6 +256,10 @@ export default function CustomersClient({
       setAddError("Name and email are required.");
       return;
     }
+    if (addForm.phone.replace(/\D/g, "").length < 7) {
+      setAddError("A phone number is required.");
+      return;
+    }
     setAdding(true);
     setAddError(null);
     const res = await fetch(`${apiBase}/players/manual`, {
@@ -578,7 +582,7 @@ export default function CustomersClient({
               <input
                 value={addForm.phone}
                 onChange={(e) => setAddForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="Phone (optional)"
+                placeholder="Phone"
                 style={inputStyle}
               />
             </div>

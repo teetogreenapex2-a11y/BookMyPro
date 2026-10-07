@@ -18,13 +18,25 @@ export async function POST(req: NextRequest) {
   const name = (body.name || "").trim();
   if (!name) return NextResponse.json({ error: "Business name is required" }, { status: 400 });
 
+  // A phone number is required to set up a business - checked here on the
+  // server too, not just in the form, so it can't be skipped. Someone who
+  // already has one on their profile doesn't have to re-enter it.
+  const userId = (session.user as any).id;
+  const phone = (body.phone || "").trim();
+  const existingUser = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } });
+  const phoneToUse = phone || existingUser?.phone || "";
+  if (phoneToUse.replace(/\D/g, "").length < 7) {
+    return NextResponse.json({ error: "Enter a phone number we can reach you at." }, { status: 400 });
+  }
+  if (phone && phone !== existingUser?.phone) {
+    await prisma.user.update({ where: { id: userId }, data: { phone } });
+  }
+
   // Let the person pick their own slug if they want, but always fall back to
   // an auto-generated + uniqueness-checked one derived from the name.
   const requestedSlug = body.slug ? slugify(body.slug) : null;
   const slugTaken = requestedSlug ? await prisma.business.findUnique({ where: { slug: requestedSlug } }) : null;
   const slug = requestedSlug && !slugTaken ? requestedSlug : await generateUniqueSlug(name);
-
-  const userId = (session.user as any).id;
 
   const business = await prisma.business.create({
     data: {

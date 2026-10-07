@@ -97,6 +97,7 @@ export default function OnboardingClient() {
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [hours, setHours] = useState("");
   const [lessonRate, setLessonRate] = useState("");
   const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -256,6 +257,10 @@ export default function OnboardingClient() {
       setError("That URL is already taken — try a different one.");
       return;
     }
+    if (phone.replace(/\D/g, "").length < 7) {
+      setError("Enter a phone number we can reach you at.");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -263,7 +268,7 @@ export default function OnboardingClient() {
       const res = await fetch("/api/businesses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, slug, email, hours, lessonRate }),
+        body: JSON.stringify({ name, slug, email, phone, hours, lessonRate }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -496,6 +501,11 @@ export default function OnboardingClient() {
               <label>
                 <div style={labelStyle}>Contact email</div>
                 <input className={inputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="info@yourbusiness.com" />
+              </label>
+
+              <label>
+                <div style={labelStyle}>Your phone number</div>
+                <input className={inputClass} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" autoComplete="tel" />
               </label>
 
               <label>

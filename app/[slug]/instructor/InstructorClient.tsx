@@ -401,6 +401,10 @@ export default function InstructorClient({
       setNewPlayerError("Name and email are required.");
       return;
     }
+    if (newPlayerPhone.replace(/\D/g, "").length < 7) {
+      setNewPlayerError("A phone number is required.");
+      return;
+    }
     setCreatingPlayer(true);
     setNewPlayerError(null);
     try {
@@ -1249,7 +1253,7 @@ export default function InstructorClient({
                       <input
                         value={newPlayerPhone}
                         onChange={(e) => setNewPlayerPhone(e.target.value)}
-                        placeholder="Phone (optional)"
+                        placeholder="Phone"
                         type="tel"
                         style={{ ...selectStyle, marginBottom: 6 }}
                       />

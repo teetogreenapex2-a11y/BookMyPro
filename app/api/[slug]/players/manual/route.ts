@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
 
-// POST /api/{slug}/players/manual  { name, email, phone? }
+// POST /api/{slug}/players/manual  { name, email, phone }
 // Owner/instructor only — for importing an existing client list, or adding
 // someone who hasn't signed in yet so they're immediately selectable in the
 // "New booking" form. If this email already has a User record (at any
@@ -29,6 +29,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
+  }
+  // A phone number is required for anyone added this way (the CSV import
+  // doesn't use this route, so contact lists without phones still import).
+  if (String(phone || "").replace(/\D/g, "").length < 7) {
+    return NextResponse.json({ error: "A phone number is required" }, { status: 400 });
   }
 
   let user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });

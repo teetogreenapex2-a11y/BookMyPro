@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, ensureMembership, getBasePaths } from "@/lib/tenant";
+import PhonePrompt from "@/app/components/PhonePrompt";
 import BookingClient from "./BookingClient";
 
 export default async function BookPage({ params }: { params: { slug: string } }) {
@@ -26,8 +27,14 @@ export default async function BookPage({ params }: { params: { slug: string } })
   // signed-out visitor to /login the moment they try to do something that
   // genuinely requires an account, like confirming a real booking.
   let packagesForClient: any[] = [];
+  let needsPhone = false;
   if (session) {
     const userId = (session.user as any).id;
+
+    // Signed-in customers with no phone on file get a pop-up asking for one
+    // (booking itself also requires it).
+    const profileUser = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } });
+    needsPhone = !profileUser?.phone || profileUser.phone.replace(/\D/g, "").length < 7;
 
     // First time this player interacts with this business, give them a
     // "player" Membership automatically — booking with a new golf pro doesn't
@@ -80,6 +87,8 @@ export default async function BookPage({ params }: { params: { slug: string } })
   const { dailyApiKey, ...businessForClient } = business;
 
   return (
+    <>
+    {needsPhone && <PhonePrompt audience="customer" />}
     <BookingClient
       initialPackages={packagesForClient}
       business={{ ...businessForClient, instructorName: instructorDisplayName }}
@@ -89,5 +98,6 @@ export default async function BookPage({ params }: { params: { slug: string } })
       apiBase={apiBase}
       isSignedIn={!!session}
     />
+    </>
   );
 }

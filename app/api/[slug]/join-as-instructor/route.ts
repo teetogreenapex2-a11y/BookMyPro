@@ -33,6 +33,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "You already have instructor access here" }, { status: 400 });
   }
 
+  // They just gave us a phone number - keep it on their profile too, so
+  // they aren't asked for it again once they're approved. Never overwrites
+  // a number they already had.
+  const profileUser = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } });
+  if (!profileUser?.phone) {
+    await prisma.user.update({ where: { id: userId }, data: { phone: phone.trim() } });
+  }
+
   await prisma.membership.upsert({
     where: { userId_businessId: { userId, businessId: business.id } },
     update: { role: "instructor", status: "pending" },

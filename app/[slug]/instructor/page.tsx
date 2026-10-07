@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, requireMembership, getBasePaths } from "@/lib/tenant";
 import { hasCalendarConnected } from "@/lib/calendar";
 import { businessPageMetadata } from "@/lib/pageMetadata";
+import { prisma } from "@/lib/prisma";
+import PhonePrompt from "@/app/components/PhonePrompt";
 import InstructorClient from "./InstructorClient";
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
@@ -22,7 +24,14 @@ export default async function InstructorPage({ params }: { params: { slug: strin
   const { basePath, apiBase } = getBasePaths(params.slug);
   if (!membership) redirect(`${basePath}/book`);
 
+  // Owners and instructors who set up before a phone number was required
+  // get a pop-up asking for one (see PhonePrompt).
+  const profileUser = await prisma.user.findUnique({ where: { id: (session.user as any).id }, select: { phone: true } });
+  const needsPhone = !profileUser?.phone || profileUser.phone.replace(/\D/g, "").length < 7;
+
   return (
+    <>
+    {needsPhone && <PhonePrompt />}
     <InstructorClient
       slug={params.slug}
       businessName={business.name}
@@ -39,5 +48,6 @@ export default async function InstructorPage({ params }: { params: { slug: strin
       closeHour={business.closeHour}
       timezone={business.timezone}
     />
+    </>
   );
 }
