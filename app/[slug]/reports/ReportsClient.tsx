@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import FakeNativeTabBar, { FAKE_TAB_BAR_HEIGHT } from "@/app/components/FakeNativeTabBar";
 import { useSandboxPreview } from "@/lib/sandboxPreview";
+import CustomerReport from "./CustomerReport";
 
 type InstructorFigure = { instructorMembershipId: string; name: string; revenueCents: number; count: number };
 type PeriodFigures = {
@@ -110,28 +111,31 @@ export default function ReportsClient({
   return (
     <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
-        <div style={{ maxWidth: 560, margin: "0 auto" }}>
+        <div style={{ maxWidth: 960, margin: "0 auto" }}>
           <a href={`${basePath}/instructor`} style={{ color: "#D7DED9", textDecoration: "none", fontSize: 13 }}>&larr; Back</a>
           <h1 className="display" style={{ fontSize: 24, margin: "6px 0 0" }}>Reports</h1>
           <p style={{ fontSize: 13, color: "#D7DED9", margin: "4px 0 0" }}>{businessName}</p>
         </div>
       </header>
 
-      <main style={{ maxWidth: 560, margin: "0 auto", padding: `20px 20px ${(isNative || isSandboxPreview) ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
+      <main style={{ maxWidth: 960, margin: "0 auto", padding: `20px 20px ${(isNative || isSandboxPreview) ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
         {loading ? (
           <p style={{ color: "var(--muted)" }}>Loading…</p>
         ) : error ? (
           <p style={{ color: "#B23A3A" }}>{error}</p>
         ) : data ? (
           <>
-            <PeriodSection title="Today" figures={data.daily} />
-            <PeriodSection title="This month" figures={data.monthly} />
-            <PeriodSection title="Year to date" figures={data.ytd} />
-            {!isOwner && (
-              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
-                Showing your own figures only.
-              </p>
-            )}
+            <div style={{ maxWidth: 560 }}>
+              <PeriodSection title="Today" figures={data.daily} />
+              <PeriodSection title="This month" figures={data.monthly} />
+              <PeriodSection title="Year to date" figures={data.ytd} />
+              {!isOwner && (
+                <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
+                  Showing your own figures only.
+                </p>
+              )}
+            </div>
+            <CustomerReport apiBase={apiBase} />
           </>
         ) : null}
       </main>
