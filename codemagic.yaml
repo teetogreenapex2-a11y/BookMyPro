@@ -210,6 +210,11 @@ workflows:
           # genuinely new.
           cd ios/App
           agvtool new-version -all $BUILD_NUMBER
+          # Version 1.0 is already approved on the App Store, so Apple
+          # closes that "train" to new uploads. The version people see
+          # must be higher than the last approved one - bump it here.
+          sed -i '' 's/MARKETING_VERSION = [0-9.]*;/MARKETING_VERSION = 1.1;/g' App.xcodeproj/project.pbxproj
+          agvtool new-marketing-version 1.1
           cd ../..
       - name: Add push notification entitlements
         script: |
