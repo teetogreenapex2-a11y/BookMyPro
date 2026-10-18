@@ -15,6 +15,13 @@ class MainViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMes
     private let tabBar = UITabBar()
     private var currentSlug = ""
     private var currentRole = ""
+    // Dynamic ("four tabs plus More") mode, driven by the website.
+    private var dynamicMode = false
+    private var dynamicJson = ""
+    private var dynamicPaths: [Int: String] = [:]
+    private var dynamicKeys: [String] = []
+    private var activeTag = 1
+    private let moreTag = 100
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -83,6 +90,9 @@ class MainViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMes
           setRole: function(role, slug, pageKey) {
             window.webkit.messageHandlers.iosTabBar.postMessage({action: 'setRole', role: role, slug: slug, pageKey: pageKey});
           },
+          setTabs: function(json, slug, activeKey) {
+            window.webkit.messageHandlers.iosTabBar.postMessage({action: 'setTabs', json: json, slug: slug, activeKey: activeKey});
+          },
           hide: function() {
             window.webkit.messageHandlers.iosTabBar.postMessage({action: 'hide'});
           }
@@ -104,12 +114,69 @@ class MainViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMes
             return
         }
 
+        if action == "setTabs" {
+            updateDynamicTabs(json: body["json"] as? String ?? "",
+                              slug: body["slug"] as? String ?? "",
+                              activeKey: body["activeKey"] as? String ?? "")
+            return
+        }
+
         if action == "setRole" {
             let role = body["role"] as? String ?? ""
             let slug = body["slug"] as? String ?? ""
             let pageKey = body["pageKey"] as? String ?? ""
             updateTabBar(role: role, slug: slug, pageKey: pageKey)
         }
+    }
+
+    private func symbolFor(_ icon: String) -> String {
+        switch icon {
+        case "calendar": return "calendar"
+        case "customers": return "person.2.fill"
+        case "videos": return "video.fill"
+        case "sketch": return "pencil.and.outline"
+        case "settings": return "gearshape.fill"
+        case "book": return "book.fill"
+        case "messages": return "message.fill"
+        case "shop": return "bag.fill"
+        case "gift": return "gift.fill"
+        case "reports": return "chart.bar.fill"
+        case "team": return "person.3.fill"
+        default: return "ellipsis"
+        }
+    }
+
+    private func updateDynamicTabs(json: String, slug: String, activeKey: String) {
+        guard !slug.isEmpty else { tabBar.isHidden = true; return }
+        dynamicMode = true
+        currentSlug = slug
+        currentRole = "dynamic"
+
+        if json != dynamicJson {
+            guard let data = json.data(using: .utf8),
+                  let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return }
+            var items: [UITabBarItem] = []
+            dynamicPaths = [:]
+            dynamicKeys = []
+            for (i, o) in arr.prefix(4).enumerated() {
+                let tag = i + 1
+                dynamicPaths[tag] = o["path"] as? String ?? "/"
+                dynamicKeys.append(o["key"] as? String ?? "")
+                items.append(UITabBarItem(title: o["label"] as? String ?? "",
+                                          image: UIImage(systemName: symbolFor(o["icon"] as? String ?? "")),
+                                          tag: tag))
+            }
+            items.append(UITabBarItem(title: "More", image: UIImage(systemName: "ellipsis"), tag: moreTag))
+            tabBar.items = items
+            dynamicJson = json
+        }
+
+        var target = moreTag
+        for (i, k) in dynamicKeys.enumerated() where k == activeKey { target = i + 1; break }
+        activeTag = target
+        tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == target })
+        tabBar.isHidden = false
+        view.bringSubviewToFront(tabBar)
     }
 
     private func updateTabBar(role: String, slug: String, pageKey: String) {
@@ -181,6 +248,20 @@ class MainViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMes
     // MARK: - Handling a real tap on a tab
 
     func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
+        if dynamicMode {
+            if item.tag == moreTag {
+                self.bridge?.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('bmp-open-more'))", completionHandler: nil)
+                // Keep the highlight on the page actually showing.
+                tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == activeTag })
+                return
+            }
+            activeTag = item.tag
+            if let p = dynamicPaths[item.tag], let url = URL(string: "https://bookmypro.app/\(currentSlug)\(p)") {
+                self.bridge?.webView?.load(URLRequest(url: url))
+            }
+            return
+        }
+
         let isInstructorRole = currentRole == "instructor" || currentRole == "owner"
         let path: String
         switch item.tag {

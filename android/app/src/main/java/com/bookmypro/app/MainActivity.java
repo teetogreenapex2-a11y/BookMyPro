@@ -17,17 +17,29 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationBarView;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.view.MenuItem;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
     private BottomNavigationView tabBar;
     private String currentSlug = "";
     private String currentRole = "";
+    private WebView webViewRef;
+    // Dynamic ("four tabs plus More") mode, driven by the website.
+    private static final int MORE_ID = 1000;
+    private boolean dynamicMode = false;
+    private String dynamicJson = "";
+    private String[] dynamicPaths = new String[0];
+    private String[] dynamicKeys = new String[0];
+    private int activeDynamicId = 1;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         WebView webView = this.bridge.getWebView();
+        webViewRef = webView;
 
         // The app loads the real, live website directly rather than a
         // locally bundled copy, which means if the device has no
@@ -70,6 +82,11 @@ public class MainActivity extends BridgeActivity {
             public void setRole(final String role, final String slug, final String pageKey) {
                 Log.d("TabBarDebug", "setRole called with role=" + role + " slug=" + slug + " pageKey=" + pageKey);
                 runOnUiThread(() -> updateTabBar(role, slug, pageKey));
+            }
+
+            @JavascriptInterface
+            public void setTabs(final String json, final String slug, final String activeKey) {
+                runOnUiThread(() -> updateDynamicTabs(json, slug, activeKey));
             }
 
             @JavascriptInterface
@@ -122,6 +139,25 @@ public class MainActivity extends BridgeActivity {
         });
 
         tabClickListener = item -> {
+            if (dynamicMode) {
+                int did = item.getItemId();
+                if (did == MORE_ID) {
+                    webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('bmp-open-more'))", null);
+                    // Keep the highlight on the page actually showing.
+                    tabBar.post(() -> {
+                        tabBar.setOnItemSelectedListener(null);
+                        tabBar.setSelectedItemId(activeDynamicId);
+                        tabBar.setOnItemSelectedListener(tabClickListener);
+                    });
+                    return false;
+                }
+                int idx = did - 1;
+                if (idx >= 0 && idx < dynamicPaths.length) {
+                    activeDynamicId = did;
+                    webView.loadUrl("https://bookmypro.app/" + currentSlug + dynamicPaths[idx]);
+                }
+                return true;
+            }
             String path;
             int id = item.getItemId();
             boolean isInstructorRole = "instructor".equals(currentRole) || "owner".equals(currentRole);
@@ -139,6 +175,70 @@ public class MainActivity extends BridgeActivity {
     }
 
     private BottomNavigationView.OnItemSelectedListener tabClickListener;
+
+    private int iconFor(String icon) {
+        switch (icon == null ? "" : icon) {
+            case "calendar": return R.drawable.tab_calendar;
+            case "customers": return R.drawable.tab_customers;
+            case "videos": return R.drawable.tab_videos;
+            case "sketch": return R.drawable.tab_swingsketch;
+            case "settings": return R.drawable.tab_settings;
+            case "book": return R.drawable.tab_book;
+            case "messages": return R.drawable.tab_messages;
+            case "shop": return R.drawable.tab_shop;
+            case "gift": return R.drawable.tab_gift;
+            case "reports": return R.drawable.tab_reports;
+            case "team": return R.drawable.tab_team;
+            default: return R.drawable.tab_more;
+        }
+    }
+
+    // The website sends the tab list (JSON) plus the business slug and which
+    // tab is active ("more" when the current page lives in the More sheet).
+    private void updateDynamicTabs(String json, String slug, String activeKey) {
+        try {
+            if (slug == null || slug.isEmpty()) { tabBar.setVisibility(View.GONE); return; }
+            dynamicMode = true;
+            currentSlug = slug;
+            currentRole = "dynamic";
+
+            if (!json.equals(dynamicJson)) {
+                JSONArray arr = new JSONArray(json);
+                int n = Math.min(arr.length(), 4);
+                dynamicPaths = new String[n];
+                dynamicKeys = new String[n];
+                tabBar.setOnItemSelectedListener(null);
+                tabBar.getMenu().clear();
+                for (int i = 0; i < n; i++) {
+                    JSONObject o = arr.getJSONObject(i);
+                    dynamicPaths[i] = o.getString("path");
+                    dynamicKeys[i] = o.getString("key");
+                    MenuItem mi = tabBar.getMenu().add(0, i + 1, i, o.getString("label"));
+                    mi.setIcon(iconFor(o.optString("icon")));
+                }
+                MenuItem more = tabBar.getMenu().add(0, MORE_ID, n, "More");
+                more.setIcon(R.drawable.tab_more);
+                dynamicJson = json;
+                tabBar.setOnItemSelectedListener(tabClickListener);
+            }
+
+            int target = MORE_ID;
+            for (int i = 0; i < dynamicKeys.length; i++) {
+                if (dynamicKeys[i].equals(activeKey)) { target = i + 1; break; }
+            }
+            activeDynamicId = target;
+            if (tabBar.getSelectedItemId() != target) {
+                tabBar.setOnItemSelectedListener(null);
+                tabBar.setSelectedItemId(target);
+                tabBar.setOnItemSelectedListener(tabClickListener);
+            }
+            tabBar.setVisibility(View.VISIBLE);
+            tabBar.requestLayout();
+            tabBar.invalidate();
+        } catch (Exception e) {
+            Log.e("TabBarDebug", "setTabs failed", e);
+        }
+    }
 
     private void updateTabBar(String role, String slug, String pageKey) {
         Log.d("TabBarDebug", "updateTabBar running with role=" + role + " slug=" + slug + " pageKey=" + pageKey + " currentRole=" + currentRole + " currentSlug=" + currentSlug);

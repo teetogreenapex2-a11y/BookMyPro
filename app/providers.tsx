@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { SessionProvider } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
+import { navFor, keyForPage } from "@/lib/navCatalog";
+import NativeMoreSheet from "@/app/components/NativeMoreSheet";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   // This runs once, regardless of which page the app happens to load into
@@ -24,6 +26,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <TabBarSync />
+      <NativeMoreSheet />
       <NativeAuthListener />
       <AndroidBackButtonHandler />
       {children}
@@ -172,8 +175,18 @@ function TabBarSync() {
     fetch(`/api/${slug}/my-role`)
       .then((r) => r.json())
       .then(({ role }) => {
-        if (role) bridge.setRole?.(role, slug, pageKey);
-        else bridge.hide?.();
+        if (!role) { bridge.hide?.(); return; }
+        // Newer app builds: send the full tab list (four tabs plus More)
+        // so the tabs can change from the website without a new build.
+        const nav = navFor(role);
+        if (bridge.setTabs && nav) {
+          const k = keyForPage(nav.all, page);
+          const active = nav.main.some((t) => t.key === k) ? k : "more";
+          bridge.setTabs(JSON.stringify(nav.main), slug, active);
+          return;
+        }
+        // Older installed builds only know the fixed role-based tabs.
+        bridge.setRole?.(role, slug, pageKey);
       })
       .catch(() => bridge.hide?.());
   }, [pathname, status]);
