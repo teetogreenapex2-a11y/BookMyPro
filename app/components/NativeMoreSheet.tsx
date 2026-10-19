@@ -54,11 +54,11 @@ export default function NativeMoreSheet() {
   return (
     <div
       onClick={() => setOpen(false)}
-      style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end" }}
+      style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.25)", display: "flex", alignItems: "flex-end" }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", background: "#fff", borderRadius: "20px 20px 0 0", padding: `16px 16px ${16 + bottomPad}px`, boxShadow: "0 -8px 30px rgba(0,0,0,0.2)" }}
+        style={{ width: "100%", background: "rgba(255,255,255,0.72)", WebkitBackdropFilter: "blur(18px) saturate(1.4)", backdropFilter: "blur(18px) saturate(1.4)", borderTop: "1px solid rgba(255,255,255,0.6)", borderRadius: "20px 20px 0 0", padding: `16px 16px ${16 + bottomPad}px`, boxShadow: "0 -8px 30px rgba(0,0,0,0.2)" }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div style={{ fontWeight: 700, fontSize: 17, color: "#1B3A2F" }}>More</div>
@@ -73,7 +73,7 @@ export default function NativeMoreSheet() {
               <button
                 key={it.key}
                 onClick={() => { setOpen(false); router.push(`/${slug}${it.path}`); }}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "16px 6px", border: "1px solid #E3D9C9", borderRadius: 16, background: "#F6F4EE", color: "#1B3A2F", fontSize: 13, fontWeight: 600 }}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "16px 6px", border: "1px solid rgba(27,58,47,0.14)", borderRadius: 16, background: "rgba(246,244,238,0.6)", color: "#1B3A2F", fontSize: 13, fontWeight: 600 }}
               >
                 <Icon size={30} />
                 <span>{it.label}</span>
