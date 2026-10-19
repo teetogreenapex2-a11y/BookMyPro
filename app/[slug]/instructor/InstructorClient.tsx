@@ -156,6 +156,9 @@ export default function InstructorClient({
   // and only flipping it true after the component has actually mounted
   // on the client avoids that mismatch entirely.
   const [isNative, setIsNative] = useState(false);
+  // True only in app builds that have the new bottom bar with a More tab.
+  // Older installed builds keep showing the top buttons so nothing is lost.
+  const [hasMoreBar, setHasMoreBar] = useState(false);
   const isSandboxPreview = useSandboxPreview();
   const [unreadMessages, setUnreadMessages] = useState(0);
   useEffect(() => {
@@ -185,6 +188,7 @@ export default function InstructorClient({
   }, []);
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
+    setHasMoreBar(Capacitor.isNativePlatform() && typeof (window as any).AndroidTabBar?.setTabs === "function");
   }, []);
 
   useEffect(() => {
@@ -896,7 +900,7 @@ export default function InstructorClient({
                 </>
               )}
               {/* On the phone these live in the bottom bar / More sheet */}
-              {!isNative && (
+              {!hasMoreBar && (
                 <>
               <a href={`${basePath}/instructor/shop`} style={{
                 fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
@@ -946,7 +950,7 @@ export default function InstructorClient({
               </button>
             </div>
           </div>
-          {isNative && (
+          {hasMoreBar && (
             <a href={`${basePath}/instructor/messages`} style={{
               display: "block", margin: "0 0 12px", padding: "9px 14px", borderRadius: 10, textDecoration: "none",
               fontSize: 13.5, fontWeight: 600,

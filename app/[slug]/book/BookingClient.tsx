@@ -106,9 +106,12 @@ export default function BookingClient({
   // at false to match the server, and only updating it after mounting on
   // the client, avoids that entirely.
   const [isNative, setIsNative] = useState(false);
+  // True only in app builds that have the new bottom bar with a More tab.
+  const [hasMoreBar, setHasMoreBar] = useState(false);
   const isSandboxPreview = useSandboxPreview();
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
+    setHasMoreBar(Capacitor.isNativePlatform() && typeof (window as any).AndroidTabBar?.setTabs === "function");
   }, []);
   const [isRemote, setIsRemote] = useState(false);
   const [packages, setPackages] = useState<Package[]>(initialPackages);
@@ -842,7 +845,7 @@ export default function BookingClient({
                   </a>
                 </>
               )}
-              {!isNative && (
+              {!hasMoreBar && (
                 <>
               <a href={`${basePath}/shop`} style={{
                 fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
@@ -858,7 +861,7 @@ export default function BookingClient({
               </a>
                 </>
               )}
-              {isSignedIn && !isNative && (
+              {isSignedIn && !hasMoreBar && (
                 <a href={`${basePath}/messages`} style={{
                   position: "relative", fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                   border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
@@ -903,7 +906,7 @@ export default function BookingClient({
               )}
             </div>
           </div>
-          {isNative && isSignedIn && (
+          {hasMoreBar && isSignedIn && (
             <a href={`${basePath}/messages`} style={{
               display: "block", margin: "0 0 12px", padding: "9px 14px", borderRadius: 10, textDecoration: "none",
               fontSize: 13.5, fontWeight: 600,
