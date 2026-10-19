@@ -895,6 +895,9 @@ export default function InstructorClient({
                   </a>
                 </>
               )}
+              {/* On the phone these live in the bottom bar / More sheet */}
+              {!isNative && (
+                <>
               <a href={`${basePath}/instructor/shop`} style={{
                 fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                 border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
@@ -925,6 +928,8 @@ export default function InstructorClient({
               }}>
                 Reports
               </a>
+                </>
+              )}
               {!isNative && !isSandboxPreview && (
                 <a href={`${basePath}/settings`} style={{
                   fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
@@ -941,6 +946,21 @@ export default function InstructorClient({
               </button>
             </div>
           </div>
+          {isNative && (
+            <a href={`${basePath}/instructor/messages`} style={{
+              display: "block", margin: "0 0 12px", padding: "9px 14px", borderRadius: 10, textDecoration: "none",
+              fontSize: 13.5, fontWeight: 600,
+              background: (unreadMessages > 0 || unreadStaffMessages > 0) ? "rgba(184,134,43,0.22)" : "rgba(255,255,255,0.08)",
+              color: (unreadMessages > 0 || unreadStaffMessages > 0) ? "#F3D58E" : "#D7DED9",
+              border: "1px solid rgba(255,255,255,0.18)",
+            }}>
+              {unreadMessages > 0
+                ? "You have a message waiting"
+                : unreadStaffMessages > 0
+                  ? "You have a team message waiting"
+                  : "You don\u2019t have any messages"}
+            </a>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
             <h1 className="display" style={{ fontSize: 26, margin: 0 }}>Availability</h1>
             {pendingBookings.length > 0 && (

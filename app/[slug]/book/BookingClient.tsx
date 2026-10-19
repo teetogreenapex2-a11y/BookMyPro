@@ -842,6 +842,8 @@ export default function BookingClient({
                   </a>
                 </>
               )}
+              {!isNative && (
+                <>
               <a href={`${basePath}/shop`} style={{
                 fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                 border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
@@ -854,7 +856,9 @@ export default function BookingClient({
               }}>
                 Gift Cards
               </a>
-              {isSignedIn && (
+                </>
+              )}
+              {isSignedIn && !isNative && (
                 <a href={`${basePath}/messages`} style={{
                   position: "relative", fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                   border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
@@ -899,6 +903,17 @@ export default function BookingClient({
               )}
             </div>
           </div>
+          {isNative && isSignedIn && (
+            <a href={`${basePath}/messages`} style={{
+              display: "block", margin: "0 0 12px", padding: "9px 14px", borderRadius: 10, textDecoration: "none",
+              fontSize: 13.5, fontWeight: 600,
+              background: unreadMessages > 0 ? "rgba(184,134,43,0.22)" : "rgba(255,255,255,0.08)",
+              color: unreadMessages > 0 ? "#F3D58E" : "#D7DED9",
+              border: "1px solid rgba(255,255,255,0.18)",
+            }}>
+              {unreadMessages > 0 ? "You have a message waiting" : "You don\u2019t have any messages"}
+            </a>
+          )}
           <h1 className="display" style={{ fontSize: 26, margin: "0 0 4px" }}>
             {service === "lesson" ? "Book a lesson" : "Book a club fitting"}
           </h1>
