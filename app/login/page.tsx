@@ -232,7 +232,7 @@ function LoginPageInner() {
                 borderRadius: 8, padding: "12px 20px", fontWeight: 600, fontSize: 14, marginTop: 20,
               }}
             >
-              Already have an account? Sign in
+              Sign in or create an account
             </button>
           </>
         ) : (
