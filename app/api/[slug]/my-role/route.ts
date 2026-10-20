@@ -19,5 +19,10 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   const userId = (session.user as any).id;
   const membership = await getMembership(userId, business.id);
-  return NextResponse.json({ role: membership?.role || null });
+  // Only an active membership counts. A pending or deactivated one is
+  // treated as no role at all - the pages themselves refuse it and bounce
+  // the person back to the booking page, so showing staff tabs for it just
+  // made every tab appear to "go back to booking."
+  if (!membership || membership.status !== "active") return NextResponse.json({ role: null });
+  return NextResponse.json({ role: membership.role });
 }
