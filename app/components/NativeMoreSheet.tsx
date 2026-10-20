@@ -31,7 +31,6 @@ export default function NativeMoreSheet() {
   useEffect(() => { setOpen(false); }, [pathname]);
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
     const onOpen = async () => {
       if (!currentSlug || status !== "authenticated") return;
       try {
@@ -58,12 +57,12 @@ export default function NativeMoreSheet() {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", background: "rgba(255,255,255,0.72)", WebkitBackdropFilter: "blur(18px) saturate(1.4)", backdropFilter: "blur(18px) saturate(1.4)", borderTop: "1px solid rgba(255,255,255,0.6)", borderRadius: "20px 20px 0 0", padding: `16px 16px ${16 + bottomPad}px`, boxShadow: "0 -8px 30px rgba(0,0,0,0.2)" }}
+        style={{ width: "100%", background: "rgba(27,58,47,0.58)", WebkitBackdropFilter: "blur(22px) saturate(1.5)", backdropFilter: "blur(22px) saturate(1.5)", borderTop: "1px solid rgba(255,255,255,0.28)", borderRadius: "20px 20px 0 0", padding: `16px 16px ${16 + bottomPad}px`, boxShadow: "0 -8px 30px rgba(0,0,0,0.2)" }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div style={{ fontWeight: 700, fontSize: 17, color: "#1B3A2F" }}>More</div>
+          <div style={{ fontWeight: 700, fontSize: 17, color: "#F6F4EE" }}>More</div>
           <button onClick={() => setOpen(false)} aria-label="Close" style={{ border: 0, background: "transparent", padding: 6 }}>
-            <X size={22} color="#1B3A2F" />
+            <X size={22} color="#F6F4EE" />
           </button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
@@ -73,7 +72,7 @@ export default function NativeMoreSheet() {
               <button
                 key={it.key}
                 onClick={() => { setOpen(false); router.push(`/${slug}${it.path}`); }}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "16px 6px", border: "1px solid rgba(27,58,47,0.14)", borderRadius: 16, background: "rgba(246,244,238,0.6)", color: "#1B3A2F", fontSize: 13, fontWeight: 600 }}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "16px 6px", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 16, background: "rgba(255,255,255,0.12)", color: "#F6F4EE", fontSize: 13, fontWeight: 600 }}
               >
                 <Icon size={30} />
                 <span>{it.label}</span>

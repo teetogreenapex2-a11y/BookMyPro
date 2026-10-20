@@ -7,6 +7,7 @@ import { SessionProvider } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 import { navFor, keyForPage } from "@/lib/navCatalog";
 import NativeMoreSheet from "@/app/components/NativeMoreSheet";
+import WebTabBar from "@/app/components/WebTabBar";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   // This runs once, regardless of which page the app happens to load into
@@ -27,6 +28,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <TabBarSync />
       <NativeMoreSheet />
+      <WebTabBar />
       <NativeAuthListener />
       <AndroidBackButtonHandler />
       {children}

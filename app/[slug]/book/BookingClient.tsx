@@ -111,7 +111,14 @@ export default function BookingClient({
   const isSandboxPreview = useSandboxPreview();
   useEffect(() => {
     setIsNative(Capacitor.isNativePlatform());
-    setHasMoreBar(Capacitor.isNativePlatform() && typeof (window as any).AndroidTabBar?.setTabs === "function");
+    setHasMoreBar(
+      (Capacitor.isNativePlatform() && typeof (window as any).AndroidTabBar?.setTabs === "function") ||
+      !!(window as any).__bmpWebBar
+    );
+    // The browser version shows the same bottom bar on phone-sized screens.
+    const onWebBar = (e: any) => { if (!Capacitor.isNativePlatform()) setHasMoreBar(!!e.detail); };
+    window.addEventListener("bmp-webbar", onWebBar);
+    return () => window.removeEventListener("bmp-webbar", onWebBar);
   }, []);
   const [isRemote, setIsRemote] = useState(false);
   const [packages, setPackages] = useState<Package[]>(initialPackages);
