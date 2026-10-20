@@ -836,7 +836,7 @@ export default function BookingClient({
               </span>
             </span>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {!isNative && !isSandboxPreview && (
+              {!isNative && !hasMoreBar && !isSandboxPreview && (
                 <>
                   <a href={`${basePath}/videos`} style={{
                     fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
@@ -879,7 +879,7 @@ export default function BookingClient({
                   )}
                 </a>
               )}
-              {isSignedIn && !isNative && !isSandboxPreview && (
+              {isSignedIn && !isNative && !hasMoreBar && !isSandboxPreview && (
                 <a href={`${basePath}/settings`} style={{
                   fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                   border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",

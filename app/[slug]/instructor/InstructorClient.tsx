@@ -884,7 +884,7 @@ export default function InstructorClient({
               </span>
             </span>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              {!isNative && !isSandboxPreview && (
+              {!isNative && !hasMoreBar && !isSandboxPreview && (
                 <>
                   <a href={`${basePath}/customers`} style={{
                     fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
@@ -941,7 +941,7 @@ export default function InstructorClient({
               </a>
                 </>
               )}
-              {!isNative && !isSandboxPreview && (
+              {!isNative && !hasMoreBar && !isSandboxPreview && (
                 <a href={`${basePath}/settings`} style={{
                   fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
                   border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
