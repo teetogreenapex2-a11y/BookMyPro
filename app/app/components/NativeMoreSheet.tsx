@@ -31,6 +31,7 @@ export default function NativeMoreSheet() {
   useEffect(() => { setOpen(false); }, [pathname]);
 
   useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
     const onOpen = async () => {
       if (!currentSlug || status !== "authenticated") return;
       try {
