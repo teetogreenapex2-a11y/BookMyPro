@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getMembership } from "@/lib/tenant";
+import { visiblePlayerUserIds } from "@/lib/messageAccess";
 
 // GET /api/{slug}/conversations/unread-count
 //
@@ -34,9 +35,13 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   // Staff (owner/instructor) - unread messages from players, across
   // every conversation at this business, not just one thread.
+  const allowed = await visiblePlayerUserIds(business.id, membership);
   const count = await prisma.message.count({
     where: {
-      conversation: { businessId: business.id },
+      conversation: {
+        businessId: business.id,
+        ...(allowed ? { playerMembership: { userId: { in: Array.from(allowed) } } } : {}),
+      },
       readAt: null,
       sender: { role: "player" },
     },

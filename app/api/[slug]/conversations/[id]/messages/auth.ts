@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
+import { staffCanSeePlayer } from "@/lib/messageAccess";
 
 // Shared by both route.ts (text messages) and upload-token/route.ts
 // (image messages) - kept in its own file specifically because a
@@ -26,6 +27,17 @@ export async function authorizedMembershipFor(req: NextRequest, slug: string, co
   // the whole point of one shared thread per player is that anyone on
   // staff can pick it up.
   if (membership.role === "player" && conversation.playerMembershipId !== membership.id) return null;
+
+  // Owners can open any conversation. An instructor can only open the
+  // ones with their own customers (someone who booked or holds a package
+  // with them).
+  if (membership.role === "instructor") {
+    const player = await prisma.membership.findUnique({
+      where: { id: conversation.playerMembershipId },
+      select: { userId: true },
+    });
+    if (!player || !(await staffCanSeePlayer(business.id, membership, player.userId))) return null;
+  }
 
   return { business, membership, conversation };
 }

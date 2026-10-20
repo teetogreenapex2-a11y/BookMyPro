@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
+import { visiblePlayerUserIds } from "@/lib/messageAccess";
 
 // GET /api/{slug}/conversations
 //
@@ -25,8 +26,14 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor"]);
   if (!membership) return NextResponse.json({ error: "Instructor access required" }, { status: 403 });
 
+  // Owners see everyone; instructors see only their own customers.
+  const allowed = await visiblePlayerUserIds(business.id, membership);
+
   const conversations = await prisma.conversation.findMany({
-    where: { businessId: business.id },
+    where: {
+      businessId: business.id,
+      ...(allowed ? { playerMembership: { userId: { in: Array.from(allowed) } } } : {}),
+    },
     include: {
       playerMembership: { select: { user: { select: { name: true, email: true } } } },
       messages: { orderBy: { createdAt: "desc" }, take: 1 },

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
+import { staffCanSeePlayer } from "@/lib/messageAccess";
 
 // POST /api/{slug}/conversations/start  { playerMembershipId }
 // Instructor/owner only - the reverse of what already happens
@@ -30,6 +31,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   });
   if (!playerMembership) {
     return NextResponse.json({ error: "Not a player at this business" }, { status: 400 });
+  }
+  if (!(await staffCanSeePlayer(business.id, membership, playerUserId))) {
+    return NextResponse.json({ error: "You can only message your own customers" }, { status: 403 });
   }
   const playerMembershipId = playerMembership.id;
 

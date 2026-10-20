@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
+import { visiblePlayerUserIds } from "@/lib/messageAccess";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
 
@@ -27,8 +28,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const text = body?.trim();
   if (!text) return NextResponse.json({ error: "Message can't be empty" }, { status: 400 });
 
+  // Owners message every customer; an instructor's message goes only to
+  // their own customers.
+  const allowed = await visiblePlayerUserIds(business.id, membership);
   const players = await prisma.membership.findMany({
-    where: { businessId: business.id, role: "player" },
+    where: {
+      businessId: business.id,
+      role: "player",
+      ...(allowed ? { userId: { in: Array.from(allowed) } } : {}),
+    },
   });
 
   const preview = text.length > 80 ? text.slice(0, 80) + "..." : text;

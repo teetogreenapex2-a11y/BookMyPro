@@ -4,6 +4,7 @@ import { getBusinessInstructors } from "@/lib/tenant";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
 import { authorizedMembershipFor } from "./auth";
+import { staffCanSeePlayer } from "@/lib/messageAccess";
 
 // GET /api/{slug}/conversations/{id}/messages
 // Also marks the other side's messages as read the moment this is
@@ -59,8 +60,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // can pick it up, same as the shared-inbox idea behind one thread
     // per player rather than per instructor.
     const staff = await getBusinessInstructors(auth.business.id);
+    // Only the owner and this customer's own instructors get the alert.
+    const playerUserId = auth.membership.userId;
+    const recipients: typeof staff = [];
+    for (const s of staff) {
+      if (await staffCanSeePlayer(auth.business.id, s, playerUserId)) recipients.push(s);
+    }
     await Promise.all(
-      staff.map((s) => sendPushToMembership(s.id, { title: "New message", body: preview, url }))
+      recipients.map((s) => sendPushToMembership(s.id, { title: "New message", body: preview, url }))
     );
   } else {
     await sendPushToMembership(auth.conversation.playerMembershipId, { title: `Message from ${auth.business.name}`, body: preview, url });

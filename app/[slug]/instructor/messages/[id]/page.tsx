@@ -6,6 +6,7 @@ import { getBusinessBySlug, requireMembership, getBasePaths } from "@/lib/tenant
 import { loginRedirectUrl } from "@/lib/businessUrl";
 import { businessPageMetadata } from "@/lib/pageMetadata";
 import ChatThread from "@/app/components/ChatThread";
+import { staffCanSeePlayer } from "@/lib/messageAccess";
 
 export async function generateMetadata({ params }: { params: { slug: string; id: string } }) {
   return businessPageMetadata(params.slug, "Messages");
@@ -26,6 +27,7 @@ export default async function InstructorConversationPage({ params }: { params: {
     include: { playerMembership: { include: { user: { select: { name: true, email: true } } } } },
   });
   if (!conversation || conversation.businessId !== business.id) notFound();
+  if (!(await staffCanSeePlayer(business.id, membership, conversation.playerMembership.userId))) notFound();
 
   const { apiBase, basePath } = getBasePaths(params.slug);
   const playerName = conversation.playerMembership.user.name || conversation.playerMembership.user.email;
