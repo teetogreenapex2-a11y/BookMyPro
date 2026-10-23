@@ -5,7 +5,7 @@ import Image from "next/image";
 import TilePicker from "@/app/components/TilePicker";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
-import { FITTING_TYPES, centsToDollars, enabledPackages, enabledFittings, getFittingPriceCents } from "@/lib/pricing";
+import { PACKAGES, FITTING_TYPES, centsToDollars, enabledPackages, enabledFittings, getFittingPriceCents } from "@/lib/pricing";
 import { formatTime12h, wallClockToUTC } from "@/lib/time";
 import PushNotificationPrompt from "@/app/components/PushNotificationPrompt";
 import HelpWidget from "@/app/components/HelpWidget";
@@ -23,7 +23,7 @@ function formatGroupCategory(category?: string | null, ageRange?: string | null)
   const label = labels[category] || category;
   return ageRange ? `${label} - ${ageRange}` : label;
 }
-type Package = { id: string; type: string; lessonsRemaining: number; rawLessonsRemaining?: number; lessonsTotal: number; paymentStatus?: string; balanceDueCents?: number; instructorMembershipId?: string | null };
+type Package = { id: string; type: string; durationLabel?: string | null; lessonsRemaining: number; rawLessonsRemaining?: number; lessonsTotal: number; paymentStatus?: string; balanceDueCents?: number; instructorMembershipId?: string | null };
 type Instructor = { id: string; name: string | null; email: string; image: string | null; role: string; [key: string]: any };
 
 // A real, well-known iOS timing issue: Apple's own push token takes a
@@ -1072,7 +1072,7 @@ export default function BookingClient({
                     }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 700 }}>
-                      {selectedPackage ? selectedPackage.type : pendingPackageInfo ? pendingPackageInfo.label : pendingDurationInfo!.label}
+                      {selectedPackage ? ownedLabel(selectedPackage) : pendingPackageInfo ? pendingPackageInfo.label : pendingDurationInfo!.label}
                     </div>
                     <div className="mono" style={{ fontSize: 11, fontWeight: 600 }}>
                       {selectedPackage
@@ -1084,6 +1084,36 @@ export default function BookingClient({
                   </button>
                 </div>
               )}
+
+              {durations.length > 0 && (() => {
+                const ownedList = packages.filter((p) => p.instructorMembershipId === selectedInstructorId && (p.rawLessonsRemaining ?? p.lessonsRemaining) > 0);
+                if (ownedList.length === 0) return null;
+                return (
+                  <div style={{ marginBottom: 14 }}>
+                    <div className="mono" style={{ fontSize: 11, color: "#9DB8A9", marginBottom: 8, letterSpacing: "0.04em" }}>YOUR PACKAGES</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {ownedList.map((op) => {
+                        const on = selectedPackageId === op.id;
+                        return (
+                          <button
+                            key={op.id}
+                            type="button"
+                            onClick={() => chooseOwnedPackage(op.id)}
+                            style={{
+                              background: on ? "var(--gold)" : "var(--chalk)", color: "var(--fairway)", borderRadius: 10,
+                              padding: "10px 14px", textAlign: "left", minWidth: 108, cursor: "pointer",
+                              border: on ? "2px solid var(--gold)" : "2px solid transparent",
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>{on ? "\u2713 " : ""}{ownedLabel(op)}</div>
+                            <div className="mono" style={{ fontSize: 11, fontWeight: 600, color: on ? "var(--fairway)" : "var(--gold)" }}>{op.lessonsRemaining} of {op.lessonsTotal} left</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {durations.length > 0 ? (
                 <div>
@@ -1861,6 +1891,12 @@ const contactInputStyle: React.CSSProperties = {
 const navBtnStyle: React.CSSProperties = {
   border: "1px solid var(--border)", background: "#FFF", borderRadius: 8, padding: "6px 12px", fontSize: 14,
 };
+
+function ownedLabel(p: { type: string; durationLabel?: string | null }) {
+  if (p.type === "duration") return p.durationLabel || "Lesson package";
+  const found = PACKAGES.find((x) => x.id === p.type);
+  return found ? found.label : p.type;
+}
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
