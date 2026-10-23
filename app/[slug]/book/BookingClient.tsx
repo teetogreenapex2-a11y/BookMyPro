@@ -1088,42 +1088,41 @@ export default function BookingClient({
                     {pendingDurationInfo ? "SWITCH LESSON OPTION" : "CHOOSE A LESSON OPTION"}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 320 }}>
-                    <select
-                      value={pendingCustomOfferingSlot ? `custom-${pendingCustomOfferingSlot}` : (pendingLessonsCount ?? "")}
-                      onChange={(e) => {
-                        const value = e.target.value;
+                    <TilePicker
+                      title="Choose a lesson option" placeholder="Choose an option…"
+                      value={pendingCustomOfferingSlot ? `custom-${pendingCustomOfferingSlot}` : (pendingLessonsCount != null ? String(pendingLessonsCount) : null)}
+                      options={[
+                        ...availableLessonsCounts.map((count) => ({
+                          value: String(count),
+                          label: count === 1 ? "Single lesson" : `${count}-pack`,
+                          price: priceHintForLessonsCount(count).replace(/^ - /, ""),
+                        })),
+                        ...activeCustomOfferings.map((o) => ({ value: `custom-${o.slot}`, label: o.name, price: centsToDollars(o.priceCents ?? 0) })),
+                      ]}
+                      onPick={(value) => {
                         if (value.startsWith("custom-")) {
                           setPendingCustomOfferingSlot(Number(value.replace("custom-", "")));
                           setPendingLessonsCount(null);
-                          setPendingDurationId(null);
-                          setPendingDurationPackageId(null);
                         } else {
                           setPendingLessonsCount(Number(value));
                           setPendingCustomOfferingSlot(null);
-                          setPendingDurationId(null);
-                          setPendingDurationPackageId(null);
                         }
+                        setPendingDurationId(null);
+                        setPendingDurationPackageId(null);
                       }}
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px",
-                        fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)",
-                      }}
-                    >
-                      <option value="" disabled>Choose an option…</option>
-                      {availableLessonsCounts.map((count) => (
-                        <option key={count} value={count}>{count === 1 ? "Single lesson" : `${count}-pack`}{priceHintForLessonsCount(count)}</option>
-                      ))}
-                      {activeCustomOfferings.map((o) => (
-                        <option key={`custom-${o.slot}`} value={`custom-${o.slot}`}>{o.name} - {centsToDollars(o.priceCents ?? 0)}</option>
-                      ))}
-                    </select>
+                    />
 
                     {pendingLessonsCount !== null && durationsForLessonsCount.length > 0 && (
-                      <select
-                        value={pendingDurationId || ""}
-                        onChange={(e) => {
-                          const durationId = e.target.value;
-                          if (!durationId) return;
+                      <TilePicker
+                        title="Choose a lesson type" placeholder="Choose a lesson type…"
+                        value={pendingDurationId || null}
+                        options={durationsForLessonsCount.map((d) => {
+                          const priceCents = pendingLessonsCount === 1
+                            ? d.singlePriceCents
+                            : d.packages.find((p) => p.lessonsCount === pendingLessonsCount)!.priceCents;
+                          return { value: d.id, label: `${d.minutes} min`, price: centsToDollars(priceCents), sub: pendingLessonsCount !== 1 ? `${pendingLessonsCount}-pack` : undefined };
+                        })}
+                        onPick={(durationId) => {
                           const duration = durations.find((d) => d.id === durationId);
                           if (!duration) return;
                           const packageOptionId = pendingLessonsCount === 1
@@ -1131,22 +1130,7 @@ export default function BookingClient({
                             : duration.packages.find((p) => p.lessonsCount === pendingLessonsCount)?.id || null;
                           chooseDurationOption(durationId, packageOptionId);
                         }}
-                        style={{
-                          border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px",
-                          fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)",
-                        }}
-                      >
-                        <option value="" disabled>Choose a lesson type…</option>
-                        {durationsForLessonsCount.map((d) => {
-                          const priceCents = pendingLessonsCount === 1
-                            ? d.singlePriceCents
-                            : d.packages.find((p) => p.lessonsCount === pendingLessonsCount)!.priceCents;
-                          const packSuffix = pendingLessonsCount !== 1 ? ` (${pendingLessonsCount}-pack)` : "";
-                          return (
-                            <option key={d.id} value={d.id}>{d.minutes} min - {centsToDollars(priceCents)}{packSuffix}</option>
-                          );
-                        })}
-                      </select>
+                      />
                     )}
                   </div>
                 </div>
@@ -1198,19 +1182,15 @@ export default function BookingClient({
                     This sends a request rather than booking a time directly — {selectedInstructor?.name || "your instructor"} will follow up to arrange it.
                   </p>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <select
-                      value={pendingPlayingLessonHoles ?? ""}
-                      onChange={(e) => setPendingPlayingLessonHoles(Number(e.target.value) as 9 | 18)}
-                      style={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)" }}
-                    >
-                      <option value="" disabled>Choose 9 or 18 holes…</option>
-                      {selectedInstructor?.playingLesson9Enabled && (
-                        <option value={9}>9 holes - {centsToDollars(selectedInstructor.playingLesson9PriceCents)}</option>
-                      )}
-                      {selectedInstructor?.playingLesson18Enabled && (
-                        <option value={18}>18 holes - {centsToDollars(selectedInstructor.playingLesson18PriceCents)}</option>
-                      )}
-                    </select>
+                    <TilePicker
+                      title="Choose 9 or 18 holes" placeholder="Choose 9 or 18 holes…"
+                      value={pendingPlayingLessonHoles != null ? String(pendingPlayingLessonHoles) : null}
+                      options={[
+                        ...(selectedInstructor?.playingLesson9Enabled ? [{ value: "9", label: "9 holes", price: centsToDollars(selectedInstructor.playingLesson9PriceCents) }] : []),
+                        ...(selectedInstructor?.playingLesson18Enabled ? [{ value: "18", label: "18 holes", price: centsToDollars(selectedInstructor.playingLesson18PriceCents) }] : []),
+                      ]}
+                      onPick={(v) => setPendingPlayingLessonHoles(Number(v) as 9 | 18)}
+                    />
                     <label style={{ display: "block" }}>
                       <span style={{ fontSize: 12, color: "#9DB8A9", display: "block", marginBottom: 4 }}>Preferred date (optional)</span>
                       <input
@@ -1268,23 +1248,12 @@ export default function BookingClient({
           {service === "fitting" && (
             <div style={{ maxWidth: 320 }}>
               {enabledFittings(selectedInstructor || {}).length === 0 ? null : (
-                <select
-                  value={fittingType || ""}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    setFittingType(id || null);
-                    setSelected(null);
-                  }}
-                  style={{
-                    width: "100%", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "10px 12px",
-                    fontFamily: "inherit", fontSize: 14, background: "var(--chalk)", color: "var(--fairway)",
-                  }}
-                >
-                  <option value="" disabled>Choose a fitting…</option>
-                  {enabledFittings(selectedInstructor || {}).map((f) => (
-                    <option key={f.id} value={f.id}>{f.label} - {centsToDollars(f.priceCents)} - {f.durationMin} min</option>
-                  ))}
-                </select>
+                <TilePicker
+                  title="Choose a fitting" placeholder="Choose a fitting…"
+                  value={fittingType || null}
+                  options={enabledFittings(selectedInstructor || {}).map((f) => ({ value: f.id, label: f.label, price: centsToDollars(f.priceCents), sub: `${f.durationMin} min` }))}
+                  onPick={(id) => { setFittingType(id); setSelected(null); }}
+                />
               )}
             </div>
           )}
@@ -1889,6 +1858,79 @@ const contactInputStyle: React.CSSProperties = {
 const navBtnStyle: React.CSSProperties = {
   border: "1px solid var(--border)", background: "#FFF", borderRadius: 8, padding: "6px 12px", fontSize: 14,
 };
+
+type TileOption = { value: string; label: string; price?: string; sub?: string };
+function TilePicker({ options, value, onPick, title, placeholder }: { options: TileOption[]; value: string | null; onPick: (v: string) => void; title: string; placeholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const current = options.find((o) => o.value === value);
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{
+          width: "100%", maxWidth: 320, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          textAlign: "left", background: "var(--chalk)", color: "var(--fairway)", borderRadius: 8,
+          padding: "10px 12px", fontSize: 14, border: current ? "2px solid var(--gold)" : "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
+        }}
+      >
+        <span style={{ fontWeight: current ? 700 : 400 }}>
+          {current ? `${current.label}${current.sub ? ` · ${current.sub}` : ""}` : (placeholder || "Choose…")}
+          {current?.price && <span className="mono" style={{ color: "var(--gold)", fontWeight: 700 }}>{`  ${current.price}`}</span>}
+        </span>
+        <span style={{ fontSize: 12, opacity: 0.6 }}>{current ? "Change" : "▾"}</span>
+      </button>
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 100000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 520, maxHeight: "80vh", overflowY: "auto",
+              background: "rgba(27,58,47,0.78)", backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
+              borderTopLeftRadius: 20, borderTopRightRadius: 20, color: "#fff",
+              padding: "16px 16px calc(28px + env(safe-area-inset-bottom))",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
+              <button type="button" onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 14 }}>Close</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+              {options.map((o) => {
+                const on = value === o.value;
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => { onPick(o.value); setOpen(false); }}
+                    style={{
+                      textAlign: "left", background: "var(--chalk)", color: "var(--fairway)", borderRadius: 12,
+                      padding: "14px 14px", cursor: "pointer",
+                      border: on ? "2px solid var(--gold)" : "2px solid transparent",
+                    }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{o.label}</div>
+                    {o.price && <div className="mono" style={{ fontSize: 15, color: "var(--gold)", fontWeight: 700, marginTop: 3 }}>{o.price}</div>}
+                    {o.sub && <div style={{ fontSize: 11.5, opacity: 0.7, marginTop: 3 }}>{o.sub}</div>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
