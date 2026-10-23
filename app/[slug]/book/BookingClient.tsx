@@ -952,18 +952,20 @@ export default function BookingClient({
                     onClick={() => { setSelectedInstructorId(inst.id); setSelected(null); }}
                     style={{
                       padding: "8px 14px", borderRadius: 10, fontSize: 13, fontWeight: 700, textAlign: "left",
-                      border: selectedInstructorId === inst.id ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.2)",
-                      background: selectedInstructorId === inst.id ? "rgba(184,134,43,0.18)" : "var(--chalk)",
-                      color: selectedInstructorId === inst.id ? "var(--chalk)" : "var(--fairway)",
+                      border: selectedInstructorId === inst.id ? "2px solid var(--gold)" : "2px solid transparent",
+                      background: selectedInstructorId === inst.id ? "var(--gold)" : "var(--chalk)",
+                      color: "var(--fairway)",
+                      opacity: selectedInstructorId && selectedInstructorId !== inst.id ? 0.35 : 1,
+                      transition: "opacity 0.2s",
                     }}
                   >
-                    <div style={{ color: selectedInstructorId === inst.id ? "var(--chalk)" : "var(--fairway)" }}>
-                      {inst.name || inst.email}
+                    <div style={{ color: "var(--fairway)" }}>
+                      {selectedInstructorId === inst.id ? "\u2713 " : ""}{inst.name || inst.email}
                     </div>
                     {inst.specialty && (
                       <div className="mono" style={{
                         fontSize: 10, fontWeight: 600, marginTop: 2,
-                        color: selectedInstructorId === inst.id ? "rgba(246,244,238,0.75)" : "var(--faint)",
+                        color: selectedInstructorId === inst.id ? "rgba(27,58,47,0.8)" : "var(--faint)",
                       }}>
                         {inst.specialty}
                       </div>
