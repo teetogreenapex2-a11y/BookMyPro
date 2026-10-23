@@ -1,5 +1,6 @@
 "use client";
 
+import TilePicker from "@/app/components/TilePicker";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
@@ -1203,40 +1204,38 @@ export default function InstructorClient({
                 {teamInstructors.length > 1 && (
                   <label>
                     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Instructor</div>
-                    <select
-                      value={newBookingForm.instructorMembershipId}
-                      onChange={(e) => {
-                        setNewBookingForm((f) => ({ ...f, instructorMembershipId: e.target.value, slotId: "" }));
-                        if (e.target.value) setViewingInstructorId(e.target.value);
+                    <TilePicker
+                      light
+                      title="Choose an instructor" placeholder="Choose an instructor…"
+                      value={newBookingForm.instructorMembershipId || null}
+                      options={teamInstructors.map((t) => ({ value: t.id, label: t.name || t.email }))}
+                      onPick={(v) => {
+                        setNewBookingForm((f) => ({ ...f, instructorMembershipId: v, slotId: "" }));
+                        if (v) setViewingInstructorId(v);
                       }}
-                      style={selectStyle}
-                    >
-                      <option value="">Choose an instructor…</option>
-                      {teamInstructors.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name || t.email}</option>
-                      ))}
-                    </select>
+                    />
                   </label>
                 )}
 
                 <label>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Type</div>
-                  <select
+                  <TilePicker
+                    light
+                    title="Choose a type" placeholder="Choose a type…"
                     value={newBookingForm.serviceType === "fitting" ? `fitting-${newBookingForm.fittingType}` : (newBookingForm.isRemote ? "lesson-remote" : "lesson")}
-                    onChange={(e) => {
-                      const v = e.target.value;
+                    options={[
+                      { value: "lesson", label: "Lesson" },
+                      ...(remoteLessonsEnabled ? [{ value: "lesson-remote", label: "Remote lesson", sub: "Video call" }] : []),
+                      { value: "fitting-driver", label: "Driver fitting" },
+                      { value: "fitting-iron", label: "Iron fitting" },
+                      { value: "fitting-full", label: "Full bag fitting" },
+                    ]}
+                    onPick={(v) => {
                       if (v === "lesson") setNewBookingForm((f) => ({ ...f, serviceType: "lesson", isRemote: false, packageId: "" }));
                       else if (v === "lesson-remote") setNewBookingForm((f) => ({ ...f, serviceType: "lesson", isRemote: true, packageId: "" }));
                       else setNewBookingForm((f) => ({ ...f, serviceType: "fitting", fittingType: v.replace("fitting-", ""), packageId: "" }));
                     }}
-                    style={selectStyle}
-                  >
-                    <option value="lesson">Lesson</option>
-                    {remoteLessonsEnabled && <option value="lesson-remote">Lesson - remote (video call)</option>}
-                    <option value="fitting-driver">Driver fitting</option>
-                    <option value="fitting-iron">Iron fitting</option>
-                    <option value="fitting-full">Full bag fitting</option>
-                  </select>
+                  />
                 </label>
 
                 <label>
@@ -1320,38 +1319,23 @@ export default function InstructorClient({
                         <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>
                           Package (optional - leave blank for a free-standing booking, e.g. pay in person)
                         </div>
-                        <select
+                        <TilePicker
+                          light
+                          title="Package" placeholder="No package - free-standing booking"
                           value={combinedValue}
-                          onChange={(e) => {
-                            const v = e.target.value;
+                          options={[
+                            { value: "", label: "No package", sub: "Free-standing booking" },
+                            ...selectedPlayer.packages.map((pkg) => ({ value: pkg.id, label: pkg.label, sub: `Owns - ${pkg.lessonsRemaining} of ${pkg.lessonsTotal} left` })),
+                            ...sellablePackages.map((p) => ({ value: `new:${p.id}`, label: p.label, price: centsToDollars(p.priceCents), sub: "Sell now" })),
+                          ]}
+                          onPick={(v) => {
                             if (v.startsWith("new:")) {
                               setNewBookingForm((f) => ({ ...f, packageId: "", buyNewPackageType: v.replace("new:", "") }));
                             } else {
                               setNewBookingForm((f) => ({ ...f, packageId: v, buyNewPackageType: "" }));
                             }
                           }}
-                          style={selectStyle}
-                        >
-                          <option value="">No package - free-standing booking</option>
-                          {selectedPlayer.packages.length > 0 && (
-                            <optgroup label="Already owns">
-                              {selectedPlayer.packages.map((pkg) => (
-                                <option key={pkg.id} value={pkg.id}>
-                                  {pkg.label} ({pkg.lessonsRemaining} of {pkg.lessonsTotal} left)
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {sellablePackages.length > 0 && (
-                            <optgroup label="Sell a new package right now">
-                              {sellablePackages.map((p) => (
-                                <option key={p.id} value={`new:${p.id}`}>
-                                  {p.label} - {centsToDollars(p.priceCents)}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                        </select>
+                        />
                       </label>
 
                       {newBookingForm.buyNewPackageType && (
