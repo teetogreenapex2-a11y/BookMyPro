@@ -5,7 +5,9 @@
 // three draw and score the exact same way, rather than three
 // independently-drifting implementations.
 
-export type Point = { x: number; y: number };
+// z is MediaPipe's depth estimate, in the same pixel scale as x (smaller = closer
+// to the camera). Optional: callers that only have 2D points still work.
+export type Point = { x: number; y: number; z?: number };
 
 // MediaPipe's pose model returns 33 landmarks in a fixed order. These 17
 // are the ones worth showing for a golf swing: shoulders/elbows/wrists,
@@ -83,13 +85,14 @@ export async function getVideoPoseLandmarker() {
 // pixel-space points every consumer actually draws with, and marks which
 // compact-array positions fell below CONFIDENCE_THRESHOLD.
 export function extractPoseLandmarks(
-  rawLandmarks: { x: number; y: number; visibility?: number }[],
+  rawLandmarks: { x: number; y: number; z?: number; visibility?: number }[],
   width: number,
   height: number
 ): { points: Point[]; lowConfidenceIndices: number[] } {
   const points: Point[] = POSE_LANDMARK_INDICES.map((i) => ({
     x: rawLandmarks[i].x * width,
     y: rawLandmarks[i].y * height,
+    z: (rawLandmarks[i].z ?? 0) * width,
   }));
   const lowConfidenceIndices = POSE_LANDMARK_INDICES
     .map((i, compactIndex) => ({ compactIndex, visibility: rawLandmarks[i].visibility ?? 1 }))
@@ -161,69 +164,413 @@ export function drawPoseSkeleton(
     }
   }
 
+  drawAnatomicalBones(ctx, effectivePoints, lowConf, color, width, effectiveHeadRadius);
+}
+
+// An anatomical skeleton drawn on top of the 17 tracked joints: skull and
+// jaw, a vertebral column, ribcage, clavicles, pelvis, tapered long bones
+// with rounded ends (radius and ulna, tibia and fibula as pairs), plus
+// hands and feet. It is a 2D drawing driven by the joint positions - the
+// bones follow the golfer, they are not a true 3D model.
+function drawAnatomicalBones(
+  ctx: CanvasRenderingContext2D,
+  P: Point[],
+  lowConf: Set<number>,
+  color: string,
+  width: number,
+  headRadius: number | null
+) {
+  const ok = (i: number) => !!P[i] && Number.isFinite(P[i].x) && Number.isFinite(P[i].y);
+  const Zv = (i: number) => (P[i] && Number.isFinite(P[i].z as number) ? (P[i].z as number) : 0);
+  const sub = (a: Point, b: Point): Point => ({ x: a.x - b.x, y: a.y - b.y });
+  const add = (a: Point, b: Point): Point => ({ x: a.x + b.x, y: a.y + b.y });
+  const mul = (a: Point, k: number): Point => ({ x: a.x * k, y: a.y * k });
+  const len = (a: Point) => Math.hypot(a.x, a.y);
+  const unit = (a: Point): Point => { const l = len(a) || 1; return { x: a.x / l, y: a.y / l }; };
+  const perp = (a: Point): Point => ({ x: -a.y, y: a.x });
+  const mid = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+  const sw = ok(0) && ok(1) ? len(sub(P[0], P[1])) : null;
+  const hwid = ok(6) && ok(7) ? len(sub(P[6], P[7])) : null;
+  const u = sw || (hwid ? hwid * 1.2 : 110);
+  const t = Math.max(width * 1.5, u * 0.085); // base bone thickness
+  const edge = "rgba(40, 30, 20, 0.55)";
+
+  // Darkens a "#rrggbb" color toward the bone edge tone - used for limbs on the far side.
+  const shade = (hex: string, k: number) => {
+    const m = /^#([0-9a-f]{6})$/i.exec(hex);
+    if (!m) return hex;
+    const n = parseInt(m[1], 16);
+    const f = (v: number) => Math.round(v * k);
+    return `rgb(${f((n >> 16) & 255)}, ${f((n >> 8) & 255)}, ${f(n & 255)})`;
+  };
+
   ctx.save();
-  ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  // Real long bones are actually narrower along the shaft and flare out
-  // wider right at the joints - drawn that way here too: a thinner
-  // connecting line for the "shaft" between two points, with the joint
-  // markers below sized and outlined to read as the wider, rounded bone
-  // ends, rather than one uniform-width line the whole way with plain
-  // dots at each end.
-  ctx.lineWidth = width * 0.55;
+  ctx.strokeStyle = edge;
   ctx.lineCap = "round";
-  POSE_CONNECTIONS.forEach(([a, b]) => {
-    const pa = effectivePoints[a], pb = effectivePoints[b];
-    if (!pa || !pb) return;
-    const uncertain = lowConf.has(a) || lowConf.has(b);
+  ctx.lineJoin = "round";
+  ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+  ctx.shadowBlur = 6;
+
+  const faded = (...idx: number[]) => idx.some((i) => lowConf.has(i));
+  // far = true draws the limb darker and a touch smaller (it is further away);
+  // sc scales bone thickness for perspective.
+  const withAlpha = (idx: number[], fn: () => void, far = false) => {
     ctx.save();
-    if (uncertain) {
-      ctx.setLineDash([5, 4]);
-      ctx.globalAlpha = 0.45;
-    }
-    ctx.beginPath();
-    ctx.moveTo(pa.x, pa.y);
-    ctx.lineTo(pb.x, pb.y);
-    ctx.stroke();
+    if (faded(...idx)) ctx.globalAlpha = 0.45;
+    if (far) ctx.fillStyle = shade(color, 0.8);
+    fn();
     ctx.restore();
-  });
-  const jointRadius = Math.max(5, width * 0.85);
-  effectivePoints.forEach((p, i) => {
-    if (i === 12) return; // head drawn separately below, as a proportional circle rather than a tiny dot
-    ctx.save();
-    if (lowConf.has(i)) ctx.globalAlpha = 0.45;
+  };
+  const knob = (c: Point, r: number) => {
     ctx.beginPath();
-    ctx.arc(p.x, p.y, jointRadius, 0, Math.PI * 2);
+    ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
     ctx.fill();
-    // A subtle darker outline on top of the same fill is what actually
-    // reads as a rounded, three-dimensional bone end rather than a flat
-    // dot - too subtle to fight the main color, just enough to define
-    // the joint's edge.
-    ctx.strokeStyle = "rgba(40, 30, 20, 0.35)";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.2;
     ctx.stroke();
-    ctx.strokeStyle = color;
-    ctx.restore();
-  });
-  // The head - a proportional circle outline rather than a tiny dot the
-  // same size as every other joint, so the skeleton actually reads as a
-  // head. Scaled to shoulder width so it looks right regardless of how
-  // close the camera is; falls back to a fixed, reasonable size on the
-  // rare case shoulders weren't detected at all.
-  if (effectivePoints[12]) {
-    const headRadius = effectiveHeadRadius ?? Math.max(8, width * 2);
-    ctx.save();
-    if (lowConf.has(12)) ctx.globalAlpha = 0.45;
-    ctx.lineWidth = width * 0.7;
+  };
+  const bone = (a: Point, b: Point, wEnd: number, wMid: number) => {
+    const d = unit(sub(b, a));
+    const n = perp(d);
+    const m = mid(a, b);
     ctx.beginPath();
-    ctx.arc(effectivePoints[12].x, effectivePoints[12].y, headRadius, 0, Math.PI * 2);
+    ctx.moveTo(a.x + n.x * wEnd, a.y + n.y * wEnd);
+    ctx.quadraticCurveTo(m.x + n.x * wMid, m.y + n.y * wMid, b.x + n.x * wEnd, b.y + n.y * wEnd);
+    ctx.lineTo(b.x - n.x * wEnd, b.y - n.y * wEnd);
+    ctx.quadraticCurveTo(m.x - n.x * wMid, m.y - n.y * wMid, a.x - n.x * wEnd, a.y - n.y * wEnd);
+    ctx.closePath();
+    ctx.fill();
+    ctx.lineWidth = 1.2;
     ctx.stroke();
-    // Same subtle bone-edge outline as the joints, for visual consistency.
-    ctx.strokeStyle = "rgba(40, 30, 20, 0.35)";
-    ctx.lineWidth = 1;
+    knob(a, wEnd * 1.15);
+    knob(b, wEnd * 1.15);
+  };
+  const thin = (a: Point, b: Point, w: number) => {
+    ctx.save();
+    ctx.lineWidth = w;
+    ctx.strokeStyle = ctx.fillStyle as string;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
     ctx.stroke();
     ctx.restore();
+  };
+
+  // ---- Depth: which side is nearer, how far the shoulders / hips are turned
+  const sideZ = (ids: number[]) => {
+    const v = ids.filter(ok).map(Zv);
+    return v.length ? v.reduce((p, c) => p + c, 0) / v.length : 0;
+  };
+  const leftZ = sideZ([0, 2, 4, 6, 8, 10]);
+  const rightZ = sideZ([1, 3, 5, 7, 9, 11]);
+  const leftIsFar = leftZ > rightZ; // larger z = further from the camera
+  const persp = (ids: number[]) => clamp(1 - sideZ(ids) / (u * 5), 0.85, 1.2);
+
+  // Yaw of a left-to-right pair of joints: cos = how square to the camera, sin = turned.
+  const yawOf = (l: number, r: number) => {
+    if (!ok(l) || !ok(r)) return { cos: 1, sin: 0, e: { x: 1, y: 0 } as Point };
+    const dx = P[r].x - P[l].x, dy = P[r].y - P[l].y, dz = Zv(r) - Zv(l);
+    const w3 = Math.max(Math.hypot(dx, dy, dz), 1e-6);
+    return { cos: clamp(Math.hypot(dx, dy) / w3, 0, 1), sin: clamp(dz / w3, -1, 1), e: unit({ x: dx, y: dy }) };
+  };
+  const shY = yawOf(0, 1);
+  const hpY = yawOf(6, 7);
+  const sinS = Math.abs(shY.sin);
+  // Which way the front of the body faces across the screen, read from the nose.
+  let frontSgn = 1;
+  if (ok(0) && ok(1) && ok(12)) {
+    const dn = (P[12].x - (P[0].x + P[1].x) / 2) * shY.e.x + (P[12].y - (P[0].y + P[1].y) / 2) * shY.e.y;
+    if (Math.abs(dn) > u * 0.02) frontSgn = dn > 0 ? 1 : -1;
   }
+
+  const drawLeg = (h: number, k: number, a: number, heel: number, toe: number) => {
+    const far = (h === 6) === leftIsFar;
+    const tl = t * persp([h, k, a]);
+    if (ok(h) && ok(k)) withAlpha([h, k], () => bone(P[h], P[k], tl * 0.95, tl * 0.5), far); // femur
+    if (ok(k) && ok(a)) {
+      withAlpha([k, a], () => {
+        const d = unit(sub(P[a], P[k]));
+        const n = perp(d);
+        bone(add(P[k], mul(n, tl * 0.3)), add(P[a], mul(n, tl * 0.15)), tl * 0.7, tl * 0.38); // tibia
+        bone(add(P[k], mul(n, -tl * 0.55)), add(P[a], mul(n, -tl * 0.4)), tl * 0.38, tl * 0.22); // fibula
+        if (ok(h)) {
+          const c = add(P[k], mul(unit(sub(P[h], P[k])), tl * 0.2));
+          knob(c, tl * 0.7); // kneecap
+        }
+      }, far);
+    }
+    if (ok(a) && ok(heel) && ok(toe)) {
+      withAlpha([a, heel, toe], () => {
+        knob(P[heel], tl * 0.75);
+        const d = unit(sub(P[toe], P[heel]));
+        const n = perp(d);
+        for (let i = -2; i <= 2; i++) {
+          const tip = add(P[toe], add(mul(n, i * tl * 0.28), mul(d, tl * 0.5 - Math.abs(i) * tl * 0.1)));
+          thin(add(P[heel], mul(d, len(sub(P[toe], P[heel])) * 0.45)), tip, tl * 0.34);
+        }
+        thin(P[a], P[toe], tl * 0.5);
+      }, far);
+    }
+  };
+
+  const drawArm = (sh: number, el: number, wr: number) => {
+    const far = (sh === 0) === leftIsFar;
+    const tl = t * persp([sh, el, wr]);
+    if (ok(sh) && ok(el)) withAlpha([sh, el], () => bone(P[sh], P[el], tl * 0.8, tl * 0.42), far); // humerus
+    if (ok(el) && ok(wr)) {
+      withAlpha([el, wr], () => {
+        const d = unit(sub(P[wr], P[el]));
+        const n = perp(d);
+        bone(add(P[el], mul(n, tl * 0.28)), add(P[wr], mul(n, tl * 0.3)), tl * 0.5, tl * 0.3); // ulna
+        bone(add(P[el], mul(n, -tl * 0.3)), add(P[wr], mul(n, -tl * 0.22)), tl * 0.42, tl * 0.26); // radius
+        const flen = len(sub(P[wr], P[el]));
+        const palmEnd = add(P[wr], mul(d, flen * 0.22));
+        ctx.save();
+        ctx.translate((P[wr].x + palmEnd.x) / 2, (P[wr].y + palmEnd.y) / 2);
+        ctx.rotate(Math.atan2(d.y, d.x));
+        ctx.beginPath();
+        ctx.ellipse(0, 0, flen * 0.13, tl * 0.62, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+        ctx.restore();
+        for (let i = -1.5; i <= 1.5; i += 1) {
+          const tip = add(add(palmEnd, mul(d, flen * 0.16)), mul(n, i * tl * 0.34));
+          thin(add(palmEnd, mul(n, i * tl * 0.3)), tip, tl * 0.26);
+        }
+      }, far);
+    }
+  };
+
+  // Far limbs first, then the torso on top of them, then the near arm over the torso.
+  const legs: [number, number, number, number, number][] = [[6, 8, 10, 13, 15], [7, 9, 11, 14, 16]];
+  const arms: [number, number, number][] = [[0, 2, 4], [1, 3, 5]];
+  const farFirst = <T extends number[]>(list: T[]) =>
+    list.slice().sort((x, y) => (((x[0] === 0 || x[0] === 6) === leftIsFar) ? 0 : 1) - (((y[0] === 0 || y[0] === 6) === leftIsFar) ? 0 : 1));
+  farFirst(legs).forEach((l) => drawLeg(...l));
+  const orderedArms = farFirst(arms);
+  drawArm(...orderedArms[0]);
+
+  // ---- Pelvis, spine, ribcage, clavicles, head
+  if (ok(0) && ok(1) && ok(6) && ok(7)) {
+    const S = mid(P[0], P[1]);
+    const Hc = mid(P[6], P[7]);
+    const axis = sub(S, Hc);
+    const L = len(axis);
+    const a = unit(axis);
+    const e = unit(sub(P[7], P[6]));
+    const hs = Math.max(hpY.cos ? len(sub(P[7], P[6])) / Math.max(hpY.cos, 0.35) / 2 : u * 0.22, u * 0.22); // true (un-foreshortened) half width
+    const hsl = hs * Math.max(hpY.cos, 0.35); // what shows on screen
+
+    withAlpha([0, 1, 6, 7], () => {
+      // pelvis: two iliac wings joined at the sacrum, narrowing as the hips turn side-on
+      const wing = (H: Point, side: number) => {
+        const top = add(Hc, mul(a, hs * 0.75));
+        const out = add(add(H, mul(e, side * hsl * 0.7)), mul(a, hs * 1.25));
+        const edgeP = add(H, mul(e, side * hsl * 0.38));
+        const low = add(H, mul(a, -hs * 0.1));
+        ctx.beginPath();
+        ctx.moveTo(top.x, top.y);
+        ctx.quadraticCurveTo(out.x, out.y, edgeP.x, edgeP.y);
+        ctx.lineTo(low.x, low.y);
+        const bc = add(Hc, mul(a, -hs * 0.45));
+        ctx.lineTo(bc.x, bc.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      };
+      wing(P[6], -1);
+      wing(P[7], 1);
+      // sacrum sits toward the back of the pelvis
+      const backOff = mul(e, -frontSgn * Math.abs(hpY.sin) * hs * 0.35);
+      ctx.beginPath();
+      const sTop = add(add(Hc, mul(a, hs * 0.6)), backOff);
+      const sBot = add(add(Hc, mul(a, -hs * 0.55)), backOff);
+      ctx.moveTo(sTop.x + e.x * hsl * 0.3, sTop.y + e.y * hsl * 0.3);
+      ctx.lineTo(sBot.x, sBot.y);
+      ctx.lineTo(sTop.x - e.x * hsl * 0.3, sTop.y - e.y * hsl * 0.3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      knob(P[6], t * 0.95);
+      knob(P[7], t * 0.95);
+
+      // ribcage: each rib is a horizontal ring seen at the shoulders' current turn -
+      // the front half solid, the back half faded - so the chest visibly rotates.
+      const E = shY.e;
+      const RIBS = 7;
+      const halfW = (u / Math.max(shY.cos, 0.35)) * 0.5; // true half width
+      for (let k = 0; k < RIBS; k++) {
+        const f = 0.5 + (k / (RIBS - 1)) * 0.42;
+        const c = add(Hc, mul(axis, f));
+        const widest = 1 - Math.abs((k - 2) / 4.5) * 0.45;
+        const aw = halfW * widest;
+        const bw = aw * 0.62;
+        const STEPS = 28;
+        const pt = (th: number): { p: Point; front: boolean } => {
+          const lat = aw * Math.cos(th);
+          const fr = bw * Math.sin(th);
+          const along = lat * shY.cos + fr * sinS * frontSgn;
+          const up = -fr * 0.16; // slight downward view so the rings read as ellipses
+          return { p: add(add(c, mul(E, along)), mul(a, up)), front: fr >= 0 };
+        };
+        ([true, false] as boolean[]).forEach((frontHalf) => {
+          ctx.save();
+          if (!frontHalf) ctx.globalAlpha *= 0.4;
+          ctx.beginPath();
+          let started = false;
+          for (let i = 0; i <= STEPS; i++) {
+            const th = (i / STEPS) * Math.PI * 2;
+            const q = pt(th);
+            if (q.front !== frontHalf) { started = false; continue; }
+            if (!started) { ctx.moveTo(q.p.x, q.p.y); started = true; } else ctx.lineTo(q.p.x, q.p.y);
+          }
+          ctx.lineWidth = t * 0.62;
+          ctx.strokeStyle = edge;
+          ctx.stroke();
+          ctx.lineWidth = t * 0.46;
+          ctx.strokeStyle = ctx.fillStyle as string;
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
+      // sternum on the front face, spine on the back - they separate as the chest turns
+      const bOff = (halfW * 0.55 * 0.62) * sinS * frontSgn;
+      const frontShift = mul(E, bOff);
+      const backShift = mul(E, -bOff);
+      const stTop = add(add(Hc, mul(axis, 0.92)), frontShift);
+      const stBot = add(add(Hc, mul(axis, 0.66)), frontShift);
+      ctx.save();
+      ctx.lineWidth = t * 0.7;
+      ctx.strokeStyle = edge;
+      ctx.beginPath(); ctx.moveTo(stTop.x, stTop.y); ctx.lineTo(stBot.x, stBot.y); ctx.stroke();
+      ctx.lineWidth = t * 0.5;
+      ctx.strokeStyle = ctx.fillStyle as string;
+      ctx.stroke();
+      ctx.restore();
+
+      const VERT = 17;
+      for (let i = 0; i < VERT; i++) {
+        const f = 0.02 + (i / (VERT - 1)) * 0.98;
+        // below the waist the spine follows the pelvis, above it the shoulders - the twist between them
+        const mix = clamp((f - 0.35) / 0.4, 0, 1);
+        const shift = add(mul(E, -(halfW * 0.3) * Math.abs(hpY.sin) * frontSgn * (1 - mix)), mix > 0 ? backShift : { x: 0, y: 0 });
+        const c = add(add(Hc, mul(axis, f)), shift);
+        const w = t * (1.15 - 0.45 * f);
+        ctx.save();
+        ctx.translate(c.x, c.y);
+        ctx.rotate(Math.atan2(a.y, a.x) + Math.PI / 2);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w, (L / VERT) * 0.42, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      [0, 1].forEach((i) => {
+        const sh = P[i];
+        const cm = add(mid(S, sh), mul(a, -t * 0.25));
+        ctx.save();
+        ctx.lineWidth = t * 0.55;
+        ctx.strokeStyle = edge;
+        ctx.beginPath(); ctx.moveTo(S.x, S.y); ctx.quadraticCurveTo(cm.x, cm.y, sh.x, sh.y); ctx.stroke();
+        ctx.lineWidth = t * 0.38;
+        ctx.strokeStyle = ctx.fillStyle as string;
+        ctx.stroke();
+        ctx.restore();
+      });
+      knob(P[0], t * 0.9);
+      knob(P[1], t * 0.9);
+    });
+
+    // ---- Neck and skull: faces the camera, turns, or shows the back of the head
+    if (ok(12)) {
+      withAlpha([12], () => {
+        const nose = P[12];
+        const r = headRadius ?? u * 0.3;
+        const down = unit(sub(S, nose));
+        const base = add(nose, mul(down, r * 0.9));
+        for (let i = 0; i < 5; i++) {
+          const c = add(base, mul(sub(S, base), i / 4));
+          ctx.save();
+          ctx.translate(c.x, c.y);
+          ctx.rotate(Math.atan2(down.y, down.x) + Math.PI / 2);
+          ctx.beginPath();
+          ctx.ellipse(0, 0, t * 0.5, t * 0.22, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        }
+        const zS = (Zv(0) + Zv(1)) / 2;
+        const noseDepth = Zv(12) - zS; // negative = nose is in front of the shoulders (toward camera)
+        const turn = clamp(sinS * frontSgn, -1, 1); // how far the face is turned along the screen
+        const facing = noseDepth < u * 0.08 || Math.abs(turn) > 0.55;
+        const eyeSpread = Math.sqrt(Math.max(0, 1 - turn * turn));
+        ctx.save();
+        ctx.translate(nose.x, nose.y);
+        ctx.rotate(Math.atan2(down.y, down.x) - Math.PI / 2);
+        // The head's local x axis may be mirrored relative to the shoulders' lateral axis.
+        const lateralSign = (shY.e.x * Math.cos(Math.atan2(down.y, down.x) - Math.PI / 2) + shY.e.y * Math.sin(Math.atan2(down.y, down.x) - Math.PI / 2)) >= 0 ? 1 : -1;
+        const tx = turn * lateralSign;
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 0.1, r * 0.9 * (0.88 + 0.12 * eyeSpread), r * 1.0, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+        // jaw
+        ctx.beginPath();
+        const jx = tx * r * 0.15;
+        ctx.moveTo(-r * 0.62 * eyeSpread + jx, r * 0.55);
+        ctx.quadraticCurveTo(-r * 0.7 * eyeSpread + jx, r * 1.15, jx, r * 1.2);
+        ctx.quadraticCurveTo(r * 0.7 * eyeSpread + jx, r * 1.15, r * 0.62 * eyeSpread + jx, r * 0.55);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        if (facing) {
+          ctx.fillStyle = "rgba(30, 24, 18, 0.85)";
+          [-1, 1].forEach((sd) => {
+            const ex = sd * r * 0.36 * eyeSpread + tx * r * 0.55;
+            if (Math.abs(ex) > r * 0.88) return; // rotated out of view
+            ctx.beginPath();
+            ctx.ellipse(ex, r * 0.05, r * 0.2 * (0.55 + 0.45 * eyeSpread), r * 0.22, 0, 0, Math.PI * 2);
+            ctx.fill();
+          });
+          const nx = tx * r * 0.7;
+          ctx.beginPath();
+          ctx.moveTo(nx, r * 0.3);
+          ctx.lineTo(nx - r * 0.1 * eyeSpread, r * 0.55);
+          ctx.lineTo(nx + r * 0.1 * eyeSpread, r * 0.55);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = "rgba(30, 24, 18, 0.7)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.32 * eyeSpread + jx, r * 0.78);
+          ctx.lineTo(r * 0.32 * eyeSpread + jx, r * 0.78);
+          ctx.stroke();
+        } else {
+          // back of the skull: a faint suture line instead of a face
+          ctx.strokeStyle = "rgba(30, 24, 18, 0.45)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(0, -r * 1.05);
+          ctx.quadraticCurveTo(r * 0.12, -r * 0.3, 0, r * 0.35);
+          ctx.stroke();
+        }
+        ctx.restore();
+      });
+    }
+  }
+
+  drawArm(...orderedArms[1]);
+
   ctx.restore();
 }
 
