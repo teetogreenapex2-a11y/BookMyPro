@@ -385,7 +385,7 @@ function drawAnatomicalBones(
       wing(P[6], -1);
       wing(P[7], 1);
       // sacrum sits toward the back of the pelvis
-      const backOff = mul(e, -frontSgn * Math.abs(hpY.sin) * hs * 0.35);
+      const backOff = mul(e, -frontSgn * clamp(Math.abs(hpY.sin) * hs * 0.35, 0, t * 1.2));
       ctx.beginPath();
       const sTop = add(add(Hc, mul(a, hs * 0.6)), backOff);
       const sBot = add(add(Hc, mul(a, -hs * 0.55)), backOff);
@@ -403,7 +403,7 @@ function drawAnatomicalBones(
       // the front half solid, the back half faded - so the chest visibly rotates.
       const E = shY.e;
       const RIBS = 7;
-      const halfW = (u / Math.max(shY.cos, 0.35)) * 0.5; // true half width
+      const halfW = Math.min((u / Math.max(shY.cos, 0.35)) * 0.5, L * 0.4, u * 0.9); // true half width, kept sane when depth is noisy
       for (let k = 0; k < RIBS; k++) {
         const f = 0.5 + (k / (RIBS - 1)) * 0.42;
         const c = add(Hc, mul(axis, f));
@@ -439,7 +439,7 @@ function drawAnatomicalBones(
         });
       }
       // sternum on the front face, spine on the back - they separate as the chest turns
-      const bOff = (halfW * 0.55 * 0.62) * sinS * frontSgn;
+      const bOff = clamp((halfW * 0.55 * 0.62) * sinS, 0, t * 1.1) * frontSgn;
       const frontShift = mul(E, bOff);
       const backShift = mul(E, -bOff);
       const stTop = add(add(Hc, mul(axis, 0.92)), frontShift);
@@ -458,7 +458,7 @@ function drawAnatomicalBones(
         const f = 0.02 + (i / (VERT - 1)) * 0.98;
         // below the waist the spine follows the pelvis, above it the shoulders - the twist between them
         const mix = clamp((f - 0.35) / 0.4, 0, 1);
-        const shift = add(mul(E, -(halfW * 0.3) * Math.abs(hpY.sin) * frontSgn * (1 - mix)), mix > 0 ? backShift : { x: 0, y: 0 });
+        const shift = mix > 0 ? mul(backShift, mix) : { x: 0, y: 0 };
         const c = add(add(Hc, mul(axis, f)), shift);
         const w = t * (1.15 - 0.45 * f);
         ctx.save();
@@ -493,8 +493,28 @@ function drawAnatomicalBones(
       withAlpha([12], () => {
         const nose = P[12];
         const r = headRadius ?? u * 0.3;
-        const down = unit(sub(S, nose));
-        const base = add(nose, mul(down, r * 0.9));
+        const down0 = unit(sub(S, nose));
+        const zS = (Zv(0) + Zv(1)) / 2;
+        const noseDepth = Zv(12) - zS; // negative = nose is in front of the shoulders (toward camera)
+        const A0 = Math.atan2(down0.y, down0.x) - Math.PI / 2;
+        const lx0 = { x: Math.cos(A0), y: Math.sin(A0) };
+        const lateralSign = (shY.e.x * lx0.x + shY.e.y * lx0.y) >= 0 ? 1 : -1;
+        // How far the face is turned sideways, two ways: from the shoulders' turn (depth), and
+        // directly from how far the nose sits off the neck line (reliable at the finish, when
+        // the head is turned to look down the target line). The larger of the two wins.
+        const fromShoulders = clamp(sinS * frontSgn, -1, 1) * lateralSign;
+        const tl = perp(a); // sideways across the torso - independent of the head's own tilt
+        const noseOff = ((nose.x - S.x) * tl.x + (nose.y - S.y) * tl.y) / (r * 1.1);
+        const fromNose = clamp(noseOff * ((tl.x * lx0.x + tl.y * lx0.y) >= 0 ? 1 : -1), -1, 1);
+        const tx = Math.abs(fromNose) >= Math.abs(fromShoulders) ? fromNose : fromShoulders;
+        const facing = noseDepth < u * 0.08 || Math.abs(tx) > 0.45;
+        const eyeSpread = Math.sqrt(Math.max(0, 1 - tx * tx));
+        // The nose is at the front of the face, so the skull sits back behind it - and the
+        // neck is drawn to that skull position so head and spine stay joined.
+        const headC = add(nose, mul(lx0, -tx * r * 0.45));
+        const down = unit(sub(S, headC));
+        const A = Math.atan2(down.y, down.x) - Math.PI / 2;
+        const base = add(headC, mul(down, r * 0.9));
         for (let i = 0; i < 5; i++) {
           const c = add(base, mul(sub(S, base), i / 4));
           ctx.save();
@@ -507,17 +527,9 @@ function drawAnatomicalBones(
           ctx.stroke();
           ctx.restore();
         }
-        const zS = (Zv(0) + Zv(1)) / 2;
-        const noseDepth = Zv(12) - zS; // negative = nose is in front of the shoulders (toward camera)
-        const turn = clamp(sinS * frontSgn, -1, 1); // how far the face is turned along the screen
-        const facing = noseDepth < u * 0.08 || Math.abs(turn) > 0.55;
-        const eyeSpread = Math.sqrt(Math.max(0, 1 - turn * turn));
         ctx.save();
-        ctx.translate(nose.x, nose.y);
-        ctx.rotate(Math.atan2(down.y, down.x) - Math.PI / 2);
-        // The head's local x axis may be mirrored relative to the shoulders' lateral axis.
-        const lateralSign = (shY.e.x * Math.cos(Math.atan2(down.y, down.x) - Math.PI / 2) + shY.e.y * Math.sin(Math.atan2(down.y, down.x) - Math.PI / 2)) >= 0 ? 1 : -1;
-        const tx = turn * lateralSign;
+        ctx.translate(headC.x, headC.y);
+        ctx.rotate(A); // local -y points away from the body
         ctx.beginPath();
         ctx.ellipse(0, -r * 0.1, r * 0.9 * (0.88 + 0.12 * eyeSpread), r * 1.0, 0, 0, Math.PI * 2);
         ctx.fill();
