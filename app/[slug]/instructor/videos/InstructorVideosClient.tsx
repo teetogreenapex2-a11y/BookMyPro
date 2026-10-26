@@ -215,11 +215,13 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
       const landmarker = await getVideoPoseLandmarker();
       if (cancelled) return;
 
+      let lastDetectedTime = -1; // also redraw when paused and the frame changes (scrubbing / stepping)
       function loop() {
         if (cancelled) return;
         const video = reviewVideoRef.current;
         const canvas = poseOverlayCanvasRef.current;
-        if (video && canvas && !video.paused && !video.ended && video.readyState >= 2) {
+        if (video && canvas && video.readyState >= 2 && ((!video.paused && !video.ended) || video.currentTime !== lastDetectedTime)) {
+          lastDetectedTime = video.currentTime;
           const ctx = canvas.getContext("2d");
           if (ctx) {
             // Keep the overlay canvas sized to match the video's actual
@@ -444,11 +446,13 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
       const landmarker = await getVideoPoseLandmarker();
       if (cancelled) return;
 
+      let lastDetectedTime = -1; // also redraw when paused and the frame changes (scrubbing / stepping)
       function loop() {
         if (cancelled) return;
         const video = videoRef.current;
         const canvas = selectedPoseOverlayCanvasRef.current;
-        if (video && canvas && !video.paused && !video.ended && video.readyState >= 2) {
+        if (video && canvas && video.readyState >= 2 && ((!video.paused && !video.ended) || video.currentTime !== lastDetectedTime)) {
+          lastDetectedTime = video.currentTime;
           const ctx = canvas.getContext("2d");
           if (ctx) {
             if (canvas.width !== video.clientWidth || canvas.height !== video.clientHeight) {
