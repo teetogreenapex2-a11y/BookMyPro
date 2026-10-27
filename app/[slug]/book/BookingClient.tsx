@@ -14,6 +14,13 @@ import { useSandboxPreview } from "@/lib/sandboxPreview";
 import { markHasSignedInOnThisDevice } from "@/lib/deviceHistory";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Calendar-day arithmetic: adding 24h in milliseconds lands an hour off across a
+// daylight-saving change (e.g. Nov 1), which showed Sunday twice and skipped Monday.
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d.getTime());
+  x.setDate(x.getDate() + n);
+  return x;
+}
 
 type Slot = { id: string; startTime: string; status: string; bookedServiceType: string | null; bookedIsRemote?: boolean; allowLastMinute?: boolean; isGroup?: boolean; groupCapacity?: number | null; groupPriceCents?: number | null; groupSpotsTaken?: number; groupCategory?: string | null; groupAgeRange?: string | null };
 
@@ -442,7 +449,7 @@ export default function BookingClient({
     if (!selectedInstructorId) return;
     setLoading(true);
     const start = weekStart.toISOString();
-    const end = new Date(weekStart.getTime() + 7 * DAY_MS).toISOString();
+    const end = addDays(weekStart, 7).toISOString();
     const res = await fetch(`${apiBase}/availability?start=${start}&end=${end}&instructorMembershipId=${selectedInstructorId}`);
     const data = await res.json();
     setSlots(data);
@@ -1537,17 +1544,17 @@ export default function BookingClient({
         <div ref={calendarRef} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>
             {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} -{" "}
-            {new Date(weekStart.getTime() + 6 * DAY_MS).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            {addDays(weekStart, 6).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             <button
-              onClick={() => setWeekStart(new Date(weekStart.getTime() - 7 * DAY_MS))}
+              onClick={() => setWeekStart(addDays(weekStart, -7))}
               disabled={weekStart.getTime() <= todayStart.getTime()}
               style={{ ...navBtnStyle, opacity: weekStart.getTime() <= todayStart.getTime() ? 0.4 : 1 }}
             >
               Prev
             </button>
-            <button onClick={() => setWeekStart(new Date(weekStart.getTime() + 7 * DAY_MS))} style={navBtnStyle}>Next</button>
+            <button onClick={() => setWeekStart(addDays(weekStart, 7))} style={navBtnStyle}>Next</button>
           </div>
         </div>
 
@@ -1556,7 +1563,7 @@ export default function BookingClient({
         ) : (
           <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
             {Array.from({ length: 7 }).map((_, dayIdx) => {
-              const dayDate = new Date(weekStart.getTime() + dayIdx * DAY_MS);
+              const dayDate = addDays(weekStart, dayIdx);
               return (
                 <div key={dayIdx} style={{ borderTop: dayIdx === 0 ? "none" : "1px solid #EFEBDD", padding: "10px 14px" }}>
                   <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>
