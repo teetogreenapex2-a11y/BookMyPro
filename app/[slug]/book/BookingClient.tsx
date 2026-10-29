@@ -57,6 +57,7 @@ export default function BookingClient({
   basePath,
   apiBase,
   isSignedIn,
+  initialContact,
 }: {
   initialPackages: Package[];
   business: { name: string; email: string; lessonRate: string; [key: string]: any };
@@ -71,6 +72,7 @@ export default function BookingClient({
   // seeing your own upcoming lessons - checks this first and sends a
   // signed-out visitor to /login instead of running.
   isSignedIn: boolean;
+  initialContact?: { name: string; phone: string; email: string } | null;
 }) {
   // Sends a signed-out visitor to sign in, with this page as the
   // callback so they land right back here once they're in. Used to gate
@@ -199,7 +201,12 @@ export default function BookingClient({
       messageRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [message]);
-  const [contact, setContact] = useState({ name: "", phone: "", email: "", handedness: "", scoreOrHandicap: "", commonIssues: "" });
+  const [contact, setContact] = useState({ name: initialContact?.name || "", phone: initialContact?.phone || "", email: initialContact?.email || "", handedness: "", scoreOrHandicap: "", commonIssues: "" });
+  // Signed-in customers whose name, phone and email we already have just confirm -
+  // the form only comes back if they tap Change, or something is missing.
+  const [editContact, setEditContact] = useState(false);
+  const savedContactComplete = !!initialContact && initialContact.name.trim().length > 0 && initialContact.phone.replace(/\D/g, "").length >= 7 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(initialContact.email);
+  const contactSummaryMode = savedContactComplete && !editContact;
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null);
   const [upcomingGroups, setUpcomingGroups] = useState<
@@ -1669,6 +1676,16 @@ export default function BookingClient({
                 {centsToDollars(selected.groupPriceCents ?? 0)} - {selected.groupSpotsTaken ?? 0} of {selected.groupCapacity} spots taken
               </div>
             </div>
+            {contactSummaryMode ? (
+              <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 12px", marginBottom: 12, color: "var(--chalk)" }}>
+                <div className="mono" style={{ fontSize: 10.5, color: "#9DB8A9", letterSpacing: "0.05em", marginBottom: 4 }}>BOOKING AS</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{contact.name}</div>
+                <div style={{ fontSize: 12.5, opacity: 0.85 }}>{contact.phone} &middot; {contact.email}</div>
+                <button type="button" onClick={() => setEditContact(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontWeight: 700, fontSize: 12.5, padding: "6px 0 0", cursor: "pointer" }}>
+                  Change
+                </button>
+              </div>
+            ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
               <input
                 value={contact.name}
@@ -1695,6 +1712,7 @@ export default function BookingClient({
                 style={contactInputStyle}
               />
             </div>
+            )}
             <button
               onClick={joinGroupSession}
               disabled={confirming || !contactValid()}
@@ -1727,7 +1745,7 @@ export default function BookingClient({
             }}
           >
             <div className="mono" style={{ fontSize: 11, color: "var(--gold)", fontWeight: 700, letterSpacing: "0.04em", marginBottom: 8 }}>
-              ENTER YOUR INFO TO {service === "lesson" && !isBuyingPackage ? "CONFIRM" : "PAY"}
+              {contactSummaryMode ? "CONFIRM YOUR BOOKING" : `ENTER YOUR INFO TO ${service === "lesson" && !isBuyingPackage ? "CONFIRM" : "PAY"}`}
             </div>
             <div style={{ color: "var(--chalk)", marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>
@@ -1743,6 +1761,16 @@ export default function BookingClient({
               </div>
             </div>
 
+            {contactSummaryMode ? (
+              <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 12px", marginBottom: 12, color: "var(--chalk)" }}>
+                <div className="mono" style={{ fontSize: 10.5, color: "#9DB8A9", letterSpacing: "0.05em", marginBottom: 4 }}>BOOKING AS</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{contact.name}</div>
+                <div style={{ fontSize: 12.5, opacity: 0.85 }}>{contact.phone} &middot; {contact.email}</div>
+                <button type="button" onClick={() => setEditContact(true)} style={{ background: "none", border: "none", color: "var(--gold)", fontWeight: 700, fontSize: 12.5, padding: "6px 0 0", cursor: "pointer" }}>
+                  Change
+                </button>
+              </div>
+            ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
               <input
                 value={contact.name}
@@ -1814,6 +1842,7 @@ export default function BookingClient({
                 style={{ ...contactInputStyle, resize: "vertical" }}
               />
             </div>
+            )}
 
             <button
               onClick={() => {

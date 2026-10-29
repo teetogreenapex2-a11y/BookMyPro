@@ -28,12 +28,14 @@ export default async function BookPage({ params }: { params: { slug: string } })
   // genuinely requires an account, like confirming a real booking.
   let packagesForClient: any[] = [];
   let needsPhone = false;
+  let initialContact: { name: string; phone: string; email: string } | null = null;
   if (session) {
     const userId = (session.user as any).id;
 
     // Signed-in customers with no phone on file get a pop-up asking for one
     // (booking itself also requires it).
-    const profileUser = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } });
+    const profileUser = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true, name: true, email: true } });
+    initialContact = { name: profileUser?.name || "", phone: profileUser?.phone || "", email: profileUser?.email || "" };
     needsPhone = !profileUser?.phone || profileUser.phone.replace(/\D/g, "").length < 7;
 
     // First time this player interacts with this business, give them a
@@ -97,6 +99,7 @@ export default async function BookPage({ params }: { params: { slug: string } })
       basePath={basePath}
       apiBase={apiBase}
       isSignedIn={!!session}
+      initialContact={initialContact}
     />
     </>
   );
