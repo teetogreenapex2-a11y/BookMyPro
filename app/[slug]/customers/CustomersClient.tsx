@@ -522,6 +522,17 @@ export default function CustomersClient({
               + Add customer
             </button>
             {isOwner && (
+              <a
+                href={`${basePath}/customers/merge`}
+                style={{
+                  background: "#FFF", color: "var(--fairway)", border: "1px solid var(--fairway)", borderRadius: 8,
+                  padding: "7px 14px", fontSize: 12, fontWeight: 700, textDecoration: "none",
+                }}
+              >
+                Merge duplicates
+              </a>
+            )}
+            {isOwner && (
               <button
                 onClick={() => { setImportOpen((o) => !o); setImportError(null); setImportResult(null); }}
                 style={{
