@@ -1,6 +1,7 @@
 "use client";
 
 import ZoomFrame from "@/app/components/ZoomFrame";
+import ClubPathLayer from "@/app/components/ClubPathLayer";
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
@@ -14,6 +15,7 @@ type Submission = {
   id: string; videoUrl: string; title: string | null; playerNote: string | null;
   status: string; submittedAt: string; reviewedAt: string | null;
   instructorName: string | null; comments: Comment[];
+  clubPath?: { x: number; y: number }[] | null;
 };
 
 function formatTimestamp(seconds: number) {
@@ -44,6 +46,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
   const isSandboxPreview = useSandboxPreview();
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [showPathFor, setShowPathFor] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
   const [instructorMembershipId, setInstructorMembershipId] = useState("");
@@ -332,14 +335,25 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
                 {openId === s.id && (
                   <div style={{ marginTop: 12 }}>
                     <ZoomFrame getVideo={() => videoRefs.current[s.id] || null}>
-                      <video
-                        ref={(el) => { videoRefs.current[s.id] = el; }}
-                        src={s.videoUrl}
-                        controls
-                        playsInline
-                        style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }}
-                      />
+                      <div style={{ position: "relative" }}>
+                        <video
+                          ref={(el) => { videoRefs.current[s.id] = el; }}
+                          src={s.videoUrl}
+                          controls
+                          playsInline
+                          style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }}
+                        />
+                        {showPathFor[s.id] !== false && Array.isArray(s.clubPath) && s.clubPath.length > 1 && <ClubPathLayer points={s.clubPath} />}
+                      </div>
                     </ZoomFrame>
+                    {Array.isArray(s.clubPath) && s.clubPath.length > 1 && (
+                      <button
+                        onClick={() => setShowPathFor((m) => ({ ...m, [s.id]: m[s.id] === false }))}
+                        style={{ marginTop: 8, background: "none", border: "1px solid var(--border)", color: "var(--fairway)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                      >
+                        {showPathFor[s.id] === false ? "Show club path" : "Hide club path"}
+                      </button>
+                    )}
                     <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
                       <button
                         onClick={() => stepFrame(s.id, -1)}

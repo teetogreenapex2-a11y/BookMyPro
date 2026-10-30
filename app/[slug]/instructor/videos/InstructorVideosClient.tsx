@@ -1,6 +1,7 @@
 "use client";
 
 import ZoomFrame from "@/app/components/ZoomFrame";
+import ClubPathLayer, { type PathPoint } from "@/app/components/ClubPathLayer";
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
@@ -15,6 +16,7 @@ type Submission = {
   id: string; videoUrl: string; title: string | null; playerNote: string | null;
   status: string; submittedAt: string; playerName: string; playerId: string; comments: Comment[];
   swingSessionId: string | null; angle: string | null;
+  clubPath?: { x: number; y: number }[] | null;
 };
 
 function formatTimestamp(seconds: number) {
@@ -386,6 +388,33 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   }, []);
 
   const selected = submissions.find((s) => s.id === selectedId) || null;
+
+  // Club path tracing: the instructor taps the clubhead on paused frames; the app draws one smooth arc through the taps.
+  const [tracing, setTracing] = useState(false);
+  const [tracePoints, setTracePoints] = useState<PathPoint[]>([]);
+  const [savingTrace, setSavingTrace] = useState(false);
+  useEffect(() => {
+    setTracing(false);
+    setTracePoints(Array.isArray(selected?.clubPath) ? selected!.clubPath! : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id]);
+  async function saveClubPath(points: PathPoint[]) {
+    if (!selected) return;
+    setSavingTrace(true);
+    try {
+      const res = await fetch(`${apiBase}/videos/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clubPath: points.length ? points : null }),
+      });
+      if (res.ok) {
+        setSubmissions((prev) => prev.map((x) => (x.id === selected.id ? { ...x, clubPath: points.length ? points : null } : x)));
+        setTracing(false);
+      }
+    } finally {
+      setSavingTrace(false);
+    }
+  }
 
   // A two-camera pair (same swingSessionId) collapses into a single list
   // entry rather than showing as two separate, seemingly-unrelated
@@ -861,8 +890,49 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                     ref={selectedPoseOverlayCanvasRef}
                     style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}
                   />
+                  <ClubPathLayer points={tracePoints} editing={tracing} onAdd={(p) => setTracePoints((pts) => [...pts, p])} />
                 </div>
                 </ZoomFrame>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                  {!tracing ? (
+                    <button
+                      onClick={() => setTracing(true)}
+                      style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--fairway)", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                    >
+                      {tracePoints.length ? "Edit club path" : "Trace club path"}
+                    </button>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 12, color: "var(--faint)", alignSelf: "center", flex: "1 1 100%" }}>
+                        Pause on a frame and tap the clubhead. Start at address, then follow it up and through to the finish.
+                      </span>
+                      <button
+                        onClick={() => saveClubPath(tracePoints)}
+                        disabled={savingTrace || tracePoints.length < 2}
+                        style={{ background: "var(--gold)", border: "none", color: "var(--fairway)", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 700, opacity: savingTrace || tracePoints.length < 2 ? 0.6 : 1, cursor: "pointer" }}
+                      >
+                        {savingTrace ? "Saving..." : "Save path"}
+                      </button>
+                      <button onClick={() => setTracePoints((pts) => pts.slice(0, -1))} disabled={!tracePoints.length} style={{ background: "none", border: "1px solid var(--border)", color: "var(--fairway)", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        Undo
+                      </button>
+                      <button onClick={() => setTracePoints([])} disabled={!tracePoints.length} style={{ background: "none", border: "1px solid var(--border)", color: "var(--fairway)", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        Clear
+                      </button>
+                      <button
+                        onClick={() => { setTracing(false); setTracePoints(Array.isArray(selected?.clubPath) ? selected!.clubPath! : []); }}
+                        style={{ background: "none", border: "none", color: "var(--faint)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                      >
+                        Cancel
+                      </button>
+                      {selected?.clubPath && tracePoints.length === 0 && (
+                        <button onClick={() => saveClubPath([])} style={{ background: "none", border: "none", color: "#B23A3A", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                          Remove saved path
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
                 {selectedAiEnabled && (
                   <button
                     onClick={() => { setSelectedPoseError(null); setSelectedShowPoseOverlay((v) => !v); }}

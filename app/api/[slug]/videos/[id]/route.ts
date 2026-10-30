@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getMembership } from "@/lib/tenant";
 import { deleteSwingVideo } from "@/lib/videoStorage";
@@ -44,6 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     playerName: submission.player.name || submission.player.email,
     instructorName: submission.instructor.user.name,
     instructorMembershipId: submission.instructorMembershipId,
+    clubPath: submission.clubPath,
     comments: submission.comments.map((c) => ({ id: c.id, timestampSeconds: c.timestampSeconds, text: c.text, createdAt: c.createdAt })),
   });
 }
@@ -70,7 +72,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
     return NextResponse.json({ error: "Only the assigned instructor can update this" }, { status: 403 });
   }
 
-  const { status } = await req.json();
+  const body = await req.json();
+
+  // { clubPath: [{x, y}, ...] | null } - the traced club path (points are 0-1, relative to the video frame).
+  if ("clubPath" in body) {
+    const cp = body.clubPath;
+    if (cp !== null) {
+      const valid =
+        Array.isArray(cp) && cp.length <= 80 &&
+        cp.every((p: any) => p && typeof p.x === "number" && typeof p.y === "number" && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1);
+      if (!valid) return NextResponse.json({ error: "Invalid club path" }, { status: 400 });
+    }
+    const saved = await prisma.videoSubmission.update({
+      where: { id: submission.id },
+      data: { clubPath: cp === null || cp.length === 0 ? Prisma.DbNull : cp.map((p: any) => ({ x: p.x, y: p.y })) },
+    });
+    return NextResponse.json({ id: saved.id, clubPath: saved.clubPath });
+  }
+
+  const { status } = body;
   if (status !== "reviewed" && status !== "pending") {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
