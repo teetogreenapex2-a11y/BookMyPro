@@ -1,5 +1,6 @@
 "use client";
 
+import ZoomFrame from "@/app/components/ZoomFrame";
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
@@ -330,12 +331,15 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
 
                 {openId === s.id && (
                   <div style={{ marginTop: 12 }}>
-                    <video
-                      ref={(el) => { videoRefs.current[s.id] = el; }}
-                      src={s.videoUrl}
-                      controls
-                      style={{ width: "100%", borderRadius: 8, background: "#000" }}
-                    />
+                    <ZoomFrame getVideo={() => videoRefs.current[s.id] || null}>
+                      <video
+                        ref={(el) => { videoRefs.current[s.id] = el; }}
+                        src={s.videoUrl}
+                        controls
+                        playsInline
+                        style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }}
+                      />
+                    </ZoomFrame>
                     <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
                       <button
                         onClick={() => stepFrame(s.id, -1)}

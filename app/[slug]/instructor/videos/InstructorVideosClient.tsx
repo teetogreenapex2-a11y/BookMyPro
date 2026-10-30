@@ -1,5 +1,6 @@
 "use client";
 
+import ZoomFrame from "@/app/components/ZoomFrame";
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
@@ -618,7 +619,8 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
 
           {reviewFile && reviewUrl && (
             <div style={{ background: "#000", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <div style={{ position: "relative", marginBottom: 12 }}>
+              <ZoomFrame getVideo={() => reviewVideoRef.current} style={{ marginBottom: 12 }}>
+              <div style={{ position: "relative" }}>
                 <video
                   ref={reviewVideoRef}
                   src={reviewUrl}
@@ -632,6 +634,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}
                 />
               </div>
+              </ZoomFrame>
               {aiAnalysisEnabled && (
                 <button
                   onClick={() => setShowPoseOverlay((v) => !v)}
@@ -851,13 +854,15 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                     "{selected.playerNote}"
                   </p>
                 )}
-                <div style={{ position: "relative", marginBottom: 6 }}>
+                <ZoomFrame getVideo={() => videoRef.current} style={{ marginBottom: 6 }}>
+                <div style={{ position: "relative" }}>
                   <video ref={videoRef} src={selected.videoUrl} crossOrigin="anonymous" controls playsInline style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }} />
                   <canvas
                     ref={selectedPoseOverlayCanvasRef}
                     style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}
                   />
                 </div>
+                </ZoomFrame>
                 {selectedAiEnabled && (
                   <button
                     onClick={() => { setSelectedPoseError(null); setSelectedShowPoseOverlay((v) => !v); }}
