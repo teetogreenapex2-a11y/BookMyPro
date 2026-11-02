@@ -64,9 +64,21 @@ export default async function BookPage({ params }: { params: { slug: string } })
       if (!b.packageId) continue;
       upcomingCountByPackage.set(b.packageId, (upcomingCountByPackage.get(b.packageId) || 0) + 1);
     }
+    // Who each unpaid package should be paid to, so the customer sees
+    // Venmo / Cash App / Zelle buttons for exactly that instructor.
+    const dueInstructorIds = Array.from(new Set(packages.filter((p) => (p.paymentStatus === "pending" || p.paymentStatus === "deposit_paid") && p.instructorMembershipId).map((p) => p.instructorMembershipId as string)));
+    const payees = dueInstructorIds.length
+      ? await prisma.membership.findMany({ where: { id: { in: dueInstructorIds } }, include: { user: { select: { name: true, email: true } } } })
+      : [];
+    const payeeById = new Map(payees.map((m) => [m.id, m]));
     packagesForClient = packages.map((pkg) => {
       const upcoming = upcomingCountByPackage.get(pkg.id) || 0;
-      return { ...pkg, rawLessonsRemaining: pkg.lessonsRemaining, lessonsRemaining: Math.min(pkg.lessonsRemaining + upcoming, pkg.lessonsTotal) };
+      const due = pkg.paymentStatus === "pending" ? pkg.pricePaidCents : pkg.paymentStatus === "deposit_paid" ? pkg.balanceDueCents : 0;
+      const payee = pkg.instructorMembershipId ? payeeById.get(pkg.instructorMembershipId) : null;
+      const payOptions = due && payee && (payee.venmoHandle || payee.cashAppHandle || payee.zelleContact)
+        ? { amountCents: due, payeeName: payee.user.name || payee.user.email, venmo: payee.venmoHandle, cashApp: payee.cashAppHandle, zelle: payee.zelleContact }
+        : null;
+      return { ...pkg, payOptions, rawLessonsRemaining: pkg.lessonsRemaining, lessonsRemaining: Math.min(pkg.lessonsRemaining + upcoming, pkg.lessonsTotal) };
     });
   }
 

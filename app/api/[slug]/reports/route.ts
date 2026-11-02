@@ -49,7 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const scopedInstructors = isOwner ? instructors : instructors.filter((i) => i.id === membership.id);
 
   async function figuresFor(periodStart: Date) {
-    const [bookingRows, packageRows, giftCardAgg, orderAgg] = await Promise.all([
+    const [bookingRows, packageRows, giftCardAgg, orderAgg, outsideRows] = await Promise.all([
       prisma.booking.groupBy({
         by: ["instructorMembershipId"],
         where: { businessId: business.id, status: "confirmed", createdAt: { gte: periodStart } },
@@ -78,7 +78,26 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
             _count: true,
           })
         : null,
+      // Money collected outside the app (Venmo, Cash App, Zelle, cash),
+      // counted when it was marked paid. An instructor only sees their own.
+      prisma.package.groupBy({
+        by: ["paymentMethod"],
+        where: {
+          businessId: business.id,
+          paymentMethod: { not: null },
+          paidAt: { gte: periodStart },
+          ...(isOwner ? {} : { instructorMembershipId: membership!.id }),
+        },
+        _sum: { outsidePaidCents: true },
+        _count: true,
+      }),
     ]);
+
+    const paidOutside: Record<string, { cents: number; count: number }> = {};
+    for (const row of outsideRows) {
+      if (!row.paymentMethod) continue;
+      paidOutside[row.paymentMethod] = { cents: row._sum.outsidePaidCents || 0, count: row._count };
+    }
 
     const byInstructor: Record<string, { revenueCents: number; count: number }> = {};
     for (const row of bookingRows) {
@@ -112,6 +131,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       : 0;
 
     return {
+      paidOutside,
       byInstructor: instructorFigures,
       totals: {
         lessonRevenueCents,

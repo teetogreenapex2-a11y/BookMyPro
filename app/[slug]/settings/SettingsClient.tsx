@@ -1,5 +1,6 @@
 "use client";
 
+import PayHandlesCard from "./PayHandlesCard";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
@@ -1669,6 +1670,8 @@ const [uploadingLogo, setUploadingLogo] = useState(false);
                 </>
               )}
             </div>
+
+            <PayHandlesCard apiBase={apiBase} />
 
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,

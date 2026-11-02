@@ -182,6 +182,15 @@ model Membership {
   business   Business @relation(fields: [businessId], references: [id])
   businessId String
   role       String   // "owner" | "instructor" | "player"
+  // How a customer got onto the list: "signup" (joined through the app/booking
+  // page themselves), "csv" (bulk-imported from a file), "manual" (added by an
+  // instructor one at a time). Existing rows default to "signup".
+  source     String   @default("signup")
+  // Where this instructor takes payments outside the app. Shown to customers
+  // with a payment due as tap-to-pay buttons. No money moves through BookMyPro.
+  venmoHandle   String?
+  cashAppHandle String?
+  zelleContact  String?
   // "active" for every normal membership (the default, matching every
   // existing row). "pending" is specifically for someone who requested to
   // join as an instructor and hasn't been approved yet - requireMembership()
@@ -431,6 +440,8 @@ model Package {
   pricePaidCents   Int       // the full listed price of this package, before any credit
   creditCents      Int       @default(0) // amount credited from a prior package when upgrading (e.g. single -> 3-pack)
   upgradedFromId   String?   // the package this one replaced, if created via an upgrade
+  outsidePaidCents Int?      // the amount actually collected outside the app when marked paid (full price, or just the balance after a deposit)
+  paymentMethod    String?   // how it was paid outside the app: "venmo" | "cashapp" | "zelle" | "cash"
   paymentStatus    String    @default("paid") // "paid" | "pending" (older, zero-upfront pay-later, kept for backward compatibility) | "deposit_paid" (half now, rest at the lesson)
   // How much is still owed on this package - 0 once it's fully paid off.
   // For a deposit package, this starts at half the price and is what

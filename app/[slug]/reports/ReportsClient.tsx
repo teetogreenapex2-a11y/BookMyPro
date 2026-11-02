@@ -8,6 +8,7 @@ import CustomerReport from "./CustomerReport";
 
 type InstructorFigure = { instructorMembershipId: string; name: string; revenueCents: number; count: number };
 type PeriodFigures = {
+  paidOutside?: Record<string, { cents: number; count: number }>;
   byInstructor: InstructorFigure[];
   totals: {
     lessonRevenueCents: number;
@@ -104,6 +105,28 @@ export default function ReportsClient({
             </>
           )}
         </div>
+
+        {(() => {
+          const rows = [["venmo", "Venmo"], ["cashapp", "Cash App"], ["zelle", "Zelle"], ["cash", "Cash"]]
+            .map(([k, label]) => ({ label, v: figures.paidOutside?.[k] }))
+            .filter((r) => r.v && (r.v.cents > 0 || r.v.count > 0));
+          if (rows.length === 0) return null;
+          const total = rows.reduce((s, r) => s + (r.v?.cents || 0), 0);
+          return (
+            <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 700, color: "var(--muted)" }}>
+                <span>Paid outside the app</span>
+                <span>{formatDollars(total)}</span>
+              </div>
+              {rows.map((r) => (
+                <div key={r.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--muted)" }}>
+                  <span>{r.label}</span>
+                  <span>{formatDollars(r.v!.cents)} ({r.v!.count})</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
     );
   }

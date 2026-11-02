@@ -65,7 +65,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
 
   const customers = playerMemberships
     .filter(({ user: p }) => isOwner || p.packages.length > 0 || p.bookings.length > 0)
-    .map(({ user: p }) => {
+    .map(({ user: p, source }) => {
     const upgradedFromIds = new Set(p.packages.map((pkg) => pkg.upgradedFromId).filter(Boolean));
 
     const now = new Date();
@@ -95,6 +95,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
         // would double-count any already-booked, upcoming lessons.
         rawLessonsRemaining: pkg.lessonsRemaining,
         paymentStatus: pkg.paymentStatus,
+        paymentMethod: pkg.paymentMethod ?? null,
         balanceDueCents: pkg.balanceDueCents,
         creditCents: pkg.creditCents,
         instructorMembershipId: pkg.instructorMembershipId,
@@ -135,6 +136,7 @@ export default async function CustomersPage({ params }: { params: { slug: string
       // literal dash defeated both (cards showed "—" with a "–" avatar).
       name: p.name || "",
       email: p.email,
+      source: source || "signup",
       phone: p.phone || "—",
       packages,
       fittings,

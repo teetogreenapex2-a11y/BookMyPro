@@ -10,10 +10,11 @@ type Customer = {
   id: string;
   name: string;
   email: string;
+  source: string; // "signup" | "csv" | "manual"
   phone: string;
   packages: {
     id: string; type: string; label: string; lessonsTotal: number; lessonsRemaining: number; rawLessonsRemaining?: number;
-    paymentStatus?: string; balanceDueCents?: number; creditCents?: number; canUpgrade?: boolean; upgradeTiers: UpgradeTier[];
+    paymentStatus?: string; paymentMethod?: string | null; balanceDueCents?: number; creditCents?: number; canUpgrade?: boolean; upgradeTiers: UpgradeTier[];
     instructorMembershipId?: string | null; instructorName?: string | null;
   }[];
   fittings: { id: string; label: string; startTime: string }[];
@@ -47,6 +48,7 @@ export default function CustomersClient({
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "remaining">("name");
   const [instructorFilter, setInstructorFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [customers, setCustomers] = useState(initialCustomers);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
@@ -73,6 +75,7 @@ export default function CustomersClient({
   const [importResult, setImportResult] = useState<{ totalRows: number; newPeople: number; existingPeopleAdded: number; skipped: { row: number; name: string; reason: string }[] } | null>(null);
   const [emailBlastOpen, setEmailBlastOpen] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
+  const [emailAudience, setEmailAudience] = useState<string>("all");
   const [emailBody, setEmailBody] = useState("");
   const [emailSending, setEmailSending] = useState(false);
   const [emailResult, setEmailResult] = useState<string | null>(null);
@@ -138,7 +141,7 @@ export default function CustomersClient({
   // Wix's Google-formatted export ("Name" / "E-mail 1 - Value" /
   // "Phone 1 - Value"), and a generic "Name, Email, Phone" spreadsheet.
   function findColumn(headers: string[], candidates: string[]): number {
-    const lower = headers.map((h) => h.trim().toLowerCase());
+    const lower = headers.map((h) => h.replace(/^\uFEFF/, "").trim().toLowerCase());
     for (const c of candidates) {
       const idx = lower.indexOf(c);
       if (idx !== -1) return idx;
@@ -151,16 +154,16 @@ export default function CustomersClient({
     setImportResult(null);
     setImporting(true);
     try {
-      const text = await file.text();
+      const text = (await file.text()).replace(/^\uFEFF/, "");
       const table = parseCsv(text);
       if (table.length < 2) throw new Error("Couldn't find any rows in that file.");
       const headers = table[0];
 
-      const emailCol = findColumn(headers, ["email", "e-mail", "e-mail 1 - value", "email address"]);
+      const emailCol = findColumn(headers, ["email", "e-mail", "e-mail 1 - value", "email address", "email 1"]);
       const nameCol = findColumn(headers, ["name", "full name"]);
       const firstCol = findColumn(headers, ["first name", "given name"]);
       const lastCol = findColumn(headers, ["last name", "family name"]);
-      const phoneCol = findColumn(headers, ["phone", "phone 1 - value", "phone number", "mobile phone"]);
+      const phoneCol = findColumn(headers, ["phone", "phone 1 - value", "phone number", "mobile phone", "phone 1"]);
 
       if (emailCol === -1) throw new Error("Couldn't find an email column in that file.");
       if (nameCol === -1 && firstCol === -1) throw new Error("Couldn't find a name column in that file.");
@@ -237,7 +240,7 @@ export default function CustomersClient({
     const res = await fetch(`${apiBase}/customers/email-blast`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subject: emailSubject, message: emailBody }),
+      body: JSON.stringify({ subject: emailSubject, message: emailBody, audience: emailAudience }),
     });
     const data = await res.json();
     setEmailSending(false);
@@ -272,7 +275,7 @@ export default function CustomersClient({
     if (res.ok) {
       setCustomers((prev) => [
         ...prev,
-        { id: data.id, name: data.name, email: data.email, phone: data.phone, packages: [], fittings: [], lessons: [], totalLessonsRemaining: 0, upcomingLessons: 0, aiAnalysisEnabled: false },
+        { id: data.id, name: data.name, email: data.email, source: "manual", phone: data.phone, packages: [], fittings: [], lessons: [], totalLessonsRemaining: 0, upcomingLessons: 0, aiAnalysisEnabled: false },
       ]);
       setAddForm({ name: "", email: "", phone: "" });
       setAddOpen(false);
@@ -281,18 +284,18 @@ export default function CustomersClient({
     }
   }
 
-  async function markPaid(packageId: string) {
+  async function markPaid(packageId: string, method?: string) {
     setMarkingPaid(packageId);
     const res = await fetch(`${apiBase}/packages/${packageId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentStatus: "paid" }),
+      body: JSON.stringify({ paymentStatus: "paid", ...(method ? { paymentMethod: method } : {}) }),
     });
     if (res.ok) {
       setCustomers((prev) =>
         prev.map((c) => ({
           ...c,
-          packages: c.packages.map((p) => (p.id === packageId ? { ...p, paymentStatus: "paid", balanceDueCents: 0 } : p)),
+          packages: c.packages.map((p) => (p.id === packageId ? { ...p, paymentStatus: "paid", paymentMethod: method || null, balanceDueCents: 0 } : p)),
         }))
       );
     }
@@ -404,11 +407,12 @@ export default function CustomersClient({
       const ids = instructors.find((i) => i.id === instructorFilter)?.membershipIds || [instructorFilter];
       rows = rows.filter((c) => c.packages.some((p) => !!p.instructorMembershipId && ids.includes(p.instructorMembershipId)));
     }
+    if (sourceFilter !== "all") rows = rows.filter((c) => (c.source || "signup") === sourceFilter);
     rows = [...rows].sort((a, b) =>
       sortBy === "name" ? a.name.localeCompare(b.name) : b.totalLessonsRemaining - a.totalLessonsRemaining
     );
     return rows;
-  }, [customers, query, sortBy, instructorFilter, instructors]);
+  }, [customers, query, sortBy, instructorFilter, sourceFilter, instructors]);
 
   const totalLessonsOutstanding = useMemo(
     () => customers.reduce((sum, c) => sum + c.totalLessonsRemaining, 0),
@@ -503,6 +507,23 @@ export default function CustomersClient({
               ))}
             </div>
           )}
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+            {([["all", "Everyone"], ["signup", "Signed up"], ["csv", "Imported (CSV)"], ["manual", "Added by hand"]] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setSourceFilter(key)}
+                style={{
+                  padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  border: sourceFilter === key ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.2)",
+                  background: sourceFilter === key ? "rgba(184,134,43,0.18)" : "transparent",
+                  color: "var(--chalk)",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -705,6 +726,17 @@ export default function CustomersClient({
               announcements to people who haven't signed into the app yet. Includes an unsubscribe link and your
               business address automatically, as required by law. Anyone who's unsubscribed is skipped.
             </p>
+            <select
+              id="email-audience"
+              value={emailAudience}
+              onChange={(e) => setEmailAudience(e.target.value)}
+              style={{ ...inputStyle, width: "100%", marginBottom: 10, boxSizing: "border-box" }}
+            >
+              <option value="all">Send to: everyone ({customers.length})</option>
+              <option value="signup">Send to: signed up in the app ({customers.filter((x) => (x.source || "signup") === "signup").length})</option>
+              <option value="csv">Send to: imported from CSV ({customers.filter((x) => x.source === "csv").length})</option>
+              <option value="manual">Send to: added by hand ({customers.filter((x) => x.source === "manual").length})</option>
+            </select>
             <input
               value={emailSubject}
               onChange={(e) => setEmailSubject(e.target.value)}
@@ -725,7 +757,8 @@ export default function CustomersClient({
               </button>
               <button
                 onClick={() => {
-                  if (window.confirm(`Send this email to all ${customers.length} customer${customers.length === 1 ? "" : "s"} who haven't unsubscribed?`)) {
+                  const audienceCount = emailAudience === "all" ? customers.length : customers.filter((x) => (x.source || "signup") === emailAudience).length;
+                  if (window.confirm(`Send this email to ${audienceCount} customer${audienceCount === 1 ? "" : "s"} who haven't unsubscribed?`)) {
                     sendEmailBlast();
                   }
                 }}
@@ -798,6 +831,8 @@ export default function CustomersClient({
                         )}
                         <div style={{ fontSize: 12, color: "var(--muted)" }}>
                           {c.email}{c.phone && c.phone !== "—" ? ` · ${c.phone}` : ""}
+                          {c.source === "csv" && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 7px" }}>IMPORTED</span>}
+                          {c.source === "manual" && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 7px" }}>ADDED</span>}
                         </div>
                         <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, cursor: togglingAiId === c.id ? "default" : "pointer" }}>
                           <input
@@ -917,16 +952,7 @@ export default function CustomersClient({
                                 }}>
                                   PAYMENT DUE
                                 </span>
-                                <button
-                                  onClick={() => markPaid(pkg.id)}
-                                  disabled={markingPaid === pkg.id}
-                                  style={{
-                                    fontSize: 10, fontWeight: 700, color: "var(--fairway)", background: "none",
-                                    border: "1px solid var(--border)", borderRadius: 4, padding: "1px 6px", cursor: "pointer",
-                                  }}
-                                >
-                                  {markingPaid === pkg.id ? "…" : "Mark as paid"}
-                                </button>
+                                <PaidPicker busy={markingPaid === pkg.id} onPick={(m) => markPaid(pkg.id, m)} />
                               </>
                             ) : pkg.paymentStatus === "deposit_paid" && !!pkg.balanceDueCents ? (
                               <>
@@ -936,16 +962,7 @@ export default function CustomersClient({
                                 }}>
                                   {centsToDollars(pkg.balanceDueCents)} DUE AT LESSON
                                 </span>
-                                <button
-                                  onClick={() => markPaid(pkg.id)}
-                                  disabled={markingPaid === pkg.id}
-                                  style={{
-                                    fontSize: 10, fontWeight: 700, color: "var(--fairway)", background: "none",
-                                    border: "1px solid var(--border)", borderRadius: 4, padding: "1px 6px", cursor: "pointer",
-                                  }}
-                                >
-                                  {markingPaid === pkg.id ? "…" : "Mark as paid"}
-                                </button>
+                                <PaidPicker busy={markingPaid === pkg.id} onPick={(m) => markPaid(pkg.id, m)} />
                               </>
                             ) : pkg.paymentStatus === "club_billed" ? (
                               <>
@@ -966,6 +983,10 @@ export default function CustomersClient({
                                   {markingPaid === pkg.id ? "…" : "Mark received"}
                                 </button>
                               </>
+                            ) : pkg.paymentStatus === "paid" && pkg.paymentMethod ? (
+                              <span style={{ fontSize: 10, fontWeight: 700, color: "#1F6B3A", background: "#E3F4E8", borderRadius: 4, padding: "1px 6px" }}>
+                                PAID · {({ venmo: "VENMO", cashapp: "CASH APP", zelle: "ZELLE", cash: "CASH" } as Record<string, string>)[pkg.paymentMethod] || pkg.paymentMethod.toUpperCase()}
+                              </span>
                             ) : null}
 
                             {pkg.canUpgrade && pkg.upgradeTiers.length > 0 && (
@@ -1079,3 +1100,42 @@ function SortButton({ active, onClick, label }: { active: boolean; onClick: () =
 const inputStyle: React.CSSProperties = {
   border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13,
 };
+
+// "Mark as paid" opens a row of how they paid, so reports can break
+// payments out by method. Tapping one saves and marks the package paid.
+const PAY_METHODS: { key: string; label: string }[] = [
+  { key: "venmo", label: "Venmo" },
+  { key: "cashapp", label: "Cash App" },
+  { key: "zelle", label: "Zelle" },
+  { key: "cash", label: "Cash" },
+];
+
+function PaidPicker({ busy, onPick }: { busy: boolean; onPick: (method: string) => void }) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        disabled={busy}
+        style={{ fontSize: 10, fontWeight: 700, color: "var(--fairway)", background: "none", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 6px", cursor: "pointer" }}
+      >
+        {busy ? "…" : "Mark as paid"}
+      </button>
+    );
+  }
+  return (
+    <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+      <span style={{ fontSize: 10, color: "var(--faint)" }}>Paid by:</span>
+      {PAY_METHODS.map((m) => (
+        <button
+          key={m.key}
+          onClick={() => onPick(m.key)}
+          disabled={busy}
+          style={{ fontSize: 10, fontWeight: 700, color: "var(--chalk)", background: "var(--fairway)", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}
+        >
+          {m.label}
+        </button>
+      ))}
+    </span>
+  );
+}

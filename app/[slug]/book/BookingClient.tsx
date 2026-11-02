@@ -30,7 +30,7 @@ function formatGroupCategory(category?: string | null, ageRange?: string | null)
   const label = labels[category] || category;
   return ageRange ? `${label} - ${ageRange}` : label;
 }
-type Package = { id: string; type: string; durationLabel?: string | null; lessonsRemaining: number; rawLessonsRemaining?: number; lessonsTotal: number; paymentStatus?: string; balanceDueCents?: number; instructorMembershipId?: string | null };
+type Package = { id: string; type: string; durationLabel?: string | null; lessonsRemaining: number; rawLessonsRemaining?: number; lessonsTotal: number; paymentStatus?: string; balanceDueCents?: number; instructorMembershipId?: string | null; payOptions?: { amountCents: number; payeeName: string; venmo?: string | null; cashApp?: string | null; zelle?: string | null } | null };
 type Instructor = { id: string; name: string | null; email: string; image: string | null; role: string; [key: string]: any };
 
 // A real, well-known iOS timing issue: Apple's own push token takes a
@@ -1096,6 +1096,30 @@ export default function BookingClient({
                         : `${centsToDollars(pendingDurationInfo!.priceCents)} - pick a time, then pay`}
                     </div>
                   </button>
+                </div>
+              )}
+
+              {packages.some((p) => p.payOptions) && (
+                <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                  {packages.filter((p) => p.payOptions).map((p) => {
+                    const o = p.payOptions!;
+                    const amt = (o.amountCents / 100).toFixed(2).replace(/\.00$/, "");
+                    const note = encodeURIComponent(`Golf lesson with ${o.payeeName}`);
+                    const btn = { display: "inline-block", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: "none", background: "var(--gold)", color: "var(--fairway)" } as const;
+                    return (
+                      <div key={p.id} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 12, padding: 14 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--chalk)", marginBottom: 4 }}>Payment due: ${amt}</div>
+                        <div style={{ fontSize: 12, color: "#9DB8A9", marginBottom: 10 }}>
+                          Optional: pay {o.payeeName} now, or just pay at your lesson.
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                          {o.venmo && <a style={btn} href={`https://venmo.com/${encodeURIComponent(o.venmo)}?txn=pay&amount=${(o.amountCents / 100).toFixed(2)}&note=${note}`} target="_blank" rel="noopener noreferrer">Pay with Venmo</a>}
+                          {o.cashApp && <a style={btn} href={`https://cash.app/$${encodeURIComponent(o.cashApp)}/${(o.amountCents / 100).toFixed(2)}`} target="_blank" rel="noopener noreferrer">Pay with Cash App</a>}
+                          {o.zelle && <span style={{ fontSize: 12.5, color: "var(--chalk)" }}>Zelle: <strong>{o.zelle}</strong></span>}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

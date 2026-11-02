@@ -26,7 +26,7 @@ export async function PATCH(
   const pkg = await prisma.package.findFirst({ where: { id: params.id, businessId: business.id } });
   if (!pkg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { paymentStatus, lessonsRemaining } = await req.json();
+  const { paymentStatus, lessonsRemaining, paymentMethod } = await req.json();
 
   const data: Record<string, unknown> = {};
 
@@ -34,7 +34,14 @@ export async function PATCH(
     if (paymentStatus !== "paid") return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     data.paymentStatus = "paid";
     data.paidAt = new Date();
+    if (paymentMethod !== undefined) {
+      data.outsidePaidCents = pkg.paymentStatus === "pending" ? pkg.pricePaidCents : (pkg.balanceDueCents || 0);
+    }
     data.balanceDueCents = 0;
+    if (paymentMethod !== undefined) {
+      if (!["venmo", "cashapp", "zelle", "cash"].includes(paymentMethod)) return NextResponse.json({ error: "Invalid payment method" }, { status: 400 });
+      data.paymentMethod = paymentMethod;
+    }
   }
 
   if (lessonsRemaining !== undefined) {
