@@ -42,9 +42,10 @@ const PLAYER_ALL: NavItem[] = [
 
 export const MAX_MAIN_TABS = 4;
 
-export function navFor(role: string): { all: NavItem[]; main: NavItem[]; more: NavItem[] } | null {
-  const all = role === "owner" ? OWNER_ALL : role === "instructor" ? STAFF_ALL : role === "player" ? PLAYER_ALL : null;
-  if (!all) return null;
+export function navFor(role: string, videoEnabled = true): { all: NavItem[]; main: NavItem[]; more: NavItem[] } | null {
+  const base = role === "owner" ? OWNER_ALL : role === "instructor" ? STAFF_ALL : role === "player" ? PLAYER_ALL : null;
+  if (!base) return null;
+  const all = videoEnabled ? base : base.filter((i) => i.key !== "videos");
   return { all, main: all.slice(0, MAX_MAIN_TABS), more: all.slice(MAX_MAIN_TABS) };
 }
 

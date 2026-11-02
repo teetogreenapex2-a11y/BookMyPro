@@ -34,6 +34,7 @@ import { businessDestination } from "@/lib/businessUrl";
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
+  if (business.videoEnabled === false) return NextResponse.json({ error: "Video is not enabled for this business" }, { status: 403 });
 
   const body = (await req.json()) as HandleUploadBody;
 

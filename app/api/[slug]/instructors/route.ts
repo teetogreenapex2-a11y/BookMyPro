@@ -60,7 +60,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     // comment on Membership for why the field names mirror Business's).
     packageSingleEnabled: m.packageSingleEnabled,
     packagePlayingEnabled: m.packagePlayingEnabled,
-    packageVideoEnabled: m.packageVideoEnabled,
+    packageVideoEnabled: business.videoEnabled === false ? false : m.packageVideoEnabled,
     packageThreeEnabled: m.packageThreeEnabled,
     packageFiveEnabled: m.packageFiveEnabled,
     packageTenEnabled: m.packageTenEnabled,

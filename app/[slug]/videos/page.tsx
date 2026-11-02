@@ -20,6 +20,7 @@ export default async function VideosPage({ params }: { params: { slug: string } 
   await ensureMembership(userId, business.id, "player");
 
   const { basePath, apiBase } = getBasePaths(params.slug);
+  if (business.videoEnabled === false) redirect(`${basePath}/book`);
 
   return <VideosClient slug={params.slug} basePath={basePath} apiBase={apiBase} />;
 }

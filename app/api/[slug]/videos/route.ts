@@ -14,6 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
+  if (business.videoEnabled === false) return NextResponse.json({ error: "Video is not enabled for this business" }, { status: 403 });
 
   const userId = (session.user as any).id;
   const membership = await getMembership(userId, business.id);
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
+  if (business.videoEnabled === false) return NextResponse.json({ error: "Video is not enabled for this business" }, { status: 403 });
 
   const userId = (session.user as any).id;
   const uploaderMembership = await getMembership(userId, business.id);

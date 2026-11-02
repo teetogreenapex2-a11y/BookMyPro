@@ -15,6 +15,7 @@ export default async function InstructorVideosPage({ params }: { params: { slug:
   const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor"]);
   const { basePath, apiBase } = getBasePaths(params.slug);
   if (!membership) redirect(`${basePath}/book`);
+  if (business.videoEnabled === false) redirect(`${basePath}/instructor`);
 
   return <InstructorVideosClient slug={params.slug} basePath={basePath} apiBase={apiBase} viewerMembershipId={membership.id} />;
 }

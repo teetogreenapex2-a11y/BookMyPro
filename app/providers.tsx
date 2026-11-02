@@ -26,6 +26,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <SessionProvider>
+      <AudioSessionAmbient />
       <TabBarSync />
       <NativeMoreSheet />
       <WebTabBar />
@@ -176,11 +177,11 @@ function TabBarSync() {
 
     fetch(`/api/${slug}/my-role`)
       .then((r) => r.json())
-      .then(({ role }) => {
+      .then(({ role, videoEnabled }) => {
         if (!role) { bridge.hide?.(); return; }
         // Newer app builds: send the full tab list (four tabs plus More)
         // so the tabs can change from the website without a new build.
-        const nav = navFor(role);
+        const nav = navFor(role, videoEnabled !== false);
         if (bridge.setTabs && nav) {
           const k = keyForPage(nav.all, page);
           const active = nav.main.some((t) => t.key === k) ? k : "more";
@@ -193,5 +194,30 @@ function TabBarSync() {
       .catch(() => bridge.hide?.());
   }, [pathname, status]);
 
+  return null;
+}
+
+// Swing videos are clips, not music. By default iPhone treats any playing
+// video as media: it takes over the lock screen / Control Center "Now
+// Playing" card, shows up in Apple Music, and stops the person's music.
+// Marking the page's audio as "ambient" tells iOS to mix with whatever
+// else is playing and stay out of Now Playing.
+function AudioSessionAmbient() {
+  useEffect(() => {
+    const apply = () => {
+      try {
+        const as = (navigator as any).audioSession;
+        if (as && as.type !== "ambient") as.type = "ambient";
+      } catch {}
+      try {
+        const ms = (navigator as any).mediaSession;
+        if (ms) ms.metadata = null;
+      } catch {}
+    };
+    apply();
+    // Re-apply the moment any video starts, in case the page reset it.
+    document.addEventListener("play", apply, true);
+    return () => document.removeEventListener("play", apply, true);
+  }, []);
   return null;
 }

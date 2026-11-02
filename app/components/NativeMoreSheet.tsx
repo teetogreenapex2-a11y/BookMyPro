@@ -34,8 +34,8 @@ export default function NativeMoreSheet() {
     const onOpen = async () => {
       if (!currentSlug || status !== "authenticated") return;
       try {
-        const { role } = await (await fetch(`/api/${currentSlug}/my-role`)).json();
-        const nav = navFor(role);
+        const { role, videoEnabled } = await (await fetch(`/api/${currentSlug}/my-role`)).json();
+        const nav = navFor(role, videoEnabled !== false);
         if (!nav) return;
         setSlug(currentSlug);
         setItems(nav.more);

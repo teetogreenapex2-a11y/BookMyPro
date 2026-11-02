@@ -69,6 +69,11 @@ model Business {
   squareRefreshToken   String?
   squareTokenExpiresAt DateTime?
 
+  // Platform-admin switch (/admin/features). False hides and blocks every video
+  // feature for this business: the Videos tab, video pages, uploads, and the
+  // remote video lesson package. For pros who only want scheduling + customers.
+  videoEnabled Boolean @default(true)
+
   packageSingleEnabled Boolean @default(true)
   packagePlayingEnabled Boolean @default(true)
   packageVideoEnabled  Boolean @default(true)
