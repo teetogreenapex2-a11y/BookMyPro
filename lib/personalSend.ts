@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { ensureMembership } from "./tenant";
 import { sendPushToMembership } from "./pushNotifications";
 import { businessDestination } from "./businessUrl";
 
@@ -28,14 +29,7 @@ export async function createReviewSubmission(userId: string, videoId: string, in
   });
   if (dup) return instructor;
 
-  // Marked "bookmypro" so the pro can tell customers who found them through
-  // BookMyPro apart from their own signups, imports and hand-added people.
-  // An existing membership keeps whatever source it already had.
-  await prisma.membership.upsert({
-    where: { userId_businessId: { userId, businessId: instructor.businessId } },
-    update: {},
-    create: { userId, businessId: instructor.businessId, role: "player", source: "bookmypro" },
-  });
+  await ensureMembership(userId, instructor.businessId, "player");
   await prisma.videoSubmission.create({
     data: {
       businessId: instructor.businessId,
