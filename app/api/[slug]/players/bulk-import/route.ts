@@ -68,9 +68,29 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const members = await prisma.membership.findMany({
     where: { businessId: business.id, userId: { in: users.map((u) => u.id) } },
-    select: { userId: true },
+    select: { userId: true, source: true },
   });
   const alreadyHere = new Set(members.map((m) => m.userId));
+
+  // People already on the list under the default "signup" label who have
+  // never signed in themselves (no account, no session, email never
+  // verified) were really imported earlier - relabel them "csv" so the
+  // Imported filter finds them. Anyone who signed in stays "signup".
+  const signupIds = members.filter((m) => m.source === "signup").map((m) => m.userId);
+  let relabeledIds = new Set<string>();
+  if (signupIds.length > 0) {
+    const neverSignedIn = await prisma.user.findMany({
+      where: { id: { in: signupIds }, emailVerified: null, accounts: { none: {} }, sessions: { none: {} } },
+      select: { id: true },
+    });
+    relabeledIds = new Set(neverSignedIn.map((u) => u.id));
+    if (relabeledIds.size > 0) {
+      await prisma.membership.updateMany({
+        where: { businessId: business.id, role: "player", source: "signup", userId: { in: Array.from(relabeledIds) } },
+        data: { source: "csv" },
+      });
+    }
+  }
 
   const toAdd: string[] = [];
   for (const c of clean) {
@@ -78,7 +98,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (!id) {
       skipped.push({ row: c.row, name: c.name, reason: "Could not create" });
     } else if (alreadyHere.has(id)) {
-      skipped.push({ row: c.row, name: c.name, reason: "Already a customer here" });
+      if (!relabeledIds.has(id)) skipped.push({ row: c.row, name: c.name, reason: "Already a customer here" });
     } else {
       toAdd.push(id);
     }
@@ -86,7 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   if (toAdd.length > 0) {
     await prisma.membership.createMany({
-      data: toAdd.map((userId) => ({ userId, businessId: business.id, role: "player" })),
+      data: toAdd.map((userId) => ({ userId, businessId: business.id, role: "player", source: "csv" })),
       skipDuplicates: true,
     });
   }
@@ -95,6 +115,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     totalRows: input.length,
     newPeople: toCreate.length,
     existingPeopleAdded: toAdd.length - toCreate.length,
+    relabeled: relabeledIds.size,
     skipped,
   });
 }

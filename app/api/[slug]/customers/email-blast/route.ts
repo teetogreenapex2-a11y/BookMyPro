@@ -29,13 +29,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const membership = await requireMembership((session.user as any).id, business.id, ["owner"]);
   if (!membership) return NextResponse.json({ error: "Owner access required" }, { status: 403 });
 
-  const { subject, message } = await req.json();
+  const { subject, message, audience } = await req.json();
   if (!subject?.trim() || !message?.trim()) {
     return NextResponse.json({ error: "Subject and message are required" }, { status: 400 });
   }
 
+  const audienceFilter = audience === "signup" || audience === "csv" || audience === "manual" || audience === "bookmypro" ? { source: audience } : {};
   const recipients = await prisma.membership.findMany({
-    where: { businessId: business.id, role: "player" },
+    where: { businessId: business.id, role: "player", isSandboxProspect: false, ...audienceFilter },
     include: { user: { select: { id: true, email: true, marketingOptOut: true } } },
   });
 

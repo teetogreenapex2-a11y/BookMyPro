@@ -10,7 +10,7 @@ type Customer = {
   id: string;
   name: string;
   email: string;
-  source: string; // "signup" | "csv" | "manual"
+  source: string; // "signup" | "csv" | "manual" | "bookmypro"
   phone: string;
   packages: {
     id: string; type: string; label: string; lessonsTotal: number; lessonsRemaining: number; rawLessonsRemaining?: number;
@@ -72,7 +72,7 @@ export default function CustomersClient({
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<{ totalRows: number; newPeople: number; existingPeopleAdded: number; skipped: { row: number; name: string; reason: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ totalRows: number; newPeople: number; existingPeopleAdded: number; relabeled?: number; skipped: { row: number; name: string; reason: string }[] } | null>(null);
   const [emailBlastOpen, setEmailBlastOpen] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailAudience, setEmailAudience] = useState<string>("all");
@@ -509,7 +509,7 @@ export default function CustomersClient({
           )}
 
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
-            {([["all", "Everyone"], ["signup", "Signed up"], ["csv", "Imported (CSV)"], ["manual", "Added by hand"]] as const).map(([key, label]) => (
+            {([["all", "Everyone"], ["signup", "Signed up"], ["csv", "Imported (CSV)"], ["manual", "Added by hand"], ["bookmypro", "From BookMyPro"]] as const).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setSourceFilter(key)}
@@ -660,6 +660,7 @@ export default function CustomersClient({
                   Read {importResult.totalRows} row{importResult.totalRows === 1 ? "" : "s"} - added{" "}
                   <strong>{importResult.newPeople + importResult.existingPeopleAdded}</strong> new customer
                   {importResult.newPeople + importResult.existingPeopleAdded === 1 ? "" : "s"}.
+                  {!!importResult.relabeled && <> Marked <strong>{importResult.relabeled}</strong> earlier import{importResult.relabeled === 1 ? "" : "s"} as Imported. Refresh the page to see it.</>}
                 </p>
                 {importResult.skipped.length > 0 && (
                   <details style={{ fontSize: 12, color: "var(--faint)" }}>
@@ -736,6 +737,7 @@ export default function CustomersClient({
               <option value="signup">Send to: signed up in the app ({customers.filter((x) => (x.source || "signup") === "signup").length})</option>
               <option value="csv">Send to: imported from CSV ({customers.filter((x) => x.source === "csv").length})</option>
               <option value="manual">Send to: added by hand ({customers.filter((x) => x.source === "manual").length})</option>
+              <option value="bookmypro">Send to: found you on BookMyPro ({customers.filter((x) => x.source === "bookmypro").length})</option>
             </select>
             <input
               value={emailSubject}
@@ -832,6 +834,7 @@ export default function CustomersClient({
                         <div style={{ fontSize: 12, color: "var(--muted)" }}>
                           {c.email}{c.phone && c.phone !== "—" ? ` · ${c.phone}` : ""}
                           {c.source === "csv" && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 7px" }}>IMPORTED</span>}
+                          {c.source === "bookmypro" && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: "var(--gold)", border: "1px solid var(--gold)", borderRadius: 999, padding: "1px 7px" }}>BOOKMYPRO</span>}
                           {c.source === "manual" && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 7px" }}>ADDED</span>}
                         </div>
                         <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, cursor: togglingAiId === c.id ? "default" : "pointer" }}>
