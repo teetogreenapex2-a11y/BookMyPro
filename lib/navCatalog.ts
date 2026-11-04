@@ -42,10 +42,14 @@ const PLAYER_ALL: NavItem[] = [
 
 export const MAX_MAIN_TABS = 4;
 
-export function navFor(role: string, videoEnabled = true): { all: NavItem[]; main: NavItem[]; more: NavItem[] } | null {
+export function navFor(role: string, videoEnabled = true, realRole?: string): { all: NavItem[]; main: NavItem[]; more: NavItem[] } | null {
   const base = role === "owner" ? OWNER_ALL : role === "instructor" ? STAFF_ALL : role === "player" ? PLAYER_ALL : null;
   if (!base) return null;
-  const all = videoEnabled ? base : base.filter((i) => i.key !== "videos");
+  let all = videoEnabled ? base : base.filter((i) => i.key !== "videos");
+  // Owners and instructors can flip between staff and player tabs.
+  const realIsStaff = realRole === "owner" || realRole === "instructor";
+  if (realIsStaff && role === "player") all = [...all, I("staffview", "Instructor view", "calendar", "/switch-view?to=instructor")];
+  else if (realIsStaff && (role === "owner" || role === "instructor")) all = [...all, I("playerview", "Player view", "book", "/switch-view?to=player")];
   return { all, main: all.slice(0, MAX_MAIN_TABS), more: all.slice(MAX_MAIN_TABS) };
 }
 

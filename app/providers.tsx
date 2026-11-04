@@ -177,11 +177,11 @@ function TabBarSync() {
 
     fetch(`/api/${slug}/my-role`)
       .then((r) => r.json())
-      .then(({ role, videoEnabled }) => {
+      .then(({ role, videoEnabled, realRole }) => {
         if (!role) { bridge.hide?.(); return; }
         // Newer app builds: send the full tab list (four tabs plus More)
         // so the tabs can change from the website without a new build.
-        const nav = navFor(role, videoEnabled !== false);
+        const nav = navFor(role, videoEnabled !== false, realRole);
         if (bridge.setTabs && nav) {
           const k = keyForPage(nav.all, page);
           const active = nav.main.some((t) => t.key === k) ? k : "more";

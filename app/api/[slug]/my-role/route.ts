@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -24,5 +25,14 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   // the person back to the booking page, so showing staff tabs for it just
   // made every tab appear to "go back to booking."
   if (!membership || membership.status !== "active") return NextResponse.json({ role: null });
-  return NextResponse.json({ role: membership.role, status: membership.status, videoEnabled: business.videoEnabled !== false });
+  // An owner/instructor who chose "Player view" (see /{slug}/switch-view)
+  // gets the player tabs; realRole tells the tab bar to offer the way back.
+  const isStaff = membership.role === "owner" || membership.role === "instructor";
+  const viewAsPlayer = isStaff && cookies().get("bmp_view")?.value === "player";
+  return NextResponse.json({
+    role: viewAsPlayer ? "player" : membership.role,
+    realRole: membership.role,
+    status: membership.status,
+    videoEnabled: business.videoEnabled !== false,
+  });
 }

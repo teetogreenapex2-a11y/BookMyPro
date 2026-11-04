@@ -48,9 +48,9 @@ export default function WebTabBar() {
     let cancelled = false;
     fetch(`/api/${currentSlug}/my-role`)
       .then((r) => r.json())
-      .then(({ role, videoEnabled }) => {
+      .then(({ role, videoEnabled, realRole }) => {
         if (cancelled) return;
-        const nav = navFor(role, videoEnabled !== false);
+        const nav = navFor(role, videoEnabled !== false, realRole);
         if (!nav) { setMain([]); return; }
         setSlug(currentSlug);
         setMain(nav.main);
