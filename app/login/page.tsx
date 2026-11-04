@@ -353,6 +353,9 @@ function LoginPageInner() {
         <a href="/find-a-pro" style={{ display: "block", marginTop: 16, fontSize: 12.5, color: "var(--faint)" }}>
           Don't have a link from your instructor? Find a Pro near you &gt;
         </a>
+        <a href="/login?callbackUrl=%2Fpersonal" style={{ display: "block", marginTop: 8, fontSize: 12.5, color: "var(--faint)" }}>
+          Just want to study your own swing? Try BookMyPro Personal &gt;
+        </a>
           </>
         )}
       </div>

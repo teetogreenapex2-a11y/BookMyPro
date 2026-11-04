@@ -47,6 +47,26 @@ export async function POST(req: NextRequest) {
     // carry meta.businessId at all, only client_reference_id, and never
     // happen on a connected account (event.account is always absent
     // here, unlike every path below this one).
+    // BookMyPro Personal (a solo user's own subscription) - tagged with
+    // metadata.kind = "personal" at checkout, handled before the business
+    // platform-billing path below.
+    if (session.mode === "subscription" && session.metadata?.kind === "personal") {
+      const userId = session.metadata.userId;
+      const subId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+      if (userId && subId) {
+        const sub = await stripe.subscriptions.retrieve(subId);
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            personalSubscriptionId: subId,
+            personalStripeCustomerId: typeof session.customer === "string" ? session.customer : session.customer?.id,
+            personalStatus: sub.status === "trialing" ? "trialing" : "active",
+          },
+        });
+      }
+      return NextResponse.json({ received: true });
+    }
+
     if (session.mode === "subscription") {
       const businessId = session.client_reference_id;
       if (!businessId) return NextResponse.json({ received: true });
@@ -90,6 +110,17 @@ export async function POST(req: NextRequest) {
     // own record of which connected account generated this event.
     if (event.account && business.stripeAccountId !== event.account) {
       console.error(`Webhook account mismatch: event.account=${event.account} vs business.stripeAccountId for businessId=${businessId}`);
+      return NextResponse.json({ received: true });
+    }
+
+    if (meta.kind === "video_review") {
+      // A BookMyPro Personal customer paid a pro to review a video - only
+      // now does the video land in that pro's queue.
+      if (meta.userId && meta.videoId && meta.instructorMembershipId) {
+        const { createReviewSubmission } = await import("@/lib/personalSend");
+        await createReviewSubmission(meta.userId, meta.videoId, meta.instructorMembershipId)
+          .catch((err) => console.error("Paid video review delivery failed:", err));
+      }
       return NextResponse.json({ received: true });
     }
 
@@ -551,6 +582,12 @@ export async function POST(req: NextRequest) {
     const invoice = event.data.object as Stripe.Invoice;
     const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
     if (customerId) {
+      await prisma.user.updateMany({
+        where: { personalStripeCustomerId: customerId, personalStatus: { in: ["active", "trialing"] } },
+        data: { personalStatus: "past_due" },
+      });
+    }
+    if (customerId) {
       const business = await prisma.business.findFirst({
         where: { platformStripeCustomerId: customerId },
         include: { memberships: { where: { role: "owner" }, include: { user: { select: { name: true, email: true } } } } },
@@ -577,10 +614,29 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (event.type === "customer.subscription.updated") {
+    const subscription = event.data.object as Stripe.Subscription;
+    if (subscription.metadata?.kind === "personal") {
+      const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
+      const status =
+        subscription.status === "trialing" ? "trialing"
+        : subscription.status === "active" ? "active"
+        : subscription.status === "past_due" || subscription.status === "unpaid" ? "past_due"
+        : "cancelled";
+      if (customerId) {
+        await prisma.user.updateMany({ where: { personalStripeCustomerId: customerId }, data: { personalStatus: status } });
+      }
+    }
+  }
+
   if (event.type === "customer.subscription.deleted") {
     const subscription = event.data.object as Stripe.Subscription;
     const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
     if (customerId) {
+      await prisma.user.updateMany({
+        where: { personalStripeCustomerId: customerId },
+        data: { personalStatus: "cancelled" },
+      });
       await prisma.business.updateMany({
         where: { platformStripeCustomerId: customerId },
         data: { subscriptionStatus: "cancelled" },
@@ -597,6 +653,10 @@ export async function POST(req: NextRequest) {
     const invoice = event.data.object as Stripe.Invoice;
     const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
     if (customerId) {
+      await prisma.user.updateMany({
+        where: { personalStripeCustomerId: customerId, personalStatus: "past_due" },
+        data: { personalStatus: "active" },
+      });
       await prisma.business.updateMany({
         where: { platformStripeCustomerId: customerId, subscriptionStatus: "past_due" },
         data: { subscriptionStatus: "active" },

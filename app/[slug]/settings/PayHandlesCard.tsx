@@ -9,13 +9,14 @@ export default function PayHandlesCard({ apiBase }: { apiBase: string }) {
   const [venmo, setVenmo] = useState("");
   const [cashApp, setCashApp] = useState("");
   const [zelle, setZelle] = useState("");
+  const [reviewPrice, setReviewPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${apiBase}/my-pay-handles`)
       .then((r) => r.json())
-      .then((d) => { setVenmo(d.venmoHandle || ""); setCashApp(d.cashAppHandle || ""); setZelle(d.zelleContact || ""); })
+      .then((d) => { setVenmo(d.venmoHandle || ""); setCashApp(d.cashAppHandle || ""); setZelle(d.zelleContact || ""); setReviewPrice(d.videoReviewPriceCents ? String(d.videoReviewPriceCents / 100) : ""); })
       .catch(() => {});
   }, [apiBase]);
 
@@ -25,7 +26,7 @@ export default function PayHandlesCard({ apiBase }: { apiBase: string }) {
     const res = await fetch(`${apiBase}/my-pay-handles`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ venmoHandle: venmo, cashAppHandle: cashApp, zelleContact: zelle }),
+      body: JSON.stringify({ venmoHandle: venmo, cashAppHandle: cashApp, zelleContact: zelle, videoReviewPriceCents: Math.round((parseFloat(reviewPrice) || 0) * 100) }),
     });
     setSaving(false);
     setMsg(res.ok ? "Saved." : "Could not save.");
@@ -44,6 +45,13 @@ export default function PayHandlesCard({ apiBase }: { apiBase: string }) {
       <div style={row}><label style={label} htmlFor="pay-venmo">Venmo</label><input id="pay-venmo" style={input} placeholder="username (no @)" value={venmo} onChange={(e) => setVenmo(e.target.value)} /></div>
       <div style={row}><label style={label} htmlFor="pay-cashapp">Cash App</label><input id="pay-cashapp" style={input} placeholder="cashtag (no $)" value={cashApp} onChange={(e) => setCashApp(e.target.value)} /></div>
       <div style={row}><label style={label} htmlFor="pay-zelle">Zelle</label><input id="pay-zelle" style={input} placeholder="phone or email" value={zelle} onChange={(e) => setZelle(e.target.value)} /></div>
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Video review price</div>
+        <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 8px" }}>
+          What you charge when someone sends you a swing video from BookMyPro Personal. Paid by card straight to your Stripe account. Leave blank for free.
+        </p>
+        <div style={row}><label style={label} htmlFor="review-price">Price ($)</label><input id="review-price" style={input} inputMode="decimal" placeholder="e.g. 15" value={reviewPrice} onChange={(e) => setReviewPrice(e.target.value)} /></div>
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <button onClick={save} disabled={saving} style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
           {saving ? "Saving…" : "Save payment options"}

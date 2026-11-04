@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
   const r = await who(params.slug);
   if (r.error) return r.error;
   const m = r.membership!;
-  return NextResponse.json({ venmoHandle: m.venmoHandle || "", cashAppHandle: m.cashAppHandle || "", zelleContact: m.zelleContact || "" });
+  return NextResponse.json({ venmoHandle: m.venmoHandle || "", cashAppHandle: m.cashAppHandle || "", zelleContact: m.zelleContact || "", videoReviewPriceCents: m.videoReviewPriceCents || 0 });
 }
 
 const clean = (v: unknown, strip: RegExp) => String(v ?? "").trim().replace(strip, "").slice(0, 80) || null;
@@ -35,7 +35,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
       venmoHandle: clean(body.venmoHandle, /^@+/),
       cashAppHandle: clean(body.cashAppHandle, /^\$+/),
       zelleContact: clean(body.zelleContact, /\s+/g),
+      ...(body.videoReviewPriceCents !== undefined
+        ? { videoReviewPriceCents: Math.max(0, Math.min(50000, Math.round(Number(body.videoReviewPriceCents) || 0))) || null }
+        : {}),
     },
   });
-  return NextResponse.json({ venmoHandle: updated.venmoHandle || "", cashAppHandle: updated.cashAppHandle || "", zelleContact: updated.zelleContact || "" });
+  return NextResponse.json({ venmoHandle: updated.venmoHandle || "", cashAppHandle: updated.cashAppHandle || "", zelleContact: updated.zelleContact || "", videoReviewPriceCents: updated.videoReviewPriceCents || 0 });
 }

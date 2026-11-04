@@ -89,6 +89,12 @@ export default async function HomePage() {
             I'm looking to book a lesson
           </a>
 <a
+            href="/personal"
+            style={{ display: "block", background: "none", color: "#1B3A2F", border: "1px solid #E3D9C9", borderRadius: 8, padding: "13px 20px", fontWeight: 600, fontSize: 14, textDecoration: "none", marginBottom: 10 }}
+          >
+            I want to record and study my own swing
+          </a>
+<a
           
             href="/features"
             style={{ display: "block", background: "none", color: "#1B3A2F", border: "1px solid #E3D9C9", borderRadius: 8, padding: "13px 20px", fontWeight: 600, fontSize: 14, textDecoration: "none" }}
@@ -155,6 +161,7 @@ function MarketingPage() {
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "22px 28px", maxWidth: 1120, margin: "0 auto" }}>
         <div className="mono" style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", color: "#B8862B" }}>BOOKMYPRO</div>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <a href="/personal" style={{ fontSize: 14, fontWeight: 600, color: "#1B3A2F", textDecoration: "none" }}>Personal</a>
           <a href="/pricing" style={{ fontSize: 14, fontWeight: 600, color: "#1B3A2F", textDecoration: "none" }}>Pricing</a>
           <a href="/login" style={{ fontSize: 14, fontWeight: 600, color: "#1B3A2F", textDecoration: "none" }}>Sign in</a>
         </div>

@@ -191,6 +191,9 @@ model Membership {
   venmoHandle   String?
   cashAppHandle String?
   zelleContact  String?
+  // What this pro charges to review one video sent in from BookMyPro
+  // Personal. Null or 0 = free. Paid by card (Stripe) straight to the pro.
+  videoReviewPriceCents Int?
   // "active" for every normal membership (the default, matching every
   // existing row). "pending" is specifically for someone who requested to
   // join as an instructor and hasn't been approved yet - requireMembership()
@@ -394,6 +397,13 @@ model User {
   // touches emailReminders (booking/schedule notifications), which is a
   // separate, opted-in-by-default relationship the person expects.
   marketingOptOut Boolean     @default(false)
+  // BookMyPro Personal: a solo video-review subscription, billed on the
+  // platform's own Stripe account. personalStatus: "none" | "trialing" |
+  // "active" | "past_due" | "cancelled". Uploading needs trialing/active.
+  personalStatus           String   @default("none")
+  personalStripeCustomerId String?
+  personalSubscriptionId   String?
+  personalVideos           PersonalVideo[]
   // Golf profile — filled in once by the player, visible to the instructor
   // on every booking (not booking-specific, since these don't change visit
   // to visit).
@@ -1029,4 +1039,51 @@ model StaffMessage {
   imageUrl            String?
   readAt              DateTime?
   createdAt           DateTime          @default(now())
+}
+
+// A live 50/50-style raffle board a business can run: customers claim
+// numbered spaces on a public page, the owner draws winners once it is
+// full. One board per business for now.
+model RaffleBoard {
+  id                String   @id @default(cuid())
+  businessId        String   @unique
+  title             String   @default("50/50 Raffle")
+  spaceCount        Int      @default(50)
+  maxPerPerson      Int      @default(3)
+  status            String   @default("open") // "open" | "drawn"
+  drawnAt           DateTime?
+  giftCardCents     Int      @default(7500)   // what every non-prize space wins
+  giftCardsIssuedAt DateTime?
+  tiers             Json     // [{ label, count, prize, rest? }] - the "rest" tier is everyone who did not win a prize
+  createdAt         DateTime @default(now())
+  spaces            RaffleSpace[]
+}
+
+model RaffleSpace {
+  id         String      @id @default(cuid())
+  board      RaffleBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId    String
+  number     Int
+  name       String
+  email      String
+  phone      String?
+  winnerTier Int?        // index into the board's tiers once drawn
+  claimedAt  DateTime    @default(now())
+
+  @@unique([boardId, number])
+  @@index([boardId, email])
+}
+
+// A solo swing video in BookMyPro Personal - private to its owner, no
+// instructor or business involved.
+model PersonalVideo {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  videoUrl  String
+  title     String?
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
