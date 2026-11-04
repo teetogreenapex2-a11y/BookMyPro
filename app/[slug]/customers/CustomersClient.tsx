@@ -72,7 +72,7 @@ export default function CustomersClient({
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<{ totalRows: number; newPeople: number; existingPeopleAdded: number; relabeled?: number; skipped: { row: number; name: string; reason: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ totalRows: number; newPeople: number; existingPeopleAdded: number; skipped: { row: number; name: string; reason: string }[] } | null>(null);
   const [emailBlastOpen, setEmailBlastOpen] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailAudience, setEmailAudience] = useState<string>("all");
@@ -660,7 +660,6 @@ export default function CustomersClient({
                   Read {importResult.totalRows} row{importResult.totalRows === 1 ? "" : "s"} - added{" "}
                   <strong>{importResult.newPeople + importResult.existingPeopleAdded}</strong> new customer
                   {importResult.newPeople + importResult.existingPeopleAdded === 1 ? "" : "s"}.
-                  {!!importResult.relabeled && <> Marked <strong>{importResult.relabeled}</strong> earlier import{importResult.relabeled === 1 ? "" : "s"} as Imported. Refresh the page to see it.</>}
                 </p>
                 {importResult.skipped.length > 0 && (
                   <details style={{ fontSize: 12, color: "var(--faint)" }}>
