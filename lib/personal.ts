@@ -18,7 +18,7 @@ export async function isPersonalComped(userId: string) {
       OR: [
         { source: "manual" },
         { business: { packages: { some: { userId } } } },
-        { business: { bookings: { some: { userId } } } },
+        { business: { bookings: { some: { playerId: userId } } } },
       ],
     },
     select: { id: true },
