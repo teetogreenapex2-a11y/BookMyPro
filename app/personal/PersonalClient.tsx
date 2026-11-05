@@ -1,5 +1,6 @@
 "use client";
 
+import { downloadVideo } from "@/lib/downloadVideo";
 import ZoomFrame from "@/app/components/ZoomFrame";
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
@@ -10,18 +11,6 @@ type Vid = { id: string; videoUrl: string; title: string | null; note: string | 
 type Review = { id: string; proName: string; businessName: string; status: string; comments: { id: string; timestampSeconds: number; text: string }[] };
 type Pro = { slug: string; name: string; city: string | null; state: string | null; distanceMiles: number | null; instructors: { id: string; name: string; specialty: string | null; priceCents: number; covered?: boolean }[] };
 
-async function downloadVideo(url: string, filename: string) {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(blobUrl);
-}
 
 const card: React.CSSProperties = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 };
 const input: React.CSSProperties = { width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, marginBottom: 8 };

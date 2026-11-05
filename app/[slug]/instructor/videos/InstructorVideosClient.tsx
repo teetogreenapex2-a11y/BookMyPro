@@ -1,5 +1,6 @@
 "use client";
 
+import { downloadVideo } from "@/lib/downloadVideo";
 import ZoomFrame from "@/app/components/ZoomFrame";
 import ClubPathLayer, { type PathPoint } from "@/app/components/ClubPathLayer";
 import { useEffect, useRef, useState } from "react";
@@ -119,20 +120,6 @@ function SwingSessionPairView({
   );
 }
 
-// See VideosClient.tsx for why this fetches the file rather than using a
-// plain download link - same cross-origin reasoning applies here too.
-async function downloadVideo(url: string, filename: string) {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(blobUrl);
-}
 
 type Player = { id: string; name: string | null; email: string };
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { downloadVideo } from "@/lib/downloadVideo";
 import ZoomFrame from "@/app/components/ZoomFrame";
 import ClubPathLayer from "@/app/components/ClubPathLayer";
 import { useEffect, useRef, useState } from "react";
@@ -24,23 +25,6 @@ function formatTimestamp(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// A plain <a download> doesn't reliably force a download for a
-// cross-origin file like these (Vercel Blob lives on a different domain
-// than the app) - most browsers just navigate to it instead. Fetching it
-// as a blob first, then downloading from that local blob URL, works
-// consistently everywhere.
-async function downloadVideo(url: string, filename: string) {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(blobUrl);
-}
 
 export default function VideosClient({ slug, basePath, apiBase }: { slug: string; basePath: string; apiBase: string }) {
   const isSandboxPreview = useSandboxPreview();
