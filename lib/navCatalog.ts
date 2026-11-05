@@ -27,6 +27,7 @@ const STAFF_ALL: NavItem[] = [
 const OWNER_ALL: NavItem[] = [
   ...STAFF_ALL.slice(0, 8),
   I("reports", "Reports", "reports", "/reports"),
+  I("raffle", "Raffle", "gift", "/raffle"),
   STAFF_ALL[8],
 ];
 
