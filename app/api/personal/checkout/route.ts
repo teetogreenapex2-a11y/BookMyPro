@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
-import { PERSONAL_TRIAL_DAYS } from "@/lib/personal";
 
 // POST /api/personal/checkout - starts the BookMyPro Personal subscription
 // on the platform's own Stripe account (not a connected account).
@@ -28,14 +27,12 @@ export async function POST() {
   }
 
   const origin = process.env.NEXTAUTH_URL || "https://bookmypro.app";
-  // Free trial only the first time - someone who cancelled and returns pays right away.
-  const everSubscribed = !!user.personalSubscriptionId;
+  // The free week is the in-app trial (no card) - checkout charges right away.
   const checkout = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
     line_items: [{ price: priceId, quantity: 1 }],
     subscription_data: {
-      ...(everSubscribed ? {} : { trial_period_days: PERSONAL_TRIAL_DAYS }),
       metadata: { kind: "personal", userId },
     },
     metadata: { kind: "personal", userId },

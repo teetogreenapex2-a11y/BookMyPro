@@ -2,6 +2,8 @@ import { prisma } from "./prisma";
 
 export const PERSONAL_VIDEO_CAP = 100;
 export const PERSONAL_TRIAL_DAYS = 7;
+// Days after the free week (or a cancelled plan) ends before saved videos are deleted. Set to 0 for immediate deletion.
+export const PERSONAL_GRACE_DAYS = 3;
 
 export function personalCanUpload(status: string | null | undefined, comped = false) {
   return comped || status === "active" || status === "trialing";
@@ -39,12 +41,25 @@ export async function hasLessonsLeft(userId: string, businessId: string, instruc
 export async function getPersonalState(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { personalStatus: true, personalStripeCustomerId: true },
+    select: { personalStatus: true, personalStripeCustomerId: true, personalTrialEndsAt: true, personalLapsedAt: true },
   });
   const count = await prisma.personalVideo.count({ where: { userId } });
   const comped = await isPersonalComped(userId);
+  const trialEndsAt = user?.personalTrialEndsAt || null;
+  const trialActive = !!trialEndsAt && trialEndsAt.getTime() > Date.now();
+  const status = user?.personalStatus || "none";
+  const canUploadNow = personalCanUpload(status, comped) || trialActive;
+  const lapseStart = user?.personalLapsedAt || trialEndsAt;
+  const deleteOn = !canUploadNow && status !== "past_due" && lapseStart
+    ? new Date(lapseStart.getTime() + PERSONAL_GRACE_DAYS * 86400000).toISOString()
+    : null;
   return {
+    deleteOn,
     comped,
+    trialActive,
+    trialEverUsed: !!trialEndsAt,
+    trialEndsAt: trialEndsAt ? trialEndsAt.toISOString() : null,
+    canUpload: personalCanUpload(status, comped) || trialActive,
     status: user?.personalStatus || "none",
     hasCustomer: !!user?.personalStripeCustomerId,
     count,

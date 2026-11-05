@@ -403,6 +403,10 @@ model User {
   personalStatus           String   @default("none")
   personalStripeCustomerId String?
   personalSubscriptionId   String?
+  // Free week started in-app with no card. Set once, never restarted.
+  personalTrialEndsAt      DateTime?
+  // When a paid plan ended (cancelled). Videos are deleted a few days after.
+  personalLapsedAt         DateTime?
   personalVideos           PersonalVideo[]
   // Golf profile — filled in once by the player, visible to the instructor
   // on every booking (not booking-specific, since these don't change visit

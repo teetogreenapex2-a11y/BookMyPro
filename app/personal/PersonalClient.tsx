@@ -22,6 +22,11 @@ export default function PersonalClient() {
   const [status, setStatus] = useState("none");
   const [hasCustomer, setHasCustomer] = useState(false);
   const [comped, setComped] = useState(false);
+  const [canUploadSrv, setCanUploadSrv] = useState(false);
+  const [trialActive, setTrialActive] = useState(false);
+  const [trialEverUsed, setTrialEverUsed] = useState(false);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [deleteOn, setDeleteOn] = useState<string | null>(null);
   const [count, setCount] = useState(0);
   const [cap, setCap] = useState(100);
   const [loading, setLoading] = useState(true);
@@ -52,6 +57,11 @@ export default function PersonalClient() {
       setStatus(d.status || "none");
       setHasCustomer(!!d.hasCustomer);
       setComped(!!d.comped);
+      setCanUploadSrv(!!d.canUpload);
+      setTrialActive(!!d.trialActive);
+      setTrialEverUsed(!!d.trialEverUsed);
+      setTrialEndsAt(d.trialEndsAt || null);
+      setDeleteOn(d.deleteOn || null);
       setCount(d.count || 0);
       setCap(d.cap || 100);
       return (d.videos || []).length as number;
@@ -59,7 +69,8 @@ export default function PersonalClient() {
   }
   useEffect(() => { load(); }, []);
 
-  const canUpload = comped || status === "active" || status === "trialing";
+  const canUpload = canUploadSrv;
+  const daysLeft = trialEndsAt ? Math.max(1, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : 0;
 
   async function go(path: string) {
     setBusy(true); setError(null);
@@ -68,6 +79,16 @@ export default function PersonalClient() {
       const d = await r.json();
       if (d.url) window.location.href = d.url;
       else setError(d.error || "Something went wrong.");
+    } catch { setError("Something went wrong."); }
+    setBusy(false);
+  }
+
+  async function startTrial() {
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/personal/trial", { method: "POST" });
+      const d = await r.json();
+      if (r.ok) await load(); else setError(d.error || "Something went wrong.");
     } catch { setError("Something went wrong."); }
     setBusy(false);
   }
@@ -179,19 +200,33 @@ export default function PersonalClient() {
             {!canUpload && (
               <div style={card}>
                 <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
-                  {status === "past_due" ? "Update your payment to keep uploading" : status === "cancelled" ? "Welcome back" : "Start your free week"}
+                  {status === "past_due" ? "Update your payment to keep uploading" : trialEverUsed || status === "cancelled" ? "Your free week is over" : "Try it free for 7 days"}
                 </div>
                 <p style={{ fontSize: 13, color: "var(--faint)", margin: "0 0 12px" }}>
-                  Up to {cap} videos, slow-motion, frame-by-frame, zoom and downloads. $4.99/month after a 7-day free trial. Cancel any time.
+                  {trialEverUsed || status === "cancelled" || status === "past_due"
+                    ? `Subscribe to keep your videos and add more. Up to ${cap} videos, slow-motion, frame-by-frame, zoom and downloads for $4.99/month. Cancel any time.`
+                    : `Start now - no card needed. Up to ${cap} videos, slow-motion, frame-by-frame, zoom and downloads. After 7 days it's $4.99/month, or your videos are deleted.`}
                 </p>
+                {deleteOn && count > 0 && status !== "past_due" && (
+                  <p style={{ fontSize: 12, fontWeight: 700, color: "#B23A3A", margin: "0 0 12px" }}>
+                    Your {count} saved video{count === 1 ? "" : "s"} will be permanently deleted on {new Date(deleteOn).toLocaleDateString()} unless you subscribe. Download any you want to keep.
+                  </p>
+                )}
                 {status === "past_due" && hasCustomer ? (
                   <button style={btn} disabled={busy} onClick={() => go("/api/personal/portal")}>Update payment</button>
+                ) : trialEverUsed || status === "cancelled" ? (
+                  <button style={btn} disabled={busy} onClick={() => go("/api/personal/checkout")}>Subscribe - $4.99/month</button>
                 ) : (
-                  <button style={btn} disabled={busy} onClick={() => go("/api/personal/checkout")}>
-                    {status === "cancelled" ? "Resubscribe" : "Start free trial"}
-                  </button>
+                  <button style={btn} disabled={busy} onClick={startTrial}>Start my free week</button>
                 )}
                 {error && <p style={{ fontSize: 12, color: "#B23A3A", margin: "10px 0 0" }}>{error}</p>}
+              </div>
+            )}
+
+            {canUpload && trialActive && !comped && status !== "active" && status !== "trialing" && (
+              <div style={{ ...card, background: "#FBF3DE", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#7A5E12" }}>{daysLeft} day{daysLeft === 1 ? "" : "s"} left in your free week</span>
+                <button style={{ ...btn, padding: "7px 12px", fontSize: 12 }} disabled={busy} onClick={() => go("/api/personal/checkout")}>Subscribe now</button>
               </div>
             )}
 
@@ -210,7 +245,7 @@ export default function PersonalClient() {
                 {error && <p style={{ fontSize: 12, color: "#B23A3A", margin: "0 0 10px" }}>{error}</p>}
                 <button onClick={submit} disabled={uploading} style={{ ...btn, opacity: uploading ? 0.7 : 1 }}>{uploading ? "Uploading..." : "Save video"}</button>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-                  <span className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{count} of {cap} videos{comped ? " - included by your pro" : status === "trialing" ? " - free trial" : ""}</span>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{count} of {cap} videos{comped ? " - included by your pro" : trialActive ? " - free week" : ""}</span>
                   <button onClick={() => go("/api/personal/portal")} disabled={busy} style={{ background: "none", border: "none", color: "var(--fairway)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Manage plan</button>
                 </div>
               </div>

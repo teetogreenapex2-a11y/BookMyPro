@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
             personalSubscriptionId: subId,
             personalStripeCustomerId: typeof session.customer === "string" ? session.customer : session.customer?.id,
             personalStatus: sub.status === "trialing" ? "trialing" : "active",
+            personalLapsedAt: null,
           },
         });
       }
@@ -624,7 +625,10 @@ export async function POST(req: NextRequest) {
         : subscription.status === "past_due" || subscription.status === "unpaid" ? "past_due"
         : "cancelled";
       if (customerId) {
-        await prisma.user.updateMany({ where: { personalStripeCustomerId: customerId }, data: { personalStatus: status } });
+        await prisma.user.updateMany({
+          where: { personalStripeCustomerId: customerId },
+          data: { personalStatus: status, ...(status === "active" || status === "trialing" ? { personalLapsedAt: null } : {}) },
+        });
       }
     }
   }
@@ -635,7 +639,7 @@ export async function POST(req: NextRequest) {
     if (customerId) {
       await prisma.user.updateMany({
         where: { personalStripeCustomerId: customerId },
-        data: { personalStatus: "cancelled" },
+        data: { personalStatus: "cancelled", personalLapsedAt: new Date() },
       });
       await prisma.business.updateMany({
         where: { platformStripeCustomerId: customerId },
