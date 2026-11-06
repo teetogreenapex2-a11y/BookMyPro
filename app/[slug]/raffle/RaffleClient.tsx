@@ -3,15 +3,22 @@
 import { useCallback, useEffect, useState } from "react";
 
 type Tier = { label: string; count: number; prize: string; rest?: boolean };
-type Board = { title: string; spaceCount: number; maxPerPerson: number; status: string; drawnAt: string | null; giftCardCents: number; giftCardsIssuedAt: string | null; tiers: Tier[] };
-type Space = { number: number; name: string; winnerTier: number | null; email?: string; phone?: string | null };
+type Board = { title: string; spaceCount: number; maxPerPerson: number; status: string; drawnAt: string | null; giftCardCents: number; priceCents: number; giftCardsIssuedAt: string | null; tiers: Tier[] };
+type PendingVenmo = { groupId: string; name: string; email: string; phone: string | null; numbers: number[]; amountCents: number };
+type VenmoInfo = { url: string; handle: string; amountCents: number; note: string; numbers: number[] };
+type Space = { number: number; name: string; held?: boolean; winnerTier: number | null; email?: string; phone?: string | null };
 
 export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBase: string; businessName: string; isOwner: boolean }) {
   const [board, setBoard] = useState<Board | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [owner, setOwner] = useState(isOwner);
   const [loading, setLoading] = useState(true);
-  const [picked, setPicked] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
+  const [formOpen, setFormOpen] = useState(false);
+  const [method, setMethod] = useState<"card" | "venmo">("card");
+  const [venmoAvailable, setVenmoAvailable] = useState(false);
+  const [pendingVenmo, setPendingVenmo] = useState<PendingVenmo[]>([]);
+  const [venmoInfo, setVenmoInfo] = useState<VenmoInfo | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -29,29 +36,37 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
       setBoard(d.board || null);
       setSpaces(d.spaces || []);
       setOwner(!!d.isOwner);
+      setVenmoAvailable(!!d.venmoAvailable);
+      setPendingVenmo(d.pendingVenmo || []);
+      // Drop selections that someone else took in the meantime.
+      const taken = new Set<number>((d.spaces || []).map((x: Space) => x.number));
+      setPicked((cur) => cur.filter((n) => !taken.has(n)));
     } catch {}
     setLoading(false);
   }, [apiBase]);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("paid=1")) {
+      setNotice("Payment received - your space is yours. Good luck!");
+    }
     load();
     const t = setInterval(load, 20000);
     return () => clearInterval(t);
   }, [load]);
 
   const byNumber = new Map(spaces.map((s) => [s.number, s]));
-  const taken = spaces.length;
+  const taken = spaces.filter((s) => !s.held).length;
   const drawn = board?.status === "drawn";
   const dollars = (c: number) => `$${(c / 100).toFixed(0)}`;
 
   async function claim() {
-    if (picked == null) return;
+    if (picked.length === 0) return;
     setSaving(true);
     setError(null);
     const res = await fetch(`${apiBase}/raffle`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ number: picked, name, email, phone }),
+      body: JSON.stringify({ numbers: picked, name, email, phone, method }),
     });
     const d = await res.json().catch(() => ({}));
     setSaving(false);
@@ -60,8 +75,18 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
       if (res.status === 409) load();
       return;
     }
-    setNotice(`You have space ${picked}. Good luck! ${d.left > 0 ? `You can claim ${d.left} more.` : "You've used all your spaces."}`);
-    setPicked(null);
+    if (d.url) { window.location.href = d.url; return; }
+    if (d.venmo) {
+      setVenmoInfo(d.venmo);
+      setFormOpen(false);
+      setPicked([]);
+      load();
+      return;
+    }
+    const mine = [...picked].sort((a, b) => a - b).join(", ");
+    setNotice(`You have space${picked.length === 1 ? "" : "s"} ${mine}. Good luck! ${d.left > 0 ? `You can claim ${d.left} more.` : "You've used all your spaces."}`);
+    setPicked([]);
+    setFormOpen(false);
     load();
   }
 
@@ -134,7 +159,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
             <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 6 }}>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{drawn ? "Final board" : "Pick your space"}</div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>{drawn ? "Winners are highlighted" : "Tap an open space"}</div>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>{drawn ? "Winners are highlighted" : `${dollars(board.priceCents)} per space · tap up to ${board.maxPerPerson}`}</div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(92px, 1fr))", gap: 8 }}>
                 {Array.from({ length: board.spaceCount }, (_, i) => i + 1).map((n) => {
@@ -146,16 +171,16 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
                     <button
                       key={n}
                       disabled={!open}
-                      onClick={() => { setPicked(n); setError(null); setNotice(null); }}
+                      onClick={() => { setNotice(null); setError(null); setPicked((cur) => cur.includes(n) ? cur.filter((x) => x !== n) : cur.length >= (board?.maxPerPerson || 3) ? cur : [...cur, n]); }}
                       style={{
                         minHeight: 72, borderRadius: 10, padding: "6px 4px", textAlign: "center", fontFamily: "inherit",
-                        border: prize ? "2px solid var(--gold)" : s ? "1.5px solid var(--fairway)" : "1.5px solid var(--border)",
-                        background: prize ? "#F5E7C2" : s ? "#FFF" : "var(--open)",
+                        border: picked.includes(n) ? "3px solid var(--fairway)" : prize ? "2px solid var(--gold)" : s ? "1.5px solid var(--fairway)" : "1.5px solid var(--border)",
+                        background: picked.includes(n) ? "#DDEBE2" : prize ? "#F5E7C2" : s ? "#FFF" : "var(--open)",
                         cursor: open ? "pointer" : "default", color: "var(--ink)",
                       }}
                     >
                       <div className="display" style={{ fontSize: 16, fontWeight: 600, color: s ? "var(--fairway)" : "var(--muted)" }}>{n}</div>
-                      {s ? <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 2, overflowWrap: "anywhere" }}>{s.name}</div> : <div style={{ fontSize: 11, fontStyle: "italic", color: "var(--muted)", marginTop: 2 }}>{drawn ? "" : "Open"}</div>}
+                      {s ? <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 2, overflowWrap: "anywhere" }}>{s.name}</div> : <div style={{ fontSize: 11, fontStyle: "italic", color: "var(--muted)", marginTop: 2 }}>{drawn ? "" : picked.includes(n) ? "Selected" : "Open"}</div>}
                       {tierLabel && <div style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "#A9791E", marginTop: 2 }}>{tierLabel}</div>}
                     </button>
                   );
@@ -202,12 +227,28 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
             </div>
             {adminMsg && <p style={{ fontSize: 12.5, color: adminMsg.startsWith("Created") ? "#1F6B3A" : "#B23A3A", margin: "0 0 10px" }}>{adminMsg}</p>}
 
+            {pendingVenmo.length > 0 && (
+              <div style={{ background: "#FBF3DE", borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Venmo payments to confirm</div>
+                {pendingVenmo.map((g) => (
+                  <div key={g.groupId} style={{ padding: "8px 0", borderTop: "1px solid rgba(0,0,0,0.08)" }}>
+                    <div style={{ fontSize: 13 }}><strong>{g.name}</strong> · space{g.numbers.length === 1 ? "" : "s"} {[...g.numbers].sort((a, b) => a - b).join(", ")} · <strong>{dollars(g.amountCents)}</strong></div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", overflowWrap: "anywhere" }}>{g.email}{g.phone ? ` · ${g.phone}` : ""}</div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                      <button disabled={adminBusy} onClick={() => admin("confirmvenmo", { groupId: g.groupId })} style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 700 }}>Mark paid</button>
+                      <button disabled={adminBusy} onClick={() => { if (window.confirm(`Release ${g.name}'s spaces? Use this if the Venmo never arrived.`)) admin("releasevenmo", { groupId: g.groupId }); }} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600 }}>Release</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {spaces.length > 0 && (
               <div style={{ fontSize: 12.5 }}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Claimed spaces</div>
                 {spaces.map((s) => (
                   <div key={s.number} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "5px 0", borderTop: "1px solid var(--border)", alignItems: "center" }}>
-                    <span style={{ minWidth: 0, overflowWrap: "anywhere" }}><strong>#{s.number}</strong> {s.name} · {s.email}{s.phone ? ` · ${s.phone}` : ""}</span>
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere" }}><strong>#{s.number}</strong> {s.name}{s.held ? " (waiting on payment)" : ""} · {s.email}{s.phone ? ` · ${s.phone}` : ""}</span>
                     {!drawn && (
                       <button onClick={() => { if (window.confirm(`Release space ${s.number}?`)) admin("release", { number: s.number }); }} disabled={adminBusy}
                         style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, fontSize: 11, padding: "3px 8px", flexShrink: 0 }}>Release</button>
@@ -220,22 +261,75 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
         )}
       </main>
 
-      {picked != null && board && (
-        <div onClick={() => setPicked(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", overflowY: "auto", WebkitOverflowScrolling: "touch", zIndex: 10000 }}>
+      {picked.length > 0 && !formOpen && board && (
+        <div style={{ position: "fixed", left: 12, right: 12, bottom: "calc(12px + env(safe-area-inset-bottom, 0px))", zIndex: 10000, background: "var(--fairway)", color: "var(--chalk)", borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, boxShadow: "0 6px 24px rgba(0,0,0,0.25)", maxWidth: 520, margin: "0 auto" }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+            {picked.length} space{picked.length === 1 ? "" : "s"} selected{!owner && board.priceCents > 0 ? ` · ${dollars(board.priceCents * picked.length)}` : ""}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setPicked([])} style={{ background: "none", border: "1px solid rgba(255,255,255,0.5)", color: "var(--chalk)", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontWeight: 600 }}>Clear</button>
+            <button onClick={() => { setFormOpen(true); setError(null); }} style={{ background: "var(--gold)", color: "#2A2107", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700 }}>Continue</button>
+          </div>
+        </div>
+      )}
+
+      {formOpen && picked.length > 0 && board && (
+        <div onClick={() => setFormOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", overflowY: "auto", WebkitOverflowScrolling: "touch", zIndex: 10001 }}>
           {/* Sits at the top of the screen (not the bottom) so neither the tab bar nor the phone keyboard can cover the fields; scrolls if the screen is short. */}
           <div onClick={(e) => e.stopPropagation()} style={{ width: "calc(100% - 32px)", maxWidth: 480, background: "#FFF", borderRadius: 18, padding: "20px 20px 24px", margin: "16px auto 40vh" }}>
-            <div className="display" style={{ fontSize: 20, marginBottom: 4 }}>Claim space {picked}</div>
+            <div className="display" style={{ fontSize: 20, marginBottom: 4 }}>
+              Claim space{picked.length === 1 ? "" : "s"} {[...picked].sort((a, b) => a - b).join(", ")}
+            </div>
+            {!owner && board.priceCents > 0 && (
+              <>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "var(--fairway)", margin: "0 0 10px" }}>
+                  {picked.length} × {dollars(board.priceCents)} = {dollars(board.priceCents * picked.length)}
+                </p>
+                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                  {([["card", "Pay by card"], ...(venmoAvailable ? [["venmo", "Pay with Venmo"]] : [])] as [string, string][]).map(([m, label]) => (
+                    <button key={m} onClick={() => setMethod(m as "card" | "venmo")} style={{
+                      flex: 1, padding: "10px 8px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+                      border: method === m ? "2px solid var(--fairway)" : "1px solid var(--border)",
+                      background: method === m ? "#DDEBE2" : "#FFF", color: "var(--ink)",
+                    }}>{label}</button>
+                  ))}
+                </div>
+                <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 12px" }}>
+                  {method === "venmo"
+                    ? "Your spaces are reserved for 24 hours. Send the Venmo payment on the next screen and they're confirmed once it's received."
+                    : "Pay by card on the next screen. Your spaces are held for 30 minutes while you pay."}
+                </p>
+              </>
+            )}
             <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 14px" }}>We use your email to count your spaces (limit {board.maxPerPerson}) and to send your prize or gift card. Other people only see your first name and last initial.</p>
             <input id="raffle-name" onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)} style={input} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
             <input id="raffle-email" onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)} style={input} placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             <input id="raffle-phone" onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)} style={input} placeholder="Phone (optional)" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
             {error && <p style={{ fontSize: 13, color: "#B23A3A", margin: "0 0 10px" }}>{error}</p>}
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setPicked(null)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 600 }}>Cancel</button>
+              <button onClick={() => setFormOpen(false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 600 }}>Back</button>
               <button onClick={claim} disabled={saving || !name.trim() || !email.trim()} style={{ flex: 2, background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 700, opacity: saving ? 0.7 : 1 }}>
-                {saving ? "Claiming…" : `Claim space ${picked}`}
+                {saving ? "One moment…" : owner || !board.priceCents ? `Claim ${picked.length} space${picked.length === 1 ? "" : "s"}` : method === "venmo" ? `Reserve & pay ${dollars(board.priceCents * picked.length)} with Venmo` : `Pay ${dollars(board.priceCents * picked.length)} by card`}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {venmoInfo && (
+        <div onClick={() => setVenmoInfo(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", overflowY: "auto", zIndex: 10001 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "calc(100% - 32px)", maxWidth: 480, background: "#FFF", borderRadius: 18, padding: "20px 20px 24px", margin: "16px auto" }}>
+            <div className="display" style={{ fontSize: 20, marginBottom: 6 }}>Spaces reserved</div>
+            <p style={{ fontSize: 14, margin: "0 0 12px" }}>
+              Space{venmoInfo.numbers.length === 1 ? "" : "s"} <strong>{venmoInfo.numbers.join(", ")}</strong> {venmoInfo.numbers.length === 1 ? "is" : "are"} yours for 24 hours. Send <strong>{dollars(venmoInfo.amountCents)}</strong> to <strong>@{venmoInfo.handle}</strong> on Venmo to lock {venmoInfo.numbers.length === 1 ? "it" : "them"} in.
+            </p>
+            <a href={venmoInfo.url} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center", background: "#3D95CE", color: "#FFF", borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 700, textDecoration: "none", marginBottom: 10 }}>
+              Open Venmo and pay {dollars(venmoInfo.amountCents)}
+            </a>
+            <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 12px" }}>
+              Keep the note ("{venmoInfo.note}") so we can match your payment. We'll mark your spaces paid as soon as we see it.
+            </p>
+            <button onClick={() => setVenmoInfo(null)} style={{ width: "100%", background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 600 }}>Done</button>
           </div>
         </div>
       )}

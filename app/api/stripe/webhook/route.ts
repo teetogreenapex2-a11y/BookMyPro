@@ -114,6 +114,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
+    if (meta.kind === "raffle_space") {
+      // Raffle spaces are only the customer's once payment is confirmed.
+      const held = await prisma.raffleSpace.findMany({ where: { stripeSessionId: session.id } });
+      const expected = Number(meta.count) || 1;
+      if (held.length > 0) {
+        await prisma.raffleSpace.updateMany({ where: { stripeSessionId: session.id, pending: true }, data: { pending: false, holdExpiresAt: null } });
+      }
+      // Any space whose hold lapsed and went to someone else gets refunded.
+      const missing = expected - held.length;
+      const unit = Number(meta.unitCents) || 0;
+      const pi = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+      if (missing > 0 && pi && unit > 0) {
+        await stripe.refunds.create({ payment_intent: pi, amount: missing * unit }, event.account ? { stripeAccount: event.account } : undefined)
+          .catch((err) => console.error("Raffle refund failed:", err));
+      }
+      return NextResponse.json({ received: true });
+    }
+
     if (meta.kind === "video_review") {
       // A BookMyPro Personal customer paid a pro to review a video - only
       // now does the video land in that pro's queue.

@@ -10,7 +10,7 @@ import { sendGiftCardEmail } from "@/lib/email";
 
 export const maxDuration = 60;
 
-// POST /api/{slug}/raffle/admin  { action: "draw" | "release" | "giftcards" | "reset", number?, sendEmail? }
+// POST /api/{slug}/raffle/admin  { action: "draw" | "release" | "giftcards" | "reset" | "confirmvenmo" | "releasevenmo", number?, groupId?, sendEmail? }
 // Owner only. Customers can claim spaces but can never draw, release or reset.
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
@@ -30,6 +30,25 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: true });
   }
 
+  // Owner saw the Venmo payment arrive - the reserved spaces become paid.
+  if (body.action === "confirmvenmo") {
+    const groupId = String(body.groupId || "");
+    if (!groupId) return NextResponse.json({ error: "Missing order" }, { status: 400 });
+    const res = await prisma.raffleSpace.updateMany({
+      where: { boardId: board.id, pending: true, payMethod: "venmo", OR: [{ groupId }, { id: groupId }] },
+      data: { pending: false, holdExpiresAt: null },
+    });
+    if (res.count === 0) return NextResponse.json({ error: "That reservation has expired or was already confirmed. Use Claim to enter it for them." }, { status: 400 });
+    return NextResponse.json({ ok: true, confirmed: res.count });
+  }
+
+  // Owner didn't get the Venmo payment - free the spaces.
+  if (body.action === "releasevenmo") {
+    const groupId = String(body.groupId || "");
+    await prisma.raffleSpace.deleteMany({ where: { boardId: board.id, pending: true, payMethod: "venmo", OR: [{ groupId }, { id: groupId }] } });
+    return NextResponse.json({ ok: true });
+  }
+
   if (body.action === "reset") {
     await prisma.$transaction([
       prisma.raffleSpace.deleteMany({ where: { boardId: board.id } }),
@@ -40,9 +59,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   if (body.action === "draw") {
     if (board.status !== "open") return NextResponse.json({ error: "Already drawn" }, { status: 400 });
-    const spaces = await prisma.raffleSpace.findMany({ where: { boardId: board.id } });
+    const spaces = await prisma.raffleSpace.findMany({ where: { boardId: board.id, pending: false } });
     if (spaces.length < board.spaceCount) {
-      return NextResponse.json({ error: `The board must be full to draw. ${spaces.length} of ${board.spaceCount} claimed.` }, { status: 400 });
+      return NextResponse.json({ error: `The board must be full to draw. ${spaces.length} of ${board.spaceCount} claimed and paid.` }, { status: 400 });
     }
     // Fisher-Yates with a cryptographic random source.
     const order = spaces.map((s) => s.id);

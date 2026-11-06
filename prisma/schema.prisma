@@ -1058,6 +1058,7 @@ model RaffleBoard {
   drawnAt           DateTime?
   giftCardCents     Int      @default(7500)   // what every non-prize space wins
   giftCardsIssuedAt DateTime?
+  priceCents        Int      @default(5000)   // cost of one space, paid by card
   tiers             Json     // [{ label, count, prize, rest? }] - the "rest" tier is everyone who did not win a prize
   createdAt         DateTime @default(now())
   spaces            RaffleSpace[]
@@ -1073,6 +1074,14 @@ model RaffleSpace {
   phone      String?
   winnerTier Int?        // index into the board's tiers once drawn
   claimedAt  DateTime    @default(now())
+  // A space is held (pending) while its customer is at Stripe checkout, and
+  // only becomes theirs once the webhook confirms payment. Abandoned holds
+  // expire and the space opens up again.
+  pending         Boolean   @default(false)
+  holdExpiresAt   DateTime?
+  stripeSessionId String?
+  payMethod       String?   // "card" | "venmo" | null (owner handed it out)
+  groupId         String?   // spaces claimed in one go share a group
 
   @@unique([boardId, number])
   @@index([boardId, email])

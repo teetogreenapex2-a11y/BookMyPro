@@ -357,7 +357,7 @@ export async function sendMarketingBlastEmail(
   details: { businessName: string; unsubscribeUserId: string }
 ) {
   const token = makeUnsubscribeToken(details.unsubscribeUserId);
-  const unsubscribeUrl = `https://bookmypro.app/unsubscribe?u=${encodeURIComponent(details.unsubscribeUserId)}&t=${token}`;
+  const unsubscribeUrl = `https://bookmypro.app/api/unsubscribe?u=${encodeURIComponent(details.unsubscribeUserId)}&t=${token}`;
 
   const html = `
     <div style="font-family: sans-serif; max-width: 480px;">
@@ -372,4 +372,26 @@ export async function sendMarketingBlastEmail(
   `;
 
   await sendEmailFrom(MARKETING_FROM_EMAIL, to, subject, html);
+}
+
+// Tells the studio owner a customer says they paid for raffle spaces by
+// Venmo, so they can check Venmo and confirm the spaces.
+export async function sendRaffleVenmoNotification(
+  to: string | null | undefined,
+  details: { businessName: string; name: string; email: string; phone: string | null; numbers: number[]; amountCents: number; raffleUrl: string }
+) {
+  if (!to) return;
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const subject = `Venmo raffle payment to confirm: ${details.name} ($${(details.amountCents / 100).toFixed(0)})`;
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">Confirm a Venmo payment</h2>
+      <p style="color: #5C6459; margin-top: 0;">${esc(details.businessName)} raffle</p>
+      <p><strong>${esc(details.name)}</strong> reserved space${details.numbers.length === 1 ? "" : "s"} <strong>${details.numbers.join(", ")}</strong> and is paying <strong>$${(details.amountCents / 100).toFixed(2)}</strong> by Venmo.</p>
+      <p style="color: #5C6459;">${esc(details.email)}${details.phone ? " &middot; " + esc(details.phone) : ""}</p>
+      <p>Check your Venmo. Once you see the payment, open the raffle and tap <strong>Mark paid</strong>. Unpaid reservations are released after 24 hours.</p>
+      <p><a href="${details.raffleUrl}" style="display:inline-block;background:#1B3A2F;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">Open the raffle</a></p>
+    </div>
+  `;
+  await sendEmail(to, subject, html);
 }
