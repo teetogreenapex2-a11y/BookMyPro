@@ -84,7 +84,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
   const restIndex = board ? board.tiers.findIndex((t) => t.rest) : -1;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--chalk)", paddingBottom: 60 }}>
+    <div style={{ minHeight: "100vh", background: "var(--chalk)", paddingBottom: "calc(120px + env(safe-area-inset-bottom, 0px))" }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 760, margin: "0 auto" }}>
           <div style={{ fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", color: "#BFE3CC", marginBottom: 6 }}>{businessName}</div>
@@ -221,13 +221,14 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
       </main>
 
       {picked != null && board && (
-        <div onClick={() => setPicked(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 100 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "#FFF", borderRadius: "18px 18px 0 0", padding: "20px 20px calc(24px + env(safe-area-inset-bottom, 0px))" }}>
+        <div onClick={() => setPicked(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", overflowY: "auto", WebkitOverflowScrolling: "touch", zIndex: 10000 }}>
+          {/* Sits at the top of the screen (not the bottom) so neither the tab bar nor the phone keyboard can cover the fields; scrolls if the screen is short. */}
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "calc(100% - 32px)", maxWidth: 480, background: "#FFF", borderRadius: 18, padding: "20px 20px 24px", margin: "16px auto 40vh" }}>
             <div className="display" style={{ fontSize: 20, marginBottom: 4 }}>Claim space {picked}</div>
             <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 14px" }}>We use your email to count your spaces (limit {board.maxPerPerson}) and to send your prize or gift card. Other people only see your first name and last initial.</p>
-            <input id="raffle-name" style={input} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
-            <input id="raffle-email" style={input} placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-            <input id="raffle-phone" style={input} placeholder="Phone (optional)" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
+            <input id="raffle-name" onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)} style={input} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+            <input id="raffle-email" onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)} style={input} placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+            <input id="raffle-phone" onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)} style={input} placeholder="Phone (optional)" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
             {error && <p style={{ fontSize: 13, color: "#B23A3A", margin: "0 0 10px" }}>{error}</p>}
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setPicked(null)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 600 }}>Cancel</button>
