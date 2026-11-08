@@ -8,7 +8,7 @@ type PendingVenmo = { groupId: string; name: string; email: string; phone: strin
 type VenmoInfo = { url: string; handle: string; amountCents: number; note: string; numbers: number[] };
 type Space = { number: number; name: string; held?: boolean; winnerTier: number | null; email?: string; phone?: string | null };
 
-export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBase: string; businessName: string; isOwner: boolean }) {
+export default function RaffleClient({ apiBase, businessName, isOwner, boardKey = "main" }: { apiBase: string; businessName: string; isOwner: boolean; boardKey?: string }) {
   const [board, setBoard] = useState<Board | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [owner, setOwner] = useState(isOwner);
@@ -31,7 +31,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`${apiBase}/raffle`, { cache: "no-store" });
+      const res = await fetch(`${apiBase}/raffle?key=${boardKey}`, { cache: "no-store" });
       const d = await res.json();
       setBoard(d.board || null);
       setSpaces(d.spaces || []);
@@ -43,7 +43,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
       setPicked((cur) => cur.filter((n) => !taken.has(n)));
     } catch {}
     setLoading(false);
-  }, [apiBase]);
+  }, [apiBase, boardKey]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.search.includes("paid=1")) {
@@ -63,7 +63,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
     if (picked.length === 0) return;
     setSaving(true);
     setError(null);
-    const res = await fetch(`${apiBase}/raffle`, {
+    const res = await fetch(`${apiBase}/raffle?key=${boardKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ numbers: picked, name, email, phone, method }),
@@ -96,7 +96,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
     const res = await fetch(`${apiBase}/raffle/admin`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, ...extra }),
+      body: JSON.stringify({ action, key: boardKey, ...extra }),
     });
     const d = await res.json().catch(() => ({}));
     setAdminBusy(false);
@@ -161,7 +161,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{drawn ? "Final board" : "Pick your space"}</div>
                 <div style={{ fontSize: 12, color: "var(--muted)" }}>{drawn ? "Winners are highlighted" : `${dollars(board.priceCents)} per space · tap up to ${board.maxPerPerson}`}</div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(92px, 1fr))", gap: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${board.spaceCount > 60 ? 70 : 92}px, 1fr))`, gap: 8 }}>
                 {Array.from({ length: board.spaceCount }, (_, i) => i + 1).map((n) => {
                   const s = byNumber.get(n);
                   const prize = s && s.winnerTier != null && s.winnerTier !== restIndex;
@@ -173,7 +173,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
                       disabled={!open}
                       onClick={() => { setNotice(null); setError(null); setPicked((cur) => cur.includes(n) ? cur.filter((x) => x !== n) : cur.length >= (board?.maxPerPerson || 3) ? cur : [...cur, n]); }}
                       style={{
-                        minHeight: 72, borderRadius: 10, padding: "6px 4px", textAlign: "center", fontFamily: "inherit",
+                        minHeight: board.spaceCount > 60 ? 58 : 72, borderRadius: 10, padding: "6px 4px", textAlign: "center", fontFamily: "inherit",
                         border: picked.includes(n) ? "3px solid var(--fairway)" : prize ? "2px solid var(--gold)" : s ? "1.5px solid var(--fairway)" : "1.5px solid var(--border)",
                         background: picked.includes(n) ? "#DDEBE2" : prize ? "#F5E7C2" : s ? "#FFF" : "var(--open)",
                         cursor: open ? "pointer" : "default", color: "var(--ink)",
@@ -202,7 +202,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner }: { apiBa
               >
                 {drawn ? "Winners drawn" : taken < board.spaceCount ? `Draw unlocks when full (${board.spaceCount - taken} to go)` : "Draw winners"}
               </button>
-              {drawn && !board.giftCardsIssuedAt && (
+              {drawn && !board.giftCardsIssuedAt && restIndex !== -1 && (
                 <>
                   <button
                     disabled={adminBusy}

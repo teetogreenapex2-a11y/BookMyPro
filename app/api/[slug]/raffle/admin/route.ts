@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (!membership) return NextResponse.json({ error: "Owner access required" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
-  const board = await getOrCreateBoard(business.id);
+  const board = await getOrCreateBoard(business.id, body.key);
   const tiers = board.tiers as unknown as RaffleTier[];
 
   if (body.action === "release") {

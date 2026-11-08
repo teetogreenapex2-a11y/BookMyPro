@@ -7,7 +7,7 @@ import { stripe, getAccountStatus } from "@/lib/stripe";
 import { sendRaffleVenmoNotification } from "@/lib/email";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { randomUUID } from "crypto";
-import { getOrCreateBoard, publicName, RaffleTier } from "@/lib/raffle";
+import { getOrCreateBoard, normalizeRaffleKey, publicName, RaffleTier } from "@/lib/raffle";
 
 async function viewerIsOwner(businessId: string) {
   const session = await getServerSession(authOptions);
@@ -26,14 +26,14 @@ async function findVenmoOwner(businessId: string) {
 
 // GET /api/{slug}/raffle - public. Customers see first name + last initial
 // only; the owner also gets full names, emails and phones.
-export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const business = await getBusinessBySlug(params.slug);
   if (!business || !business.approved) return NextResponse.json({ error: "Business not found" }, { status: 404 });
   const isOwner = await viewerIsOwner(business.id);
 
-  const board = isOwner
-    ? await getOrCreateBoard(business.id)
-    : await prisma.raffleBoard.findUnique({ where: { businessId: business.id } });
+  const key = normalizeRaffleKey(req.nextUrl.searchParams.get("key"));
+  // The board is created the first time its link is opened, by anyone.
+  const board = await getOrCreateBoard(business.id, key);
   if (!board) return NextResponse.json({ board: null, isOwner });
 
   // Drop abandoned holds, then show paid spaces plus holds still in progress.
@@ -86,8 +86,7 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const business = await getBusinessBySlug(params.slug);
   if (!business || !business.approved) return NextResponse.json({ error: "Business not found" }, { status: 404 });
-  const board = await prisma.raffleBoard.findUnique({ where: { businessId: business.id } });
-  if (!board) return NextResponse.json({ error: "There's no raffle running right now" }, { status: 404 });
+  const board = await getOrCreateBoard(business.id, normalizeRaffleKey(req.nextUrl.searchParams.get("key")));
   if (board.status !== "open") return NextResponse.json({ error: "This raffle has already been drawn" }, { status: 400 });
 
   const body = await req.json().catch(() => null);
@@ -148,11 +147,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   const origin = process.env.NEXTAUTH_URL || "https://bookmypro.app";
-  const raffleUrl = `${origin}/${params.slug}/raffle`;
+  const raffleUrl = `${origin}/${params.slug}/raffle${board.key === "main" ? "" : "/" + board.key}`;
   const sorted = [...numbers].sort((a, b) => a - b);
 
   if (method === "venmo") {
-    const note = `${business.name} raffle - space${sorted.length === 1 ? "" : "s"} ${sorted.join(", ")}`;
+    const note = `${business.name} ${board.title} - space${sorted.length === 1 ? "" : "s"} ${sorted.join(", ")}`;
     const handle = String(venmoOwner!.venmoHandle).replace(/^@/, "");
     const venmoUrl = `https://venmo.com/${encodeURIComponent(handle)}?txn=pay&amount=${(totalCents / 100).toFixed(2)}&note=${encodeURIComponent(note)}`;
     // Tell the owner someone is paying, so they know to confirm it.
@@ -178,7 +177,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         line_items: [{
           price_data: {
             currency: "usd",
-            product_data: { name: `${business.name} raffle - space${sorted.length === 1 ? "" : "s"} ${sorted.join(", ")}` },
+            product_data: { name: `${business.name} ${board.title} - space${sorted.length === 1 ? "" : "s"} ${sorted.join(", ")}` },
             unit_amount: board.priceCents,
           },
           quantity: sorted.length,
