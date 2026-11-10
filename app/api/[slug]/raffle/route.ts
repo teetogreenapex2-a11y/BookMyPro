@@ -7,6 +7,7 @@ import { stripe, getAccountStatus } from "@/lib/stripe";
 import { sendRaffleVenmoNotification } from "@/lib/email";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { randomUUID } from "crypto";
+import { markRaffleSessionPaid } from "@/lib/raffleNotify";
 import { getOrCreateBoard, normalizeRaffleKey, publicName, RaffleTier } from "@/lib/raffle";
 
 async function viewerIsOwner(businessId: string) {
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       const useConnect = business.paymentProvider === "stripe" && !!business.stripeAccountId;
       const cs = await stripe.checkout.sessions.retrieve(sid, undefined, useConnect ? { stripeAccount: business.stripeAccountId! } : undefined);
       if (cs.payment_status === "paid" && cs.metadata?.kind === "raffle_space" && cs.metadata?.businessId === business.id) {
-        await prisma.raffleSpace.updateMany({ where: { boardId: board.id, stripeSessionId: sid, pending: true }, data: { pending: false, holdExpiresAt: null } });
+        await markRaffleSessionPaid(sid);
       }
     } catch (e) { console.error("Raffle payment check failed:", e); }
   }

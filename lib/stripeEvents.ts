@@ -11,6 +11,8 @@ import { sendBookingNotification } from "@/lib/email";
 import { sendPushToMembership, checkAndNotifyLowPackage } from "@/lib/pushNotifications";
 import { BUSINESS_TIMEZONE } from "@/lib/time";
 import { businessDestination } from "@/lib/businessUrl";
+import { sendPaymentReceivedEmails } from "@/lib/email";
+import { markRaffleSessionPaid } from "@/lib/raffleNotify";
 
 // Shared by the Stripe webhook and by the return-from-checkout confirmation,
 // so a paid customer is fulfilled even if the webhook is late or never arrives.
@@ -103,12 +105,41 @@ export async function processStripeEvent(event: Stripe.Event): Promise<NextRespo
       return NextResponse.json({ received: true });
     }
 
+    // Payment alert for the business + receipt for the customer, sent as soon as
+    // the money is confirmed (before fulfilment) so a payment is never silent.
+    if (meta.kind === "package" || meta.kind === "package_deposit" || meta.kind === "fitting" || meta.kind === "group") {
+      try {
+        const what =
+          meta.kind === "fitting" ? "Club fitting"
+          : meta.kind === "group" ? "Group class"
+          : meta.kind === "package_deposit" ? "Lesson package deposit"
+          : meta.durationLabel ? `Lesson package (${meta.durationLabel})` : "Lesson package";
+        await sendPaymentReceivedEmails({
+          ownerTo: await getBookingNotificationRecipients(business, meta.instructorMembershipId),
+          businessName: business.name,
+          what,
+          amountCents: session.amount_total ?? 0,
+          customerName: meta.contactName || session.customer_details?.name || null,
+          customerEmail: meta.contactEmail || session.customer_details?.email || null,
+          customerPhone: meta.contactPhone || null,
+          url: businessDestination(business.slug, "/book"),
+        });
+        if (meta.instructorMembershipId) {
+          await sendPushToMembership(meta.instructorMembershipId, {
+            title: "Payment received",
+            body: `${meta.contactName || "A customer"} paid $${((session.amount_total ?? 0) / 100).toFixed(0)}`,
+            url: businessDestination(business.slug, "/instructor"),
+          });
+        }
+      } catch (e) { console.error("Payment notification failed:", e); }
+    }
+
     if (meta.kind === "raffle_space") {
       // Raffle spaces are only the customer's once payment is confirmed.
       const held = await prisma.raffleSpace.findMany({ where: { stripeSessionId: session.id } });
       const expected = Number(meta.count) || 1;
       if (held.length > 0) {
-        await prisma.raffleSpace.updateMany({ where: { stripeSessionId: session.id, pending: true }, data: { pending: false, holdExpiresAt: null } });
+        await markRaffleSessionPaid(session.id);
       }
       // Any space whose hold lapsed and went to someone else gets refunded.
       const missing = expected - held.length;
@@ -546,6 +577,19 @@ export async function processStripeEvent(event: Stripe.Event): Promise<NextRespo
       const order = await prisma.order.findUnique({ where: { id: meta.orderId } });
       if (order && order.status === "pending") {
         await prisma.order.update({ where: { id: order.id }, data: { status: "paid" } });
+        try {
+          const buyer = await prisma.user.findUnique({ where: { id: order.buyerId }, select: { email: true, name: true } });
+          await sendPaymentReceivedEmails({
+            ownerTo: await getBookingNotificationRecipients(business, null),
+            businessName: business.name,
+            what: `Shop order (${order.fulfillmentType === "shipping" ? "shipping" : "pickup"})`,
+            amountCents: session.amount_total ?? order.totalCents,
+            customerName: order.shippingName || buyer?.name || null,
+            customerEmail: order.contactEmail || buyer?.email || null,
+            customerPhone: order.contactPhone || null,
+            url: businessDestination(business.slug, "/shop"),
+          });
+        } catch (e) { console.error("Order notification failed:", e); }
       }
     }
 

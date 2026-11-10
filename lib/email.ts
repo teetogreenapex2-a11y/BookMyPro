@@ -395,3 +395,75 @@ export async function sendRaffleVenmoNotification(
   `;
   await sendEmail(to, subject, html);
 }
+
+
+// A card payment for raffle spaces went through: tell the owner, and send the
+// customer a receipt so they know their spaces are secured.
+export async function sendRafflePaidEmails(
+  ownerEmail: string | null | undefined,
+  d: { businessName: string; raffleTitle: string; name: string; email: string; phone: string | null; numbers: number[]; amountCents: number; raffleUrl: string }
+) {
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const many = d.numbers.length === 1 ? "" : "s";
+  const amount = `$${(d.amountCents / 100).toFixed(2)}`;
+  if (ownerEmail) {
+    await sendEmail(
+      ownerEmail,
+      `Raffle space paid: ${d.name} (${amount})`,
+      `<div style="font-family: sans-serif; max-width: 480px;">
+        <h2 style="margin-bottom: 4px;">Raffle payment received</h2>
+        <p style="color: #5C6459; margin-top: 0;">${esc(d.businessName)} - ${esc(d.raffleTitle)}</p>
+        <p><strong>${esc(d.name)}</strong> paid <strong>${amount}</strong> by card for space${many} <strong>${d.numbers.join(", ")}</strong>.</p>
+        <p style="color: #5C6459;">${esc(d.email)}${d.phone ? " &middot; " + esc(d.phone) : ""}</p>
+        <p><a href="${d.raffleUrl}" style="display:inline-block;background:#1B3A2F;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">Open the raffle</a></p>
+      </div>`
+    ).catch(() => {});
+  }
+  await sendEmail(
+    d.email,
+    `You're in! ${d.raffleTitle} - space${many} ${d.numbers.join(", ")}`,
+    `<div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">Payment received - you're in!</h2>
+      <p style="color: #5C6459; margin-top: 0;">${esc(d.businessName)} - ${esc(d.raffleTitle)}</p>
+      <p>Hi ${esc(d.name)}, we received your <strong>${amount}</strong> payment. You have space${many} <strong>${d.numbers.join(", ")}</strong>. Good luck!</p>
+      <p><a href="${d.raffleUrl}" style="display:inline-block;background:#1B3A2F;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">View the raffle</a></p>
+    </div>`
+  ).catch(() => {});
+}
+
+
+// A card payment came in (lesson/package, fitting, class or shop order): tell
+// the business, and send the customer a receipt so they know it went through.
+export async function sendPaymentReceivedEmails(d: {
+  ownerTo: string[]; businessName: string; what: string; amountCents: number;
+  customerName: string | null; customerEmail: string | null; customerPhone: string | null; url: string;
+}) {
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const amount = `$${(d.amountCents / 100).toFixed(2)}`;
+  const who = d.customerName || d.customerEmail || "A customer";
+  if (d.ownerTo.length > 0) {
+    await sendEmail(
+      d.ownerTo,
+      `Payment received: ${who} (${amount})`,
+      `<div style="font-family: sans-serif; max-width: 480px;">
+        <h2 style="margin-bottom: 4px;">Payment received</h2>
+        <p style="color: #5C6459; margin-top: 0;">${esc(d.businessName)}</p>
+        <p><strong>${esc(who)}</strong> paid <strong>${amount}</strong> by card for: <strong>${esc(d.what)}</strong>.</p>
+        <p style="color: #5C6459;">${d.customerEmail ? esc(d.customerEmail) : ""}${d.customerPhone ? " &middot; " + esc(d.customerPhone) : ""}</p>
+        <p><a href="${d.url}" style="display:inline-block;background:#1B3A2F;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">Open BookMyPro</a></p>
+      </div>`
+    ).catch(() => {});
+  }
+  if (d.customerEmail) {
+    await sendEmail(
+      d.customerEmail,
+      `Payment received - ${d.businessName}`,
+      `<div style="font-family: sans-serif; max-width: 480px;">
+        <h2 style="margin-bottom: 4px;">Payment received - thank you!</h2>
+        <p style="color: #5C6459; margin-top: 0;">${esc(d.businessName)}</p>
+        <p>Hi ${esc(d.customerName || "there")}, we received your <strong>${amount}</strong> payment for <strong>${esc(d.what)}</strong>. You don't need to pay again.</p>
+        <p><a href="${d.url}" style="display:inline-block;background:#1B3A2F;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">View your account</a></p>
+      </div>`
+    ).catch(() => {});
+  }
+}

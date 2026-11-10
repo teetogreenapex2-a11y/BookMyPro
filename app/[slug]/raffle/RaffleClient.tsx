@@ -70,13 +70,14 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
       body: JSON.stringify({ numbers: picked, name, email, phone, method }),
     });
     const d = await res.json().catch(() => ({}));
+    // Going to Stripe: keep the button disabled so a second tap can't start a second payment.
+    if (res.ok && d.url) { window.location.href = d.url; return; }
     setSaving(false);
     if (!res.ok) {
       setError(d.error || "Something went wrong.");
       if (res.status === 409) load();
       return;
     }
-    if (d.url) { window.location.href = d.url; return; }
     if (d.venmo) {
       setVenmoInfo(d.venmo);
       setFormOpen(false);
