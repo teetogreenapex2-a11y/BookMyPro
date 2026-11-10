@@ -7,10 +7,11 @@ import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
 import { getOrCreateBoard, RaffleTier } from "@/lib/raffle";
 import { generateGiftCardCode } from "@/lib/giftCards";
 import { sendGiftCardEmail } from "@/lib/email";
+import { chargeBoard, cancelPledges } from "@/lib/rafflePledge";
 
 export const maxDuration = 60;
 
-// POST /api/{slug}/raffle/admin  { action: "draw" | "release" | "giftcards" | "reset" | "confirmvenmo" | "releasevenmo", number?, groupId?, sendEmail? }
+// POST /api/{slug}/raffle/admin  { action: "draw" | "release" | "giftcards" | "reset" | "confirmvenmo" | "releasevenmo" | "chargeall" | "cancelpledges", number?, groupId?, sendEmail? }
 // Owner only. Customers can claim spaces but can never draw, release or reset.
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
@@ -49,17 +50,32 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: true });
   }
 
+  // Pledge raffles: charge every saved card now (normally this happens by itself when the board fills).
+  if (body.action === "chargeall") {
+    const pledgedCount = await prisma.raffleSpace.count({ where: { boardId: board.id, pledged: true } });
+    if (pledgedCount === 0) return NextResponse.json({ error: "Nothing pledged to charge." }, { status: 400 });
+    const r = await chargeBoard(board.id);
+    if (!r) return NextResponse.json({ error: "These cards were already charged." }, { status: 400 });
+    return NextResponse.json({ ok: true, charged: r.ok, declined: r.failed.length });
+  }
+
+  // Pledge raffles: it didn't fill - free the pledged spots; nobody is charged.
+  if (body.action === "cancelpledges") {
+    const n = await cancelPledges(board.id);
+    return NextResponse.json({ ok: true, cancelled: n });
+  }
+
   if (body.action === "reset") {
     await prisma.$transaction([
       prisma.raffleSpace.deleteMany({ where: { boardId: board.id } }),
-      prisma.raffleBoard.update({ where: { id: board.id }, data: { status: "open", drawnAt: null, giftCardsIssuedAt: null } }),
+      prisma.raffleBoard.update({ where: { id: board.id }, data: { status: "open", drawnAt: null, giftCardsIssuedAt: null, chargedAt: null } }),
     ]);
     return NextResponse.json({ ok: true });
   }
 
   if (body.action === "draw") {
     if (board.status !== "open") return NextResponse.json({ error: "Already drawn" }, { status: 400 });
-    const spaces = await prisma.raffleSpace.findMany({ where: { boardId: board.id, pending: false } });
+    const spaces = await prisma.raffleSpace.findMany({ where: { boardId: board.id, pending: false, pledged: false } });
     if (spaces.length < board.spaceCount) {
       return NextResponse.json({ error: `The board must be full to draw. ${spaces.length} of ${board.spaceCount} claimed and paid.` }, { status: 400 });
     }

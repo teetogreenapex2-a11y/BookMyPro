@@ -1060,6 +1060,8 @@ model RaffleBoard {
   giftCardCents     Int      @default(7500)   // what every non-prize space wins
   giftCardsIssuedAt DateTime?
   priceCents        Int      @default(5000)   // cost of one space, paid by card
+  pledgeMode        Boolean  @default(false)  // cards are saved now and charged only when the board fills
+  chargedAt         DateTime?                 // set once the pledged cards have been charged
   tiers             Json     // [{ label, count, prize, rest? }] - the "rest" tier is everyone who did not win a prize
   createdAt         DateTime @default(now())
   spaces            RaffleSpace[]
@@ -1085,6 +1087,9 @@ model RaffleSpace {
   stripeSessionId String?
   payMethod       String?   // "card" | "venmo" | null (owner handed it out)
   groupId         String?   // spaces claimed in one go share a group
+  pledged         Boolean   @default(false) // card saved, not charged yet (pledge-mode raffles)
+  stripeCustomerId      String?
+  stripePaymentMethodId String?
 
   @@unique([boardId, number])
   @@index([boardId, email])

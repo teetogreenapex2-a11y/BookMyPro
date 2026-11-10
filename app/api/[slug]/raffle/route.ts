@@ -8,6 +8,7 @@ import { sendRaffleVenmoNotification } from "@/lib/email";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { randomUUID } from "crypto";
 import { markRaffleSessionPaid } from "@/lib/raffleNotify";
+import { fulfillPledgeSession } from "@/lib/rafflePledge";
 import { getOrCreateBoard, normalizeRaffleKey, publicName, RaffleTier } from "@/lib/raffle";
 
 async function viewerIsOwner(businessId: string) {
@@ -44,6 +45,9 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     try {
       const useConnect = business.paymentProvider === "stripe" && !!business.stripeAccountId;
       const cs = await stripe.checkout.sessions.retrieve(sid, undefined, useConnect ? { stripeAccount: business.stripeAccountId! } : undefined);
+      if (cs.metadata?.kind === "raffle_pledge" && cs.status === "complete" && cs.metadata?.businessId === business.id) {
+        await fulfillPledgeSession(sid, business.id);
+      }
       if (cs.payment_status === "paid" && cs.metadata?.kind === "raffle_space" && cs.metadata?.businessId === business.id) {
         await markRaffleSessionPaid(sid);
       }
@@ -70,6 +74,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   return NextResponse.json({
     isOwner,
     venmoAvailable: !!venmoOwner,
+    pledgedCount: spaces.filter((x) => x.pledged).length,
     pendingVenmo,
     board: {
       title: board.title,
@@ -79,12 +84,14 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       drawnAt: board.drawnAt,
       giftCardCents: board.giftCardCents,
       priceCents: board.priceCents,
+      pledgeMode: board.pledgeMode,
       giftCardsIssuedAt: board.giftCardsIssuedAt,
       tiers: board.tiers as unknown as RaffleTier[],
     },
     spaces: spaces.map((s) => ({
       number: s.number,
       held: s.pending,
+      pledged: s.pledged,
       name: s.pending ? "Reserved" : isOwner ? s.name : publicName(s.name),
       winnerTier: s.winnerTier,
       ...(isOwner ? { email: s.email, phone: s.phone } : {}),
@@ -132,6 +139,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // The owner can hand out spaces free; everyone else pays.
   const isOwner = await viewerIsOwner(business.id);
   const needsPayment = board.priceCents > 0 && !isOwner;
+  const pledge = needsPayment && board.pledgeMode;
+  if (pledge && method === "venmo") {
+    return NextResponse.json({ error: `Venmo isn't available for this raffle. Pledge by card - you're only charged when all ${board.spaceCount} spots are filled.` }, { status: 400 });
+  }
   const venmoOwner = needsPayment && method === "venmo" ? await findVenmoOwner(business.id) : null;
   if (needsPayment && method === "venmo" && !venmoOwner) {
     return NextResponse.json({ error: "Venmo isn't available right now. Pay by card instead." }, { status: 400 });
@@ -186,6 +197,25 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (useConnect) {
       const acct = await getAccountStatus(business.stripeAccountId!);
       if (!acct.chargesEnabled) throw new Error("Card payments aren't set up yet.");
+    }
+    if (pledge) {
+      // Save the card now; it's charged only when the board fills.
+      const opts = useConnect ? { stripeAccount: business.stripeAccountId! } : undefined;
+      const customer = await stripe.customers.create({ email, name, metadata: { businessId: business.id, raffle: board.key } }, opts);
+      const setup = await stripe.checkout.sessions.create(
+        {
+          mode: "setup",
+          customer: customer.id,
+          payment_method_types: ["card"],
+          expires_at: Math.floor(Date.now() / 1000) + holdMinutes * 60,
+          metadata: { kind: "raffle_pledge", businessId: business.id, count: String(sorted.length) },
+          success_url: `${raffleUrl}?pledged=1&sid={CHECKOUT_SESSION_ID}`,
+          cancel_url: raffleUrl,
+        },
+        opts
+      );
+      await prisma.raffleSpace.updateMany({ where: { id: { in: created.map((c) => c.id) } }, data: { stripeSessionId: setup.id } });
+      return NextResponse.json({ ok: true, url: setup.url }, { status: 201 });
     }
     const checkout = await stripe.checkout.sessions.create(
       {

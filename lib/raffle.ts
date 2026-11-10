@@ -13,10 +13,11 @@ export const DEFAULT_TIERS: RaffleTier[] = [
 // Each raffle a business can run, by key. The key is the last part of its
 // link: /{slug}/raffle (main) and /{slug}/raffle/200 (the 200/20 raffle).
 export const RAFFLE_PRESETS: Record<string, {
-  title: string; spaceCount: number; maxPerPerson: number; priceCents: number; giftCardCents: number; tiers: RaffleTier[];
+  title: string; spaceCount: number; maxPerPerson: number; priceCents: number; giftCardCents: number; tiers: RaffleTier[]; pledge?: boolean;
 }> = {
   main: { title: "50/50 Raffle", spaceCount: 50, maxPerPerson: 3, priceCents: 5000, giftCardCents: 7500, tiers: DEFAULT_TIERS },
   "200": {
+    pledge: true, // cards are saved now and only charged once all 20 spots are filled
     title: "200/20 Raffle", spaceCount: 20, maxPerPerson: 1, priceCents: 20000, giftCardCents: 20000, // 20 spots at $200 each; non-winners get their $200 back as a gift card
     tiers: [
       { label: "Grand Prize", count: 1, prize: "Full bag ($3,000 value)" },
@@ -40,13 +41,13 @@ export async function getOrCreateBoard(businessId: string, rawKey: unknown = "ma
   if (existing) {
     // While nobody has claimed a space yet, keep the board in step with its
     // preset (so changing the preset here takes effect without a reset).
-    const differs = existing.spaceCount !== p.spaceCount || existing.priceCents !== p.priceCents || existing.giftCardCents !== p.giftCardCents || existing.maxPerPerson !== p.maxPerPerson || existing.title !== p.title || JSON.stringify(existing.tiers) !== JSON.stringify(p.tiers);
+    const differs = existing.spaceCount !== p.spaceCount || existing.priceCents !== p.priceCents || existing.giftCardCents !== p.giftCardCents || existing.maxPerPerson !== p.maxPerPerson || existing.title !== p.title || existing.pledgeMode !== !!p.pledge || JSON.stringify(existing.tiers) !== JSON.stringify(p.tiers);
     if (differs && existing.status === "open" && (await prisma.raffleSpace.count({ where: { boardId: existing.id } })) === 0) {
-      return prisma.raffleBoard.update({ where: { id: existing.id }, data: { title: p.title, spaceCount: p.spaceCount, maxPerPerson: p.maxPerPerson, priceCents: p.priceCents, giftCardCents: p.giftCardCents, tiers: p.tiers as any } });
+      return prisma.raffleBoard.update({ where: { id: existing.id }, data: { title: p.title, spaceCount: p.spaceCount, maxPerPerson: p.maxPerPerson, priceCents: p.priceCents, giftCardCents: p.giftCardCents, pledgeMode: !!p.pledge, chargedAt: null, tiers: p.tiers as any } });
     }
     return existing;
   }
-  return prisma.raffleBoard.create({ data: { businessId, key, title: p.title, spaceCount: p.spaceCount, maxPerPerson: p.maxPerPerson, priceCents: p.priceCents, giftCardCents: p.giftCardCents, tiers: p.tiers as any } });
+  return prisma.raffleBoard.create({ data: { businessId, key, title: p.title, spaceCount: p.spaceCount, maxPerPerson: p.maxPerPerson, priceCents: p.priceCents, giftCardCents: p.giftCardCents, pledgeMode: !!p.pledge, tiers: p.tiers as any } });
 }
 
 // "Jane Smith" -> "Jane S." so the public board never shows full names.

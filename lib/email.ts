@@ -467,3 +467,14 @@ export async function sendPaymentReceivedEmails(d: {
     ).catch(() => {});
   }
 }
+
+
+// A simple branded message used by the raffle pledge flow.
+export async function sendRaffleMessage(to: string, subject: string, heading: string, bodyHtml: string, ctaUrl?: string, ctaLabel = "Open the raffle") {
+  const html = `<div style="font-family: sans-serif; max-width: 480px;">
+    <h2 style="margin-bottom: 8px;">${heading}</h2>
+    ${bodyHtml}
+    ${ctaUrl ? `<p><a href="${ctaUrl}" style="display:inline-block;background:#1B3A2F;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">${ctaLabel}</a></p>` : ""}
+  </div>`;
+  await sendEmail(to, subject, html);
+}

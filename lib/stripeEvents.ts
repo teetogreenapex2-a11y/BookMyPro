@@ -13,6 +13,7 @@ import { BUSINESS_TIMEZONE } from "@/lib/time";
 import { businessDestination } from "@/lib/businessUrl";
 import { sendPaymentReceivedEmails } from "@/lib/email";
 import { markRaffleSessionPaid } from "@/lib/raffleNotify";
+import { fulfillPledgeSession } from "@/lib/rafflePledge";
 
 // Shared by the Stripe webhook and by the return-from-checkout confirmation,
 // so a paid customer is fulfilled even if the webhook is late or never arrives.
@@ -132,6 +133,11 @@ export async function processStripeEvent(event: Stripe.Event): Promise<NextRespo
           });
         }
       } catch (e) { console.error("Payment notification failed:", e); }
+    }
+
+    if (meta.kind === "raffle_pledge") {
+      await fulfillPledgeSession(session.id, businessId);
+      return NextResponse.json({ received: true });
     }
 
     if (meta.kind === "raffle_space") {

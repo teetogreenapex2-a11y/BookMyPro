@@ -3,16 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 
 type Tier = { label: string; count: number; prize: string; rest?: boolean };
-type Board = { title: string; spaceCount: number; maxPerPerson: number; status: string; drawnAt: string | null; giftCardCents: number; priceCents: number; giftCardsIssuedAt: string | null; tiers: Tier[] };
+type Board = { title: string; spaceCount: number; maxPerPerson: number; status: string; drawnAt: string | null; giftCardCents: number; priceCents: number; pledgeMode?: boolean; giftCardsIssuedAt: string | null; tiers: Tier[] };
 type PendingVenmo = { groupId: string; name: string; email: string; phone: string | null; numbers: number[]; amountCents: number };
 type VenmoInfo = { url: string; handle: string; amountCents: number; note: string; numbers: number[] };
-type Space = { number: number; name: string; held?: boolean; winnerTier: number | null; email?: string; phone?: string | null };
+type Space = { number: number; name: string; held?: boolean; pledged?: boolean; winnerTier: number | null; email?: string; phone?: string | null };
 
 export default function RaffleClient({ apiBase, businessName, isOwner, boardKey = "main" }: { apiBase: string; businessName: string; isOwner: boolean; boardKey?: string }) {
   const [board, setBoard] = useState<Board | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [owner, setOwner] = useState(isOwner);
   const [raffleBase, setRaffleBase] = useState("");
+  const [pledgedCount, setPledgedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<number[]>([]);
   const [formOpen, setFormOpen] = useState(false);
@@ -39,6 +40,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
       setSpaces(d.spaces || []);
       setOwner(!!d.isOwner);
       setVenmoAvailable(!!d.venmoAvailable);
+      setPledgedCount(d.pledgedCount || 0);
       setPendingVenmo(d.pendingVenmo || []);
       // Drop selections that someone else took in the meantime.
       const taken = new Set<number>((d.spaces || []).map((x: Space) => x.number));
@@ -49,7 +51,9 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
 
   useEffect(() => {
     if (typeof window !== "undefined") setRaffleBase(window.location.pathname.replace(/\/raffle(\/.*)?$/, "/raffle"));
-    if (typeof window !== "undefined" && window.location.search.includes("paid=1")) {
+    if (typeof window !== "undefined" && window.location.search.includes("pledged=1")) {
+      setNotice("You're pledged! Your card was NOT charged. It's charged only when all spots are filled - we'll email you.");
+    } else if (typeof window !== "undefined" && window.location.search.includes("paid=1")) {
       setNotice("Thanks! Confirming your payment - your space will show as yours in a moment.");
     }
     load();
@@ -69,7 +73,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
     const res = await fetch(`${apiBase}/raffle?key=${boardKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ numbers: picked, name, email, phone, method }),
+      body: JSON.stringify({ numbers: picked, name, email, phone, method: board?.pledgeMode ? "card" : method }),
     });
     const d = await res.json().catch(() => ({}));
     // Going to Stripe: keep the button disabled so a second tap can't start a second payment.
@@ -105,6 +109,8 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
     const d = await res.json().catch(() => ({}));
     setAdminBusy(false);
     if (!res.ok) { setAdminMsg(d.error || "Something went wrong."); return; }
+    if (action === "chargeall") setAdminMsg(`Created charges: ${d.charged} paid${d.declined ? `, ${d.declined} declined` : ""}.`);
+    if (action === "cancelpledges") setAdminMsg(`Created: cancelled ${d.cancelled} pledged spot${d.cancelled === 1 ? "" : "s"}. Nobody was charged.`);
     if (action === "giftcards") setAdminMsg(`Created ${d.created} gift cards${d.emailed ? `, emailed ${d.emailed}` : ""}.`);
     load();
   }
@@ -148,6 +154,12 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
         {!loading && !board && (
           <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 24, textAlign: "center", color: "var(--muted)" }}>
             There's no raffle running right now. Check back soon.
+          </div>
+        )}
+
+        {board?.pledgeMode && !drawn && (
+          <div style={{ background: "#FBF3DE", border: "1px solid #E8D49A", borderRadius: 10, padding: "12px 14px", fontSize: 14, marginBottom: 14, lineHeight: 1.5 }}>
+            <strong>{taken} of {board.spaceCount} spots pledged.</strong> Pledging saves your card but <strong>doesn't charge it</strong>. Everyone is charged {dollars(board.priceCents)} only when all {board.spaceCount} spots are filled. If it doesn't fill, nobody is charged.
           </div>
         )}
 
@@ -207,11 +219,11 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
             <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 12px" }}>Only you see this. Customers can claim spaces but can't draw, release or reset.</p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
               <button
-                disabled={adminBusy || drawn || taken < board.spaceCount}
+                disabled={adminBusy || drawn || taken < board.spaceCount || pledgedCount > 0}
                 onClick={() => { if (window.confirm("Draw the winners now? This can't be undone.")) admin("draw"); }}
-                style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, fontWeight: 700, opacity: adminBusy || drawn || taken < board.spaceCount ? 0.45 : 1 }}
+                style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, fontWeight: 700, opacity: adminBusy || drawn || taken < board.spaceCount || pledgedCount > 0 ? 0.45 : 1 }}
               >
-                {drawn ? "Winners drawn" : taken < board.spaceCount ? `Draw unlocks when full (${board.spaceCount - taken} to go)` : "Draw winners"}
+                {drawn ? "Winners drawn" : pledgedCount > 0 ? "Draw unlocks after the cards are charged" : taken < board.spaceCount ? `Draw unlocks when full (${board.spaceCount - taken} to go)` : "Draw winners"}
               </button>
               {drawn && !board.giftCardsIssuedAt && restIndex !== -1 && (
                 <>
@@ -236,6 +248,16 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                 Reset
               </button>
             </div>
+            {pledgedCount > 0 && !drawn && (
+              <div style={{ background: "#FBF3DE", borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{pledgedCount} pledged · cards not charged yet</div>
+                <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 8px" }}>Cards are charged automatically when all {board.spaceCount} spots fill. If it doesn't fill, cancel and nobody is charged.</p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button disabled={adminBusy} onClick={() => { if (window.confirm(`Charge all ${pledgedCount} pledged cards ${dollars(board.priceCents)} each now? This can't be undone.`)) admin("chargeall"); }} style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 12.5, fontWeight: 700 }}>Charge everyone now</button>
+                  <button disabled={adminBusy} onClick={() => { if (window.confirm("Cancel the pledges? Nobody is charged and these spots reopen.")) admin("cancelpledges"); }} style={{ background: "none", color: "#B23A3A", border: "1px solid #B23A3A", borderRadius: 8, padding: "9px 14px", fontSize: 12.5, fontWeight: 700 }}>Cancel pledges (no one charged)</button>
+                </div>
+              </div>
+            )}
             {adminMsg && <p style={{ fontSize: 12.5, color: adminMsg.startsWith("Created") ? "#1F6B3A" : "#B23A3A", margin: "0 0 10px" }}>{adminMsg}</p>}
 
             {pendingVenmo.length > 0 && (
@@ -259,7 +281,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Claimed spaces</div>
                 {spaces.map((s) => (
                   <div key={s.number} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "5px 0", borderTop: "1px solid var(--border)", alignItems: "center" }}>
-                    <span style={{ minWidth: 0, overflowWrap: "anywhere" }}><strong>#{s.number}</strong> {s.name}{s.held ? " (waiting on payment)" : ""} · {s.email}{s.phone ? ` · ${s.phone}` : ""}</span>
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere" }}><strong>#{s.number}</strong> {s.name}{s.held ? " (waiting on payment)" : s.pledged ? " (pledged - not charged)" : ""} · {s.email}{s.phone ? ` · ${s.phone}` : ""}</span>
                     {!drawn && (
                       <button onClick={() => { if (window.confirm(`Release space ${s.number}?`)) admin("release", { number: s.number }); }} disabled={adminBusy}
                         style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, fontSize: 11, padding: "3px 8px", flexShrink: 0 }}>Release</button>
@@ -297,7 +319,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                   {picked.length} × {dollars(board.priceCents)} = {dollars(board.priceCents * picked.length)}
                 </p>
                 <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                  {([["card", "Pay by card"], ...(venmoAvailable ? [["venmo", "Pay with Venmo"]] : [])] as [string, string][]).map(([m, label]) => (
+                  {([["card", board.pledgeMode ? "Pledge by card" : "Pay by card"], ...(venmoAvailable && !board.pledgeMode ? [["venmo", "Pay with Venmo"]] : [])] as [string, string][]).map(([m, label]) => (
                     <button key={m} onClick={() => setMethod(m as "card" | "venmo")} style={{
                       flex: 1, padding: "10px 8px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
                       border: method === m ? "2px solid var(--fairway)" : "1px solid var(--border)",
@@ -306,7 +328,9 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                   ))}
                 </div>
                 <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 12px" }}>
-                  {method === "venmo"
+                  {board.pledgeMode
+                    ? `You won't be charged today. Your card is saved and charged ${dollars(board.priceCents * picked.length)} only when all ${board.spaceCount} spots are filled. If it doesn't fill, you're never charged.`
+                    : method === "venmo"
                     ? "Your spaces are reserved for 24 hours. Send the Venmo payment on the next screen and they're confirmed once it's received."
                     : "Pay by card on the next screen. Your spaces are held for 30 minutes while you pay."}
                 </p>
@@ -320,7 +344,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setFormOpen(false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 600 }}>Back</button>
               <button onClick={claim} disabled={saving || !name.trim() || !email.trim()} style={{ flex: 2, background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 700, opacity: saving ? 0.7 : 1 }}>
-                {saving ? "One moment…" : owner || !board.priceCents ? `Claim ${picked.length} space${picked.length === 1 ? "" : "s"}` : method === "venmo" ? `Reserve & pay ${dollars(board.priceCents * picked.length)} with Venmo` : `Pay ${dollars(board.priceCents * picked.length)} by card`}
+                {saving ? "One moment…" : owner || !board.priceCents ? `Claim ${picked.length} space${picked.length === 1 ? "" : "s"}` : board.pledgeMode ? `Pledge ${dollars(board.priceCents * picked.length)} - charged only when full` : method === "venmo" ? `Reserve & pay ${dollars(board.priceCents * picked.length)} with Venmo` : `Pay ${dollars(board.priceCents * picked.length)} by card`}
               </button>
             </div>
           </div>
