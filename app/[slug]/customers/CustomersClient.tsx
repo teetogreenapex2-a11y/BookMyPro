@@ -72,7 +72,7 @@ export default function CustomersClient({
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<{ totalRows: number; newPeople: number; existingPeopleAdded: number; skipped: { row: number; name: string; reason: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ totalRows: number; newPeople: number; existingPeopleAdded: number; relabeled?: number; skipped: { row: number; name: string; reason: string }[] } | null>(null);
   const [emailBlastOpen, setEmailBlastOpen] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailAudience, setEmailAudience] = useState<string>("all");
@@ -197,6 +197,11 @@ export default function CustomersClient({
   }
 
   const [startingConversationId, setStartingConversationId] = useState<string | null>(null);
+  const [emailOne, setEmailOne] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [emailOneSubject, setEmailOneSubject] = useState("");
+  const [emailOneBody, setEmailOneBody] = useState("");
+  const [emailOneSending, setEmailOneSending] = useState(false);
+  const [emailOneResult, setEmailOneResult] = useState<string | null>(null);
   async function messageCustomer(playerUserId: string) {
     setStartingConversationId(playerUserId);
     const res = await fetch(`${apiBase}/conversations/start`, {
@@ -230,6 +235,26 @@ export default function CustomersClient({
       setBlastBody("");
     } else {
       setBlastResult(data.error || "Something went wrong.");
+    }
+  }
+
+  async function sendEmailOne() {
+    if (!emailOne || !emailOneSubject.trim() || !emailOneBody.trim()) return;
+    setEmailOneSending(true);
+    setEmailOneResult(null);
+    const res = await fetch(`${apiBase}/customers/email-one`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: emailOne.id, subject: emailOneSubject, message: emailOneBody }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setEmailOneSending(false);
+    if (res.ok) {
+      setEmailOneResult("Sent!");
+      setEmailOneSubject("");
+      setEmailOneBody("");
+    } else {
+      setEmailOneResult(data.error || "Something went wrong.");
     }
   }
 
@@ -528,11 +553,11 @@ export default function CustomersClient({
       </header>
 
       <main style={{ maxWidth: 960, margin: "0 auto", padding: `20px 20px ${(isNative || isSandboxPreview) ? 60 + FAKE_TAB_BAR_HEIGHT : 60}px` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
           <div className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
             {filtered.length} shown
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <button
               onClick={() => { setAddOpen((o) => !o); setAddError(null); }}
               style={{
@@ -660,6 +685,7 @@ export default function CustomersClient({
                   Read {importResult.totalRows} row{importResult.totalRows === 1 ? "" : "s"} - added{" "}
                   <strong>{importResult.newPeople + importResult.existingPeopleAdded}</strong> new customer
                   {importResult.newPeople + importResult.existingPeopleAdded === 1 ? "" : "s"}.
+                  {!!importResult.relabeled && <> Marked <strong>{importResult.relabeled}</strong> earlier import{importResult.relabeled === 1 ? "" : "s"} as Imported. Refresh the page to see it.</>}
                 </p>
                 {importResult.skipped.length > 0 && (
                   <details style={{ fontSize: 12, color: "var(--faint)" }}>
@@ -772,6 +798,26 @@ export default function CustomersClient({
           </div>
         )}
 
+        {emailOne && (
+          <div onClick={() => setEmailOne(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", overflowY: "auto", zIndex: 10001 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "calc(100% - 32px)", maxWidth: 480, background: "#FFF", borderRadius: 18, padding: "20px 20px 24px", margin: "16px auto 40vh" }}>
+              <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 2 }}>Email {emailOne.name || emailOne.email}</div>
+              <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 12px", overflowWrap: "anywhere" }}>
+                A real email to {emailOne.email}. Includes an unsubscribe link automatically.
+              </p>
+              <input value={emailOneSubject} onChange={(e) => setEmailOneSubject(e.target.value)} placeholder="Subject" style={{ ...inputStyle, width: "100%", marginBottom: 10, boxSizing: "border-box" }} />
+              <textarea value={emailOneBody} onChange={(e) => setEmailOneBody(e.target.value)} placeholder="Type your message… (leave a blank line between paragraphs)" rows={6} style={{ ...inputStyle, width: "100%", resize: "vertical", marginBottom: 10, boxSizing: "border-box" }} />
+              {emailOneResult && <p style={{ fontSize: 12.5, color: emailOneResult === "Sent!" ? "var(--fairway)" : "#B23A3A", margin: "0 0 10px", fontWeight: 600 }}>{emailOneResult}</p>}
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button onClick={() => setEmailOne(null)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
+                <button onClick={sendEmailOne} disabled={emailOneSending || !emailOneSubject.trim() || !emailOneBody.trim()} style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  {emailOneSending ? "Sending…" : "Send email"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {filtered.length === 0 ? (
           <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 14, padding: "40px 24px", textAlign: "center" }}>
             <p style={{ fontSize: 13, color: "var(--faint)", margin: 0 }}>
@@ -872,6 +918,19 @@ export default function CustomersClient({
                         >
                           {startingConversationId === c.id ? "…" : (<><span style={{ fontSize: 15 }}>✉</span> Message</>)}
                         </button>
+                        {isOwner && c.email && (
+                          <button
+                            onClick={() => { setEmailOne({ id: c.id, name: c.name, email: c.email }); setEmailOneResult(null); }}
+                            title="Email"
+                            style={{
+                              height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+                              padding: "0 14px", fontSize: 13, fontWeight: 600, color: "var(--fairway)", background: "#FFF",
+                              border: "1px solid var(--fairway)", borderRadius: 8, cursor: "pointer",
+                            }}
+                          >
+                            Email
+                          </button>
+                        )}
                         <div style={{ width: 20 }} />
                         <button
                           onClick={() => {
