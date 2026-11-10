@@ -12,6 +12,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
   const [board, setBoard] = useState<Board | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [owner, setOwner] = useState(isOwner);
+  const [raffleBase, setRaffleBase] = useState("");
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<number[]>([]);
   const [formOpen, setFormOpen] = useState(false);
@@ -47,6 +48,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
   }, [apiBase, boardKey]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") setRaffleBase(window.location.pathname.replace(/\/raffle(\/.*)?$/, "/raffle"));
     if (typeof window !== "undefined" && window.location.search.includes("paid=1")) {
       setNotice("Thanks! Confirming your payment - your space will show as yours in a moment.");
     }
@@ -114,6 +116,13 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
     <div style={{ minHeight: "100vh", background: "var(--chalk)", paddingBottom: "calc(120px + env(safe-area-inset-bottom, 0px))" }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 760, margin: "0 auto" }}>
+          {owner && raffleBase && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              {[{ k: "main", label: "50/50 Raffle", href: raffleBase }, { k: "200", label: "200/20 Raffle", href: `${raffleBase}/200` }].map((t) => (
+                <a key={t.k} href={t.href} style={{ padding: "7px 14px", borderRadius: 999, fontSize: 13, fontWeight: 700, textDecoration: "none", background: boardKey === t.k ? "var(--chalk)" : "rgba(255,255,255,0.14)", color: boardKey === t.k ? "var(--fairway)" : "var(--chalk)" }}>{t.label}</a>
+              ))}
+            </div>
+          )}
           <div style={{ fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase", color: "#BFE3CC", marginBottom: 6 }}>{businessName}</div>
           <h1 className="display" style={{ fontSize: 28, margin: "0 0 6px" }}>{board?.title || "Raffle"}</h1>
           {board && (
