@@ -129,7 +129,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         contactPhone: contactPhone.trim(),
         contactEmail: contactEmail.trim(),
       },
-      success_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=success"),
+      success_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=success&session_id={CHECKOUT_SESSION_ID}"),
       cancel_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=cancelled"),
     },
     { stripeAccount: business.stripeAccountId }

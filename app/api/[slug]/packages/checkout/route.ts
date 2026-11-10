@@ -216,7 +216,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         contactEmail: contactEmail?.trim() || "",
         isRemote: isRemote ? "true" : "",
       },
-      success_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=success"),
+      success_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=success&session_id={CHECKOUT_SESSION_ID}"),
       cancel_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=cancelled"),
     },
     { stripeAccount: business.stripeAccountId }

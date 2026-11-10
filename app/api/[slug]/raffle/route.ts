@@ -36,6 +36,19 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const board = await getOrCreateBoard(business.id, key);
   if (!board) return NextResponse.json({ board: null, isOwner });
 
+  // Back from Stripe Checkout: confirm the payment directly with Stripe so the
+  // spaces are secured even if the webhook is late or misconfigured.
+  const sid = req.nextUrl.searchParams.get("sid");
+  if (sid && /^cs_[A-Za-z0-9_]+$/.test(sid)) {
+    try {
+      const useConnect = business.paymentProvider === "stripe" && !!business.stripeAccountId;
+      const cs = await stripe.checkout.sessions.retrieve(sid, undefined, useConnect ? { stripeAccount: business.stripeAccountId! } : undefined);
+      if (cs.payment_status === "paid" && cs.metadata?.kind === "raffle_space" && cs.metadata?.businessId === business.id) {
+        await prisma.raffleSpace.updateMany({ where: { boardId: board.id, stripeSessionId: sid, pending: true }, data: { pending: false, holdExpiresAt: null } });
+      }
+    } catch (e) { console.error("Raffle payment check failed:", e); }
+  }
+
   // Drop abandoned holds, then show paid spaces plus holds still in progress.
   await prisma.raffleSpace.deleteMany({ where: { boardId: board.id, pending: true, holdExpiresAt: { lt: new Date() } } });
   const spaces = await prisma.raffleSpace.findMany({ where: { boardId: board.id }, orderBy: { number: "asc" } });
@@ -105,6 +118,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   // Abandoned checkouts / unpaid Venmo reservations free their spaces once the hold runs out.
   await prisma.raffleSpace.deleteMany({ where: { boardId: board.id, pending: true, holdExpiresAt: { lt: new Date() } } });
+
+  // A retry after a failed or abandoned payment replaces this person's own unpaid holds, so they aren't blocked by their own earlier attempt.
+  await prisma.raffleSpace.deleteMany({ where: { boardId: board.id, email, pending: true } });
 
   const mine = await prisma.raffleSpace.count({ where: { boardId: board.id, email } });
   if (mine + numbers.length > board.maxPerPerson) {
@@ -184,7 +200,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         }],
         expires_at: Math.floor(Date.now() / 1000) + holdMinutes * 60,
         metadata: { kind: "raffle_space", businessId: business.id, count: String(sorted.length), unitCents: String(board.priceCents) },
-        success_url: `${raffleUrl}?paid=1`,
+        success_url: `${raffleUrl}?paid=1&sid={CHECKOUT_SESSION_ID}`,
         cancel_url: raffleUrl,
       },
       useConnect ? { stripeAccount: business.stripeAccountId! } : undefined

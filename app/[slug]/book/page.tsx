@@ -5,8 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, ensureMembership, getBasePaths } from "@/lib/tenant";
 import PhonePrompt from "@/app/components/PhonePrompt";
 import BookingClient from "./BookingClient";
+import { confirmCheckoutSession } from "@/lib/stripeEvents";
 
-export default async function BookPage({ params }: { params: { slug: string } }) {
+export default async function BookPage({ params, searchParams }: { params: { slug: string }; searchParams?: { session_id?: string; purchase?: string } }) {
   const session = await getServerSession(authOptions);
 
   const business = await getBusinessBySlug(params.slug);
@@ -26,6 +27,28 @@ export default async function BookPage({ params }: { params: { slug: string } })
   // once someone's actually signed in; BookingClient itself sends a
   // signed-out visitor to /login the moment they try to do something that
   // genuinely requires an account, like confirming a real booking.
+  // Back from Stripe Checkout: confirm the payment with Stripe so the lesson/package
+  // exists even if the webhook was late or didn't arrive.
+  if (session && searchParams?.session_id) {
+    await confirmCheckoutSession(business.id, business.paymentProvider === "stripe" ? business.stripeAccountId : null, searchParams.session_id);
+  }
+
+  // What to tell a customer who just came back from paying.
+  let paymentBanner: { ok: boolean; text: string } | null = null;
+  if (searchParams?.purchase === "success") {
+    let done = false;
+    if (searchParams.session_id) {
+      const [pk, bk] = await Promise.all([
+        prisma.package.findFirst({ where: { stripeSessionId: searchParams.session_id }, select: { id: true } }),
+        prisma.booking.findFirst({ where: { stripeSessionId: searchParams.session_id }, select: { id: true } }),
+      ]);
+      done = !!(pk || bk);
+    }
+    paymentBanner = done
+      ? { ok: true, text: "Payment received - you're all set! Your lesson is confirmed and in your history below." }
+      : { ok: false, text: "Payment received. We're finishing your booking - refresh in a minute. Please don't pay again; if it doesn't appear soon, contact your instructor." };
+  }
+
   let packagesForClient: any[] = [];
   let needsPhone = false;
   let initialContact: { name: string; phone: string; email: string } | null = null;
@@ -103,6 +126,11 @@ export default async function BookPage({ params }: { params: { slug: string } })
   return (
     <>
     {needsPhone && <PhonePrompt audience="customer" />}
+    {paymentBanner && (
+      <div style={{ margin: "12px 16px 0", padding: "12px 14px", borderRadius: 10, fontSize: 14, fontWeight: 600, background: paymentBanner.ok ? "#e6f4ea" : "#fff4db", color: paymentBanner.ok ? "#1e6b34" : "#7a5200", border: `1px solid ${paymentBanner.ok ? "#b7dfc2" : "#f0d594"}` }}>
+        {paymentBanner.text}
+      </div>
+    )}
     <BookingClient
       initialPackages={packagesForClient}
       business={{ ...businessForClient, instructorName: instructorDisplayName }}

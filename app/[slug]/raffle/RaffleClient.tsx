@@ -31,7 +31,8 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`${apiBase}/raffle?key=${boardKey}`, { cache: "no-store" });
+      const sid = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sid") : null;
+      const res = await fetch(`${apiBase}/raffle?key=${boardKey}${sid ? `&sid=${encodeURIComponent(sid)}` : ""}`, { cache: "no-store" });
       const d = await res.json();
       setBoard(d.board || null);
       setSpaces(d.spaces || []);
@@ -47,7 +48,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.search.includes("paid=1")) {
-      setNotice("Payment received - your space is yours. Good luck!");
+      setNotice("Thanks! Confirming your payment - your space will show as yours in a moment.");
     }
     load();
     const t = setInterval(load, 20000);
