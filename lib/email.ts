@@ -24,14 +24,14 @@ async function sendEmail(to: string | string[], subject: string, html: string) {
   return sendEmailFrom(FROM_EMAIL, to, subject, html);
 }
 
-async function sendEmailFrom(from: string, to: string | string[], subject: string, html: string) {
+async function sendEmailFrom(from: string, to: string | string[], subject: string, html: string, replyTo?: string) {
   const client = getClient();
   if (!client) {
     console.warn("RESEND_API_KEY is not set — skipping notification email.");
     return;
   }
   try {
-    await client.emails.send({ from, to, subject, html });
+    await client.emails.send({ from, to, subject, html, ...(replyTo ? { replyTo } : {}) });
   } catch (err) {
     // Never let a notification failure break the booking flow itself.
     console.error("Failed to send notification email:", err);
@@ -350,11 +350,33 @@ export function verifyUnsubscribeToken(userId: string, token: string): boolean {
 // responsible for what goes in it. This function's job is just wrapping it
 // with the parts that are legally required for a US commercial email
 // (CAN-SPAM): a working unsubscribe link and a real mailing address.
+// Turns the plain text typed in the composer into tidy email HTML: every line
+// becomes its own spaced paragraph, links become tappable, **bold** works.
+export function textToEmailHtml(message: string) {
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return String(message)
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)
+    .map((line) => {
+      let h = esc(line);
+      h = h.replace(/https?:\/\/[^\s<]+/g, (m) => {
+        const tail = (m.match(/[.,;:!?)]+$/) || [""])[0];
+        const url = tail ? m.slice(0, -tail.length) : m;
+        return `<a href="${url}" style="color:#1B6B3A;font-weight:600;">${url}</a>${tail}`;
+      });
+      h = h.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      return `<p style="margin: 0 0 14px; line-height: 1.55; font-size: 15px;">${h}</p>`;
+    })
+    .join("");
+}
+
 export async function sendMarketingBlastEmail(
   to: string,
   subject: string,
   bodyHtml: string,
-  details: { businessName: string; unsubscribeUserId: string }
+  details: { businessName: string; unsubscribeUserId: string; replyTo?: string | null }
 ) {
   const token = makeUnsubscribeToken(details.unsubscribeUserId);
   const unsubscribeUrl = `https://bookmypro.app/api/unsubscribe?u=${encodeURIComponent(details.unsubscribeUserId)}&t=${token}`;
@@ -371,7 +393,9 @@ export async function sendMarketingBlastEmail(
     </div>
   `;
 
-  await sendEmailFrom(MARKETING_FROM_EMAIL, to, subject, html);
+  // Shows as "Tee to Green Golf" in the inbox; replies go to the business.
+  const displayName = details.businessName.replace(/[<>"]/g, "").trim();
+  await sendEmailFrom(`${displayName} <${MARKETING_FROM_EMAIL}>`, to, subject, html, details.replyTo || undefined);
 }
 
 // Tells the studio owner a customer says they paid for raffle spaces by

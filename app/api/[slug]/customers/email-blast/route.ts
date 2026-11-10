@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
-import { sendMarketingBlastEmail } from "@/lib/email";
+import { sendMarketingBlastEmail, textToEmailHtml } from "@/lib/email";
 
 // Sending one email at a time (see the loop below) can run past Vercel's
 // default 10s limit once the list gets past a couple dozen people -
@@ -57,11 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     );
   }
 
-  const bodyHtml = message
-    .trim()
-    .split(/\n{2,}/)
-    .map((para: string) => `<p style="margin: 0 0 14px;">${para.replace(/\n/g, "<br/>")}</p>`)
-    .join("");
+  const bodyHtml = textToEmailHtml(message);
 
   // Resend's own rate limit is per-second, not a batch API concern here -
   // sending one at a time with a small delay keeps this well under it
@@ -72,6 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     await sendMarketingBlastEmail(user.email, subject.trim(), bodyHtml, {
       businessName: business.name,
       unsubscribeUserId: user.id,
+      replyTo: business.notificationEmail || business.email,
     });
     sent++;
     await new Promise((r) => setTimeout(r, 120));

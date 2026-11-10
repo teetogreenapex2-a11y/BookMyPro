@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
-import { sendMarketingBlastEmail } from "@/lib/email";
+import { sendMarketingBlastEmail, textToEmailHtml } from "@/lib/email";
 
 // POST /api/{slug}/customers/email-one  { userId, subject, message }
 // Owner only. A real email to ONE customer's inbox (the in-app "Message"
@@ -30,15 +30,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (!m || !m.user.email) return NextResponse.json({ error: "That customer has no email address." }, { status: 404 });
   if (m.user.marketingOptOut) return NextResponse.json({ error: "This customer unsubscribed from emails." }, { status: 400 });
 
-  const bodyHtml = String(message)
-    .trim()
-    .split(/\n{2,}/)
-    .map((para: string) => `<p style="margin: 0 0 14px;">${para.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>")}</p>`)
-    .join("");
+  const bodyHtml = textToEmailHtml(message);
 
   await sendMarketingBlastEmail(m.user.email, String(subject).trim(), bodyHtml, {
     businessName: business.name,
     unsubscribeUserId: m.user.id,
+    replyTo: business.notificationEmail || business.email,
   });
   return NextResponse.json({ ok: true });
 }
