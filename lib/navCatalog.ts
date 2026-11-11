@@ -47,6 +47,7 @@ export function navFor(role: string, videoEnabled = true, realRole?: string): { 
   const base = role === "owner" ? OWNER_ALL : role === "instructor" ? STAFF_ALL : role === "player" ? PLAYER_ALL : null;
   if (!base) return null;
   let all = videoEnabled ? base : base.filter((i) => i.key !== "videos");
+  all = [...all, I("whatsnew", "What's new", "sparkle", "/whats-new")];
   // Owners and instructors can flip between staff and player tabs.
   const realIsStaff = realRole === "owner" || realRole === "instructor";
   if (realIsStaff && role === "player") all = [...all, I("staffview", "Instructor view", "calendar", "/switch-view?to=instructor")];

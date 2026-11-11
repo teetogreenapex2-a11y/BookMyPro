@@ -6,13 +6,14 @@ import { useSession } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 import {
   CalendarDays, Users, Video, PencilRuler, Settings, BookOpen, MessageCircle,
-  ShoppingBag, Gift, BarChart3, UsersRound, X,
+  ShoppingBag, Gift, BarChart3, UsersRound, Sparkles, X,
 } from "lucide-react";
 import { navFor, type NavItem } from "@/lib/navCatalog";
+import { hasUnseen } from "@/lib/changelog";
 
 const ICONS: Record<string, any> = {
   calendar: CalendarDays, customers: Users, videos: Video, sketch: PencilRuler, settings: Settings,
-  book: BookOpen, messages: MessageCircle, shop: ShoppingBag, gift: Gift, reports: BarChart3, team: UsersRound,
+  book: BookOpen, messages: MessageCircle, shop: ShoppingBag, gift: Gift, reports: BarChart3, team: UsersRound, sparkle: Sparkles,
 };
 
 // The bottom sheet that opens when someone taps "More" on the phone's native
@@ -25,6 +26,7 @@ export default function NativeMoreSheet() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NavItem[]>([]);
   const [slug, setSlug] = useState("");
+  const [unseen, setUnseen] = useState(false);
 
   const currentSlug = pathname?.split("/").filter(Boolean)[0] || "";
 
@@ -38,6 +40,7 @@ export default function NativeMoreSheet() {
         const nav = navFor(role, videoEnabled !== false, realRole);
         if (!nav) return;
         setSlug(currentSlug);
+        setUnseen(hasUnseen(role));
         setItems(nav.more);
         setOpen(true);
       } catch {}
@@ -74,7 +77,10 @@ export default function NativeMoreSheet() {
                 onClick={() => { setOpen(false); router.push(`/${slug}${it.path}`); }}
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "16px 6px", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 16, background: "rgba(255,255,255,0.12)", color: "#F6F4EE", fontSize: 13, fontWeight: 600 }}
               >
-                <Icon size={30} />
+                <span style={{ position: "relative", display: "inline-flex" }}>
+                  <Icon size={30} />
+                  {it.key === "whatsnew" && unseen && <span style={{ position: "absolute", top: -2, right: -6, width: 11, height: 11, borderRadius: 999, background: "#E5484D", border: "1.5px solid #1B3A2F" }} />}
+                </span>
                 <span>{it.label}</span>
               </button>
             );

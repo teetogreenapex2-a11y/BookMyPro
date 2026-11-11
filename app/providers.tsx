@@ -8,6 +8,7 @@ import { Capacitor } from "@capacitor/core";
 import { navFor, keyForPage } from "@/lib/navCatalog";
 import NativeMoreSheet from "@/app/components/NativeMoreSheet";
 import WebTabBar from "@/app/components/WebTabBar";
+import WhatsNewBanner from "@/app/components/WhatsNewBanner";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   // This runs once, regardless of which page the app happens to load into
@@ -30,6 +31,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <TabBarSync />
       <NativeMoreSheet />
       <WebTabBar />
+      <WhatsNewBanner />
       <NativeAuthListener />
       <AndroidBackButtonHandler />
       {children}

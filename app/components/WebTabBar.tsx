@@ -6,13 +6,13 @@ import { useSession } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 import {
   CalendarDays, Users, Video, PencilRuler, Settings, BookOpen, MessageCircle,
-  ShoppingBag, Gift, BarChart3, UsersRound, MoreHorizontal,
+  ShoppingBag, Gift, BarChart3, UsersRound, Sparkles, MoreHorizontal,
 } from "lucide-react";
 import { navFor, keyForPage, type NavItem } from "@/lib/navCatalog";
 
 const ICONS: Record<string, any> = {
   calendar: CalendarDays, customers: Users, videos: Video, sketch: PencilRuler, settings: Settings,
-  book: BookOpen, messages: MessageCircle, shop: ShoppingBag, gift: Gift, reports: BarChart3, team: UsersRound,
+  book: BookOpen, messages: MessageCircle, shop: ShoppingBag, gift: Gift, reports: BarChart3, team: UsersRound, sparkle: Sparkles,
 };
 
 export const WEB_TAB_BAR_HEIGHT = 68;
