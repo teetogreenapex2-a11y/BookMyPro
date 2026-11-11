@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Capacitor } from "@capacitor/core";
 
 export type TileOption = { value: string; label: string; price?: string; sub?: string };
 export default function TilePicker({ options, value, onPick, title, placeholder, light }: { options: TileOption[]; value: string | null; onPick: (v: string) => void; title: string; placeholder?: string; light?: boolean }) {
   const [open, setOpen] = useState(false);
+  // The native app's tab bar floats above the web view, so the sheet needs extra bottom room to keep every choice visible.
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => { setIsNative(Capacitor.isNativePlatform()); }, []);
   const current = options.find((o) => o.value === value);
   useEffect(() => {
     if (!open) return;
@@ -38,10 +42,10 @@ export default function TilePicker({ options, value, onPick, title, placeholder,
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: "100%", maxWidth: 520, maxHeight: "80vh", overflowY: "auto",
+              width: "100%", maxWidth: 520, maxHeight: "85vh", overflowY: "auto",
               background: "rgba(27,58,47,0.78)", backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
               borderTopLeftRadius: 20, borderTopRightRadius: 20, color: "#fff",
-              padding: "16px 16px calc(28px + env(safe-area-inset-bottom))",
+              padding: `16px 16px calc(${isNative ? 120 : 28}px + env(safe-area-inset-bottom))`,
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
