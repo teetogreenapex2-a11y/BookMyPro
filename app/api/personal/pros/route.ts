@@ -1,3 +1,4 @@
+import { chargesOnPlatform } from "@/lib/stripe";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -72,7 +73,7 @@ export async function GET(req: NextRequest) {
       // A paid review needs a Stripe-connected business; a pro charging
       // for reviews without card payments set up can't be offered yet.
       instructors: b.memberships
-        .filter((m: any) => !(m.videoReviewPriceCents > 0) || (b.paymentProvider === "stripe" && !!b.stripeAccountId))
+        .filter((m: any) => !(m.videoReviewPriceCents > 0) || (b.paymentProvider === "stripe" && (chargesOnPlatform(b as any) || !!b.stripeAccountId)))
         .map((m: any) => ({ id: m.id, name: m.user.name || "Instructor", specialty: m.specialty, priceCents: covered.has(m.id) ? 0 : (m.videoReviewPriceCents || 0), covered: covered.has(m.id) && (m.videoReviewPriceCents || 0) > 0 })),
     }))
     .filter((b) => b.instructors.length > 0);

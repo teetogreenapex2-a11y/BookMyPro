@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getBusinessBySlug, requireMembership } from "@/lib/tenant";
-import { getAccountStatus, isAccountAccessError } from "@/lib/stripe";
+import { getAccountStatus, isAccountAccessError, chargesOnPlatform } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/{slug}/stripe/status — used by Settings to show whether payments
@@ -18,6 +18,9 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
   const membership = await requireMembership((session.user as any).id, business.id, ["owner", "instructor"]);
   if (!membership) return NextResponse.json({ error: "Instructor access required" }, { status: 403 });
 
+  if (chargesOnPlatform(business)) {
+    return NextResponse.json({ connected: true, detailsSubmitted: true, chargesEnabled: true, payoutsEnabled: true, platform: true });
+  }
   if (!business.stripeAccountId) {
     return NextResponse.json({ connected: false, chargesEnabled: false });
   }

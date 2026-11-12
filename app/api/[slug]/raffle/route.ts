@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getMembership } from "@/lib/tenant";
-import { stripe, getAccountStatus } from "@/lib/stripe";
+import { stripe, getAccountStatus, chargesOnPlatform } from "@/lib/stripe";
 import { sendRaffleVenmoNotification } from "@/lib/email";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { randomUUID } from "crypto";
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const sid = req.nextUrl.searchParams.get("sid");
   if (sid && /^cs_[A-Za-z0-9_]+$/.test(sid)) {
     try {
-      const useConnect = business.paymentProvider === "stripe" && !!business.stripeAccountId;
+      const useConnect = business.paymentProvider === "stripe" && !!business.stripeAccountId && !chargesOnPlatform(business);
       const cs = await stripe.checkout.sessions.retrieve(sid, undefined, useConnect ? { stripeAccount: business.stripeAccountId! } : undefined);
       if (cs.metadata?.kind === "raffle_pledge" && cs.status === "complete" && cs.metadata?.businessId === business.id) {
         await fulfillPledgeSession(sid, business.id);
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   // Card: payment goes straight to the studio's connected Stripe account when
   // it has one, otherwise to the platform account.
-  const useConnect = business.paymentProvider === "stripe" && !!business.stripeAccountId;
+  const useConnect = business.paymentProvider === "stripe" && !!business.stripeAccountId && !chargesOnPlatform(business);
   try {
     if (useConnect) {
       const acct = await getAccountStatus(business.stripeAccountId!);

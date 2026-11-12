@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { stripe, getAccountStatus } from "@/lib/stripe";
+import { stripe, getAccountStatus, chargesOnPlatform, connectOpts } from "@/lib/stripe";
 import { createSquarePaymentLink } from "@/lib/square";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getInstructorById } from "@/lib/tenant";
@@ -174,10 +174,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   // Default: Stripe.
-  if (!business.stripeAccountId) {
+  if (!chargesOnPlatform(business) && !business.stripeAccountId) {
     return NextResponse.json({ error: "This business hasn't set up payments yet" }, { status: 400 });
   }
-  const acctStatus = await getAccountStatus(business.stripeAccountId);
+  const acctStatus = chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
   if (!acctStatus.chargesEnabled) {
     return NextResponse.json({ error: "This business hasn't finished setting up payments yet" }, { status: 400 });
   }
@@ -219,7 +219,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       success_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=success&session_id={CHECKOUT_SESSION_ID}"),
       cancel_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=cancelled"),
     },
-    { stripeAccount: business.stripeAccountId }
+    connectOpts(business)
   );
 
   return NextResponse.json({ url: checkoutSession.url });

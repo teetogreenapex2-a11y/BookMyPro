@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { stripe } from "@/lib/stripe";
+import { stripe, chargesOnPlatform } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { sendRaffleMessage } from "@/lib/email";
 import { sendPushToMembership } from "@/lib/pushNotifications";
@@ -11,8 +11,8 @@ import { sendPushToMembership } from "@/lib/pushNotifications";
 const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const money = (c: number) => `$${(c / 100).toFixed(0)}`;
 
-function stripeOpts(b: { paymentProvider: string | null; stripeAccountId: string | null }) {
-  return b.paymentProvider === "stripe" && b.stripeAccountId ? { stripeAccount: b.stripeAccountId } : undefined;
+function stripeOpts(b: { slug: string; paymentProvider: string | null; stripeAccountId: string | null }) {
+  return b.paymentProvider === "stripe" && b.stripeAccountId && !chargesOnPlatform(b) ? { stripeAccount: b.stripeAccountId } : undefined;
 }
 function raffleUrl(slug: string, key: string) {
   const origin = process.env.NEXTAUTH_URL || "https://bookmypro.app";

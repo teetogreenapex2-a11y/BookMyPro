@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { stripe, getAccountStatus } from "@/lib/stripe";
+import { stripe, getAccountStatus, chargesOnPlatform, connectOpts } from "@/lib/stripe";
 import { createReviewSubmission, findSendableInstructor, reviewPriceFor } from "@/lib/personalSend";
 
 // POST /api/personal/send  { videoId, instructorMembershipId }
@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
   }
 
   const business = instructor.business;
-  if (business.paymentProvider !== "stripe" || !business.stripeAccountId) {
+  if (business.paymentProvider !== "stripe" || (!chargesOnPlatform(business) && !business.stripeAccountId)) {
     return NextResponse.json({ error: "This pro can't take card payments yet." }, { status: 400 });
   }
-  const acct = await getAccountStatus(business.stripeAccountId);
+  const acct = chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
   if (!acct.chargesEnabled) return NextResponse.json({ error: "This pro hasn't finished setting up payments yet." }, { status: 400 });
 
   const origin = process.env.NEXTAUTH_URL || "https://bookmypro.app";
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       success_url: `${origin}/personal?sent=1`,
       cancel_url: `${origin}/personal`,
     },
-    { stripeAccount: business.stripeAccountId }
+    connectOpts(business)
   );
   return NextResponse.json({ url: checkout.url });
 }

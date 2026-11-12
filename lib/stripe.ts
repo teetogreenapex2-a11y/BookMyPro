@@ -159,3 +159,21 @@ export async function createPlatformCheckoutSession(
 
   return session.url;
 }
+
+
+// Businesses listed in the PLATFORM_CHARGE_SLUGS environment variable (comma
+// separated, e.g. "tee-to-green-golf") take card payments directly on the
+// platform's own Stripe account instead of their connected account, so the
+// money lands in (and pays out from) the platform account. Remove the slug
+// from the variable to switch back.
+export function chargesOnPlatform(b: { slug: string }) {
+  return (process.env.PLATFORM_CHARGE_SLUGS || "")
+    .split(",").map((x) => x.trim().toLowerCase()).filter(Boolean)
+    .includes(b.slug.toLowerCase());
+}
+
+// The Stripe request option that routes a charge to the right account.
+export function connectOpts(b: { slug: string; stripeAccountId: string | null }) {
+  if (chargesOnPlatform(b)) return undefined;
+  return b.stripeAccountId ? { stripeAccount: b.stripeAccountId } : undefined;
+}

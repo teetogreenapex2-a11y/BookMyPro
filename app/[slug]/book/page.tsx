@@ -6,6 +6,7 @@ import { getBusinessBySlug, ensureMembership, getBasePaths } from "@/lib/tenant"
 import PhonePrompt from "@/app/components/PhonePrompt";
 import BookingClient from "./BookingClient";
 import { confirmCheckoutSession } from "@/lib/stripeEvents";
+import { chargesOnPlatform } from "@/lib/stripe";
 
 export default async function BookPage({ params, searchParams }: { params: { slug: string }; searchParams?: { session_id?: string; purchase?: string } }) {
   const session = await getServerSession(authOptions);
@@ -30,7 +31,7 @@ export default async function BookPage({ params, searchParams }: { params: { slu
   // Back from Stripe Checkout: confirm the payment with Stripe so the lesson/package
   // exists even if the webhook was late or didn't arrive.
   if (session && searchParams?.session_id) {
-    await confirmCheckoutSession(business.id, business.paymentProvider === "stripe" ? business.stripeAccountId : null, searchParams.session_id);
+    await confirmCheckoutSession(business.id, business.paymentProvider === "stripe" && !chargesOnPlatform(business) ? business.stripeAccountId : null, searchParams.session_id);
   }
 
   // What to tell a customer who just came back from paying.

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { stripe, getAccountStatus } from "@/lib/stripe";
+import { stripe, getAccountStatus, chargesOnPlatform, connectOpts } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug, getMembership } from "@/lib/tenant";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
@@ -43,10 +43,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
-  if (!business.stripeAccountId) {
+  if (!chargesOnPlatform(business) && !business.stripeAccountId) {
     return NextResponse.json({ error: "This business hasn't connected a payment account yet" }, { status: 400 });
   }
-  const acctStatus = await getAccountStatus(business.stripeAccountId);
+  const acctStatus = chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
   if (!acctStatus.chargesEnabled) {
     return NextResponse.json({ error: "This business's payment account isn't fully set up yet" }, { status: 400 });
   }
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       success_url: getBusinessAbsoluteUrl(req, business.slug, "/shop?purchase=success"),
       cancel_url: getBusinessAbsoluteUrl(req, business.slug, "/shop?purchase=cancelled"),
     },
-    { stripeAccount: business.stripeAccountId }
+    connectOpts(business)
   );
 
   await prisma.order.update({ where: { id: order.id }, data: { stripeSessionId: checkoutSession.id } });

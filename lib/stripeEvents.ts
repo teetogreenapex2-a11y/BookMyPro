@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { stripe } from "@/lib/stripe";
+import { stripe, chargesOnPlatform, connectOpts } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { findPackage, findFitting } from "@/lib/pricing";
 import { blockOverlappingSlots } from "@/lib/availabilityOverlap";
@@ -561,14 +561,14 @@ export async function processStripeEvent(event: Stripe.Event): Promise<NextRespo
           body: `${meta.contactName || "A player"} joined the group session`,
           url: businessDestination(business.slug, "/instructor"),
         });
-      } else if (business.stripeAccountId) {
+      } else if (business.stripeAccountId || chargesOnPlatform(business)) {
         // The session filled up between checkout starting and payment
         // landing - refund automatically rather than leaving a player
         // charged for a spot that no longer exists.
         try {
           await stripe.refunds.create(
             { payment_intent: session.payment_intent as string },
-            { stripeAccount: business.stripeAccountId }
+            connectOpts(business)
           );
         } catch (err) {
           console.error("Group session full - refund failed:", err);
