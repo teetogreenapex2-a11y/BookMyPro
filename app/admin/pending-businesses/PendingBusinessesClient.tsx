@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-type PendingBusiness = { id: string; slug: string; name: string; ownerName: string | null; ownerEmail: string | null };
+type PendingBusiness = { id: string; slug: string; name: string; ownerName: string | null; ownerEmail: string | null; requestedAt: string | null; accountCreatedAt: string | null };
+
+const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "unknown");
 
 export default function PendingBusinessesClient() {
   const [businesses, setBusinesses] = useState<PendingBusiness[]>([]);
@@ -53,6 +55,10 @@ export default function PendingBusinessesClient() {
                   <div style={{ fontSize: 12, color: "#8A8571" }}>{b.slug}</div>
                   <div style={{ fontSize: 12, color: "#5C6459", marginTop: 2 }}>
                     {b.ownerName || "(no name)"} &lt;{b.ownerEmail}&gt;
+                  </div>
+                  <div style={{ fontSize: 12, color: "#8A8571", marginTop: 2 }}>
+                    Requested {fmt(b.requestedAt)}
+                    {b.accountCreatedAt && b.accountCreatedAt.slice(0, 10) !== (b.requestedAt || "").slice(0, 10) ? ` · account made ${fmt(b.accountCreatedAt)}` : ""}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
