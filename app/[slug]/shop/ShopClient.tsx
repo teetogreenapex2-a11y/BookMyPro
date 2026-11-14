@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
+import { choosePayMethod, showVenmoInstructions } from "@/lib/payChoiceClient";
 import { Capacitor } from "@capacitor/core";
 
 type Variant = { id: string; label: string; stockQuantity: number };
@@ -98,6 +99,8 @@ export default function ShopClient({ slug, basePath, apiBase, businessName }: { 
       setOrderError("Enter a shipping name and address.");
       return;
     }
+    const payMethod = await choosePayMethod(slug);
+    if (!payMethod) return;
     setPlacingOrder(true);
     setOrderError(null);
     const res = await fetch(`${apiBase}/orders`, {
@@ -105,6 +108,7 @@ export default function ShopClient({ slug, basePath, apiBase, businessName }: { 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         items: cart.map((l) => ({ productId: l.productId, variantId: l.variantId, quantity: l.quantity })),
+        paymentMethod: payMethod,
         fulfillmentType, shippingName, shippingAddress, contactPhone, contactEmail,
         giftCardCode: giftCardBalance !== null ? giftCardCode : undefined,
       }),
@@ -112,6 +116,7 @@ export default function ShopClient({ slug, basePath, apiBase, businessName }: { 
     const data = await res.json();
     setPlacingOrder(false);
     if (!res.ok) { setOrderError(data.error || "Something went wrong."); return; }
+    if (data.venmo) { showVenmoInstructions(data.venmo, () => { window.location.href = `${basePath}/shop?purchase=venmo`; }); return; }
     if (data.checkoutUrl) window.location.href = data.checkoutUrl;
     else window.location.href = `${basePath}/shop?purchase=success`;
   }

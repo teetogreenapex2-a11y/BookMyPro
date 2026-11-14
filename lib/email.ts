@@ -502,3 +502,23 @@ export async function sendRaffleMessage(to: string, subject: string, heading: st
   </div>`;
   await sendEmail(to, subject, html);
 }
+
+// A customer chose Venmo: tell whoever gets paid to confirm once the money shows up.
+export async function sendVenmoToConfirmEmail(
+  to: string | null | undefined,
+  d: { businessName: string; what: string; amountCents: number; ref: string; customer: string; customerEmail?: string | null; url: string }
+) {
+  if (!to) return;
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">Confirm a Venmo payment</h2>
+      <p style="color: #5C6459; margin-top: 0;">${esc(d.businessName)}</p>
+      <p><strong>${esc(d.customer)}</strong> is paying <strong>$${(d.amountCents / 100).toFixed(2)}</strong> by Venmo for <strong>${esc(d.what)}</strong>.</p>
+      <p style="color: #5C6459;">Reference #${d.ref}${d.customerEmail ? " &middot; " + esc(d.customerEmail) : ""}</p>
+      <p>Check your Venmo. Once you see the payment, open Venmo payments and tap <strong>Confirm</strong>. Nothing is booked or sent to the customer until you do.</p>
+      <p><a href="${d.url}" style="display:inline-block;background:#1B3A2F;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">Open Venmo payments</a></p>
+    </div>
+  `;
+  await sendEmail(to, `Venmo payment to confirm: ${d.customer} ($${(d.amountCents / 100).toFixed(0)})`, html);
+}

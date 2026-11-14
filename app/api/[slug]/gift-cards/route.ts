@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { stripe, getAccountStatus, chargesOnPlatform, connectOpts } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
+import { checkoutOrVenmo } from "@/lib/venmoCheckout";
 import { getBusinessBySlug, getMembership } from "@/lib/tenant";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
 
@@ -41,23 +42,25 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
-  if (!chargesOnPlatform(business) && !business.stripeAccountId) {
+  const body = await req.json();
+  const isVenmo = body?.paymentMethod === "venmo";
+  if (!isVenmo && !chargesOnPlatform(business) && !business.stripeAccountId) {
     return NextResponse.json({ error: "This business hasn't connected a payment account yet" }, { status: 400 });
   }
-  const acctStatus = chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
+  const acctStatus = isVenmo || chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
   if (!acctStatus.chargesEnabled) {
     return NextResponse.json({ error: "This business's payment account isn't fully set up yet" }, { status: 400 });
   }
 
   const userId = (session.user as any).id;
-  const { amountCents, recipientName, recipientEmail, message } = await req.json();
+  const { amountCents, recipientName, recipientEmail, message } = body;
   const amount = Math.round(Number(amountCents));
 
   if (!Number.isFinite(amount) || amount < MIN_GIFT_CARD_CENTS || amount > MAX_GIFT_CARD_CENTS) {
     return NextResponse.json({ error: `Gift cards run from $${MIN_GIFT_CARD_CENTS / 100} to $${MAX_GIFT_CARD_CENTS / 100}` }, { status: 400 });
   }
 
-  const checkoutSession = await stripe.checkout.sessions.create(
+  const checkoutSession = await checkoutOrVenmo(
     {
       mode: "payment",
       payment_method_types: ["card", "klarna"],
@@ -84,8 +87,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       success_url: getBusinessAbsoluteUrl(req, business.slug, "/gift-cards?purchase=success"),
       cancel_url: getBusinessAbsoluteUrl(req, business.slug, "/gift-cards?purchase=cancelled"),
     },
-    connectOpts(business)
+    connectOpts(business),
+    { venmo: isVenmo, business, userId, userEmail: session.user?.email }
   );
+  if (checkoutSession.error) return NextResponse.json({ error: checkoutSession.error }, { status: 400 });
+  if (checkoutSession.venmo) return NextResponse.json({ venmo: checkoutSession.venmo });
 
   return NextResponse.json({ checkoutUrl: checkoutSession.url });
 }

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { stripe, getAccountStatus, chargesOnPlatform, connectOpts } from "@/lib/stripe";
 import { createSquarePaymentLink } from "@/lib/square";
 import { prisma } from "@/lib/prisma";
+import { checkoutOrVenmo } from "@/lib/venmoCheckout";
 import { getBusinessBySlug, getInstructorById } from "@/lib/tenant";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
 import { findPackage, getPackagePriceCents, isPackageEnabled, isPackagePriceSet } from "@/lib/pricing";
@@ -27,7 +28,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "This business doesn't offer a deposit option" }, { status: 400 });
   }
 
-  const { packageType, availabilityId, instructorMembershipId, contactName, contactPhone, contactEmail, isRemote: submittedIsRemote } = await req.json();
+  const { packageType, availabilityId, instructorMembershipId, contactName, contactPhone, contactEmail, isRemote: submittedIsRemote, paymentMethod } = await req.json();
+  const isVenmo = paymentMethod === "venmo";
   if (!contactName?.trim() || !contactPhone?.trim() || !contactEmail?.trim()) {
     return NextResponse.json({ error: "Name, phone, and email are all required" }, { status: 400 });
   }
@@ -70,7 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const depositCents = Math.floor(fullPriceCents / 2);
   const userId = (session.user as any).id;
 
-  if (business.paymentProvider === "square") {
+  if (business.paymentProvider === "square" && !isVenmo) {
     if (!business.squareAccessToken) {
       return NextResponse.json({ error: "This business hasn't set up payments yet" }, { status: 400 });
     }
@@ -106,15 +108,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
   }
 
-  if (!chargesOnPlatform(business) && !business.stripeAccountId) {
+  if (!isVenmo && !chargesOnPlatform(business) && !business.stripeAccountId) {
     return NextResponse.json({ error: "This business hasn't set up payments yet" }, { status: 400 });
   }
-  const acctStatus = chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
+  const acctStatus = isVenmo || chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
   if (!acctStatus.chargesEnabled) {
     return NextResponse.json({ error: "This business hasn't finished setting up payments yet" }, { status: 400 });
   }
 
-  const checkoutSession = await stripe.checkout.sessions.create(
+  const checkoutSession = await checkoutOrVenmo(
     {
       mode: "payment",
       payment_method_types: ["card", "klarna"],
@@ -145,8 +147,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       success_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=success&session_id={CHECKOUT_SESSION_ID}"),
       cancel_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=cancelled"),
     },
-    connectOpts(business)
+    connectOpts(business),
+    { venmo: isVenmo, business, userId, userEmail: session.user?.email, instructorMembershipId: instructorMembershipId }
   );
+  if (checkoutSession.error) return NextResponse.json({ error: checkoutSession.error }, { status: 400 });
+  if (checkoutSession.venmo) return NextResponse.json({ venmo: checkoutSession.venmo });
 
   return NextResponse.json({ url: checkoutSession.url });
 }

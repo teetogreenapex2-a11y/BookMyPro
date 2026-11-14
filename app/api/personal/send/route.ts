@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { checkoutOrVenmo } from "@/lib/venmoCheckout";
 import { stripe, getAccountStatus, chargesOnPlatform, connectOpts } from "@/lib/stripe";
 import { createReviewSubmission, findSendableInstructor, reviewPriceFor } from "@/lib/personalSend";
 
@@ -38,14 +39,15 @@ export async function POST(req: NextRequest) {
   }
 
   const business = instructor.business;
-  if (business.paymentProvider !== "stripe" || (!chargesOnPlatform(business) && !business.stripeAccountId)) {
+  const isVenmo = body.paymentMethod === "venmo";
+  if (!isVenmo && (business.paymentProvider !== "stripe" || (!chargesOnPlatform(business) && !business.stripeAccountId))) {
     return NextResponse.json({ error: "This pro can't take card payments yet." }, { status: 400 });
   }
-  const acct = chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
+  const acct = isVenmo || chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
   if (!acct.chargesEnabled) return NextResponse.json({ error: "This pro hasn't finished setting up payments yet." }, { status: 400 });
 
   const origin = process.env.NEXTAUTH_URL || "https://bookmypro.app";
-  const checkout = await stripe.checkout.sessions.create(
+  const checkout = await checkoutOrVenmo(
     {
       mode: "payment",
       customer_email: session.user?.email || undefined,
@@ -61,7 +63,10 @@ export async function POST(req: NextRequest) {
       success_url: `${origin}/personal?sent=1`,
       cancel_url: `${origin}/personal`,
     },
-    connectOpts(business)
+    connectOpts(business),
+    { venmo: isVenmo, business, userId, userEmail: session.user?.email, instructorMembershipId }
   );
+  if (checkout.error) return NextResponse.json({ error: checkout.error }, { status: 400 });
+  if (checkout.venmo) return NextResponse.json({ venmo: checkout.venmo });
   return NextResponse.json({ url: checkout.url });
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { choosePayMethod, showVenmoInstructions } from "@/lib/payChoiceClient";
 import { Capacitor } from "@capacitor/core";
 
 type OwnGiftCard = { id: string; code: string; initialValueCents: number; remainingValueCents: number; status: string; recipientName: string | null };
@@ -67,16 +68,19 @@ export default function GiftCardsClient({ slug, basePath, apiBase, businessName,
   }, [apiBase]);
 
   async function purchase() {
+    const payMethod = await choosePayMethod(slug);
+    if (!payMethod) return;
     setPurchasing(true);
     setError(null);
     const res = await fetch(`${apiBase}/gift-cards`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amountCents, recipientName, recipientEmail, message }),
+      body: JSON.stringify({ amountCents, recipientName, recipientEmail, message, paymentMethod: payMethod }),
     });
     const data = await res.json();
     setPurchasing(false);
     if (!res.ok) { setError(data.error || "Something went wrong."); return; }
+    if (data.venmo) { showVenmoInstructions(data.venmo, () => { window.location.href = `${basePath}/gift-cards?purchase=venmo`; }); return; }
     window.location.href = data.checkoutUrl;
   }
 

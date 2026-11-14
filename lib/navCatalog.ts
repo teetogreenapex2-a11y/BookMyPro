@@ -28,6 +28,7 @@ const OWNER_ALL: NavItem[] = [
   ...STAFF_ALL.slice(0, 8),
   I("reports", "Reports", "reports", "/reports"),
   I("raffle", "Raffle", "gift", "/raffle"),
+  I("venmo", "Venmo payments", "reports", "/venmo"),
   STAFF_ALL[8],
 ];
 

@@ -7,6 +7,13 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    id: "2026-11-13-venmo",
+    date: "Nov 13, 2026",
+    title: "Pay with Venmo",
+    text: "You can now pay by Venmo for lessons, packages, group classes, fittings, gift cards, shop orders and video reviews. Pick Pay with Venmo, send the payment, and your pro confirms it - then you get your receipt. Pros: new Venmo payments to confirm show up under More > Venmo payments.",
+    audience: "all",
+  },
+  {
     id: "2026-11-11-email",
     date: "Nov 11, 2026",
     title: "Email one customer, and nicer emails",

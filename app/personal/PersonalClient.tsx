@@ -4,10 +4,16 @@ import { downloadVideo } from "@/lib/downloadVideo";
 import ZoomFrame from "@/app/components/ZoomFrame";
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
+import { choosePayMethod, showVenmoInstructions } from "@/lib/payChoiceClient";
 import { Capacitor } from "@capacitor/core";
 import { upload } from "@vercel/blob/client";
+import { analyzeSwingTempo } from "@/lib/swingTempo";
 
-type Vid = { id: string; videoUrl: string; title: string | null; note: string | null; createdAt: string; reviews?: Review[] };
+const CLUBS = ["Driver", "3 Wood", "5 Wood", "Hybrid", "3 Iron", "4 Iron", "5 Iron", "6 Iron", "7 Iron", "8 Iron", "9 Iron", "Pitching Wedge", "Gap Wedge", "Sand Wedge", "Lob Wedge", "Putter"];
+const TARGET_TEMPO = 3.0;
+
+type KeyFrames = { address: number; top: number; impact: number; finish: number };
+type Vid = { id: string; videoUrl: string; title: string | null; note: string | null; club: string | null; tempoRatio: number | null; backswingMs: number | null; downswingMs: number | null; keyFrames: KeyFrames | null; analyzedAt: string | null; createdAt: string; reviews?: Review[] };
 type Review = { id: string; proName: string; businessName: string; status: string; comments: { id: string; timestampSeconds: number; text: string }[] };
 type Pro = { slug: string; name: string; city: string | null; state: string | null; distanceMiles: number | null; instructors: { id: string; name: string; specialty: string | null; priceCents: number; covered?: boolean }[] };
 
@@ -40,6 +46,11 @@ export default function PersonalClient() {
   const [busy, setBusy] = useState(false);
   const [isNative, setIsNative] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [club, setClub] = useState("");
+  const [clubFilter, setClubFilter] = useState("");
+  const [analyzing, setAnalyzing] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [analysisErr, setAnalysisErr] = useState<Record<string, string>>({});
   const [sendFor, setSendFor] = useState<string | null>(null);
   const [pros, setPros] = useState<Pro[] | null>(null);
   const [proQuery, setProQuery] = useState("");
@@ -68,6 +79,13 @@ export default function PersonalClient() {
     } catch { return 0; } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  // Analyze a video automatically the first time it's opened.
+  useEffect(() => {
+    const v = videos.find((x) => x.id === openId);
+    if (v && !v.analyzedAt && !analysisErr[v.id] && !analyzing) runAnalysis(v);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId, videos.length]);
 
   const canUpload = canUploadSrv;
   const daysLeft = trialEndsAt ? Math.max(1, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : 0;
@@ -111,9 +129,9 @@ export default function PersonalClient() {
       await upload(file.name, file, {
         access: "public",
         handleUploadUrl: "/api/personal/videos/upload-token",
-        clientPayload: JSON.stringify({ title: title.trim() || undefined, note: note.trim() || undefined }),
+        clientPayload: JSON.stringify({ title: title.trim() || undefined, note: note.trim() || undefined, club: club || undefined }),
       });
-      setTitle(""); setNote(""); setFile(null);
+      setTitle(""); setNote(""); setFile(null); setClub("");
       // The DB row is created by a background callback - retry a few times.
       for (let i = 0; i < 5; i++) {
         const n = await load();
@@ -123,6 +141,33 @@ export default function PersonalClient() {
     } catch (err: any) {
       setError(err?.message || "Something went wrong uploading that.");
     } finally { setUploading(false); }
+  }
+
+  async function setVideoClub(id: string, value: string) {
+    setVideos((cur) => cur.map((v) => (v.id === id ? { ...v, club: value || null } : v)));
+    await fetch(`/api/personal/videos/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ club: value }) });
+  }
+
+  // Runs the swing analysis the first time a video is opened.
+  async function runAnalysis(v: Vid) {
+    if (analyzing) return;
+    setAnalyzing(v.id); setProgress(0);
+    setAnalysisErr((e) => { const n = { ...e }; delete n[v.id]; return n; });
+    const out = await analyzeSwingTempo(v.videoUrl, setProgress);
+    if (out.ok) {
+      await fetch(`/api/personal/videos/${v.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ analysis: out.result }) });
+      await load();
+    } else {
+      setAnalysisErr((e) => ({ ...e, [v.id]: (out as { ok: false; error: string }).error }));
+    }
+    setAnalyzing(null);
+  }
+
+  function jumpTo(id: string, t: number) {
+    const el = videoRefs.current[id];
+    if (!el) return;
+    el.pause();
+    el.currentTime = t;
   }
 
   async function findPros(params: string) {
@@ -143,13 +188,16 @@ export default function PersonalClient() {
       { timeout: 10000 }
     );
   }
-  async function sendTo(videoId: string, instructorMembershipId: string) {
+  async function sendTo(videoId: string, instructorMembershipId: string, proSlug?: string, paid?: boolean) {
     setSendMsg(null);
+    let payMethod: "card" | "venmo" | null = "card";
+    if (paid && proSlug) { payMethod = await choosePayMethod(proSlug, instructorMembershipId); if (!payMethod) return; }
     const r = await fetch("/api/personal/send", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ videoId, instructorMembershipId }),
+      body: JSON.stringify({ videoId, instructorMembershipId, paymentMethod: payMethod }),
     });
     const d = await r.json();
+    if (r.ok && d.venmo) { showVenmoInstructions(d.venmo, () => setSendMsg("Waiting for your pro to confirm your Venmo payment - your video is sent once they do.")); return; }
     if (r.ok && d.url) { window.location.href = d.url; return; }
     if (r.ok) { setSendMsg(`Sent to ${d.businessName}!`); load(); }
     else setSendMsg(d.error || "Couldn't send that.");
@@ -240,6 +288,10 @@ export default function PersonalClient() {
                     {recording ? "Opening camera..." : "🎥 Record a video"}
                   </button>
                 )}
+                <select value={club} onChange={(e) => setClub(e.target.value)} style={input}>
+                  <option value="">Club (optional)</option>
+                  {CLUBS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
                 <input type="file" accept="video/mp4,video/quicktime,video/webm,video/x-m4v" onChange={(e) => setFile(e.target.files?.[0] || null)} style={{ width: "100%", fontSize: 13, marginBottom: 6 }} />
                 {file && <p style={{ fontSize: 12, color: "var(--fairway)", fontWeight: 600, margin: "0 0 10px" }}>Ready to upload: {file.name}</p>}
                 {error && <p style={{ fontSize: 12, color: "#B23A3A", margin: "0 0 10px" }}>{error}</p>}
@@ -251,22 +303,92 @@ export default function PersonalClient() {
               </div>
             )}
 
+            {(() => {
+              const usedClubs = CLUBS.filter((c) => videos.some((v) => v.club === c));
+              const scoped = videos.filter((v) => !clubFilter || v.club === clubFilter);
+              const pts = scoped.filter((v) => v.tempoRatio != null).slice(0, 20).reverse();
+              const avg = (arr: Vid[]) => arr.reduce((a, v) => a + (v.tempoRatio || 0), 0) / arr.length;
+              const recent = pts.slice(-5), earlier = pts.slice(-10, -5);
+              return (
+                <>
+                  {usedClubs.length > 0 && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                      {["", ...usedClubs].map((c) => (
+                        <button key={c || "all"} onClick={() => setClubFilter(c)} style={{
+                          fontSize: 12, fontWeight: 700, borderRadius: 999, padding: "6px 12px", cursor: "pointer",
+                          border: clubFilter === c ? "1px solid var(--fairway)" : "1px solid var(--border)",
+                          background: clubFilter === c ? "var(--fairway)" : "var(--card)",
+                          color: clubFilter === c ? "var(--chalk)" : "var(--fairway)",
+                        }}>{c || "All clubs"}</button>
+                      ))}
+                    </div>
+                  )}
+                  {pts.length >= 2 && (
+                    <div style={card}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>Tempo trend{clubFilter ? ` - ${clubFilter}` : ""}</div>
+                      <div style={{ fontSize: 12, color: "var(--faint)", margin: "2px 0 8px" }}>
+                        Backswing-to-downswing ratio. Tour players are near {TARGET_TEMPO.toFixed(1)} : 1.
+                        {earlier.length > 0 && recent.length > 0 ? ` Recent average ${avg(recent).toFixed(1)} : 1, before that ${avg(earlier).toFixed(1)} : 1.` : ` Average ${avg(pts).toFixed(1)} : 1.`}
+                      </div>
+                      <svg viewBox="0 0 300 90" style={{ width: "100%", height: 90 }}>
+                        <line x1="0" x2="300" y1={80 - ((TARGET_TEMPO - 1.5) / 3) * 70} y2={80 - ((TARGET_TEMPO - 1.5) / 3) * 70} stroke="#B8862B" strokeDasharray="4 4" strokeWidth="1" />
+                        <polyline fill="none" stroke="#1B3A2F" strokeWidth="2" points={pts.map((v, i) => `${(i / Math.max(1, pts.length - 1)) * 290 + 5},${80 - (Math.max(1.5, Math.min(4.5, v.tempoRatio!)) - 1.5) / 3 * 70}`).join(" ")} />
+                        {pts.map((v, i) => (
+                          <circle key={v.id} cx={(i / Math.max(1, pts.length - 1)) * 290 + 5} cy={80 - (Math.max(1.5, Math.min(4.5, v.tempoRatio!)) - 1.5) / 3 * 70} r="3.5" fill="#1B3A2F" />
+                        ))}
+                      </svg>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
             <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 8, letterSpacing: "0.04em" }}>YOUR VIDEOS</div>
             {videos.length === 0 ? (
               <p style={{ fontSize: 13, color: "var(--faint)" }}>Nothing saved yet.</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {videos.map((s) => (
+                {videos.filter((v) => !clubFilter || v.club === clubFilter).map((s) => (
                   <div key={s.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
                     <div style={{ cursor: "pointer" }} onClick={() => setOpenId(openId === s.id ? null : s.id)}>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{s.title || "Untitled video"}</div>
-                      <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{new Date(s.createdAt).toLocaleDateString()}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{s.title || "Untitled video"}{s.club ? <span style={{ fontWeight: 600, color: "var(--fairway)" }}> · {s.club}</span> : null}</div>
+                      <div className="mono" style={{ fontSize: 11, color: "var(--faint)" }}>{new Date(s.createdAt).toLocaleDateString()}{s.tempoRatio != null ? ` · tempo ${s.tempoRatio.toFixed(1)} : 1` : ""}</div>
                     </div>
                     {openId === s.id && (
                       <div style={{ marginTop: 12 }}>
                         <ZoomFrame getVideo={() => videoRefs.current[s.id] || null}>
                           <video ref={(el) => { videoRefs.current[s.id] = el; }} src={s.videoUrl} controls playsInline style={{ width: "100%", borderRadius: 8, background: "#000", display: "block" }} />
                         </ZoomFrame>
+                        <div style={{ marginTop: 10 }}>
+                          {analyzing === s.id ? (
+                            <div style={{ fontSize: 12.5, color: "var(--fairway)", fontWeight: 600 }}>Analyzing your swing... {progress}%</div>
+                          ) : s.tempoRatio != null && s.keyFrames ? (
+                            <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10 }}>
+                              <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 22, fontWeight: 800, color: "var(--fairway)" }}>{s.tempoRatio.toFixed(1)} : 1</span>
+                                <span style={{ fontSize: 12, color: "var(--faint)" }}>tempo (tour pros are about {TARGET_TEMPO.toFixed(1)} : 1)</span>
+                              </div>
+                              <div style={{ fontSize: 12, color: "var(--faint)", margin: "2px 0 8px" }}>
+                                {Math.abs(s.tempoRatio - TARGET_TEMPO) <= 0.3 ? "Right in the tour-pro zone." : s.tempoRatio > TARGET_TEMPO ? "Your backswing is long compared to your downswing." : "Your downswing is slow compared to your backswing."}
+                              </div>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                {(["address", "top", "impact", "finish"] as const).map((k) => (
+                                  <button key={k} onClick={() => jumpTo(s.id, s.keyFrames![k])} style={{ flex: 1, fontSize: 12, fontWeight: 700, textTransform: "capitalize", borderRadius: 8, padding: "8px 4px", cursor: "pointer", border: "1px solid var(--border)", background: "var(--card)", color: "var(--fairway)" }}>{k}</button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : analysisErr[s.id] ? (
+                            <div style={{ fontSize: 12.5, color: "#B23A3A" }}>
+                              {analysisErr[s.id]}{" "}
+                              <button onClick={() => runAnalysis(s)} style={{ background: "none", border: "none", color: "var(--fairway)", fontWeight: 700, cursor: "pointer", padding: 0 }}>Try again</button>
+                            </div>
+                          ) : null}
+                        </div>
+                        <div style={{ marginTop: 10 }}>
+                          <select value={s.club || ""} onChange={(e) => setVideoClub(s.id, e.target.value)} style={{ ...input, marginBottom: 0 }}>
+                            <option value="">Club (optional)</option>
+                            {CLUBS.map((c) => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
                         <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
                           <button onClick={() => stepFrame(s.id, -1)} style={ghost}>{"<"} Frame</button>
                           <button onClick={() => stepFrame(s.id, 1)} style={ghost}>Frame {">"}</button>
@@ -306,7 +428,7 @@ export default function PersonalClient() {
                                 {b.instructors.map((i) => (
                                   <div key={i.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 6 }}>
                                     <div style={{ fontSize: 12.5 }}>{i.name}{i.specialty ? <span style={{ color: "var(--faint)" }}> - {i.specialty}</span> : null}</div>
-                                    <button onClick={() => sendTo(s.id, i.id)} style={{ ...btn, padding: "6px 12px", fontSize: 12 }}>{i.covered ? "Send (included)" : i.priceCents > 0 ? `Pay $${(i.priceCents / 100).toFixed(i.priceCents % 100 ? 2 : 0)} & send` : "Send free"}</button>
+                                    <button onClick={() => sendTo(s.id, i.id, b.slug, !i.covered && i.priceCents > 0)} style={{ ...btn, padding: "6px 12px", fontSize: 12 }}>{i.covered ? "Send (included)" : i.priceCents > 0 ? `Pay $${(i.priceCents / 100).toFixed(i.priceCents % 100 ? 2 : 0)} & send` : "Send free"}</button>
                                   </div>
                                 ))}
                               </div>

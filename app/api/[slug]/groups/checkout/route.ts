@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { stripe, getAccountStatus, chargesOnPlatform, connectOpts } from "@/lib/stripe";
 import { createSquarePaymentLink } from "@/lib/square";
 import { prisma } from "@/lib/prisma";
+import { checkoutOrVenmo } from "@/lib/venmoCheckout";
 import { getBusinessBySlug } from "@/lib/tenant";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
 
@@ -60,7 +61,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
-  const { availabilityId, contactName, contactPhone, contactEmail } = await req.json();
+  const { availabilityId, contactName, contactPhone, contactEmail, paymentMethod } = await req.json();
+  const isVenmo = paymentMethod === "venmo";
   if (!availabilityId) return NextResponse.json({ error: "Pick a session first" }, { status: 400 });
 
   const slot = await prisma.availability.findFirst({
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const userId = (session.user as any).id;
   const label = `Group lesson with ${slot.instructor.user.name || "your pro"}`;
 
-  if (business.paymentProvider === "square") {
+  if (business.paymentProvider === "square" && !isVenmo) {
     if (!business.squareAccessToken) {
       return NextResponse.json({ error: "This business hasn't set up payments yet" }, { status: 400 });
     }
@@ -110,15 +112,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   // Default: Stripe.
-  if (!chargesOnPlatform(business) && !business.stripeAccountId) {
+  if (!isVenmo && !chargesOnPlatform(business) && !business.stripeAccountId) {
     return NextResponse.json({ error: "This business hasn't set up payments yet" }, { status: 400 });
   }
-  const acctStatus = chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
+  const acctStatus = isVenmo || chargesOnPlatform(business) ? { chargesEnabled: true } : await getAccountStatus(business.stripeAccountId!);
   if (!acctStatus.chargesEnabled) {
     return NextResponse.json({ error: "This business hasn't finished setting up payments yet" }, { status: 400 });
   }
 
-  const checkoutSession = await stripe.checkout.sessions.create(
+  const checkoutSession = await checkoutOrVenmo(
     {
       mode: "payment",
       payment_method_types: ["card", "klarna"],
@@ -146,8 +148,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       success_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=success&session_id={CHECKOUT_SESSION_ID}"),
       cancel_url: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=cancelled"),
     },
-    connectOpts(business)
+    connectOpts(business),
+    { venmo: isVenmo, business, userId, userEmail: session.user?.email, instructorMembershipId: undefined }
   );
+  if (checkoutSession.error) return NextResponse.json({ error: checkoutSession.error }, { status: 400 });
+  if (checkoutSession.venmo) return NextResponse.json({ venmo: checkoutSession.venmo });
 
   return NextResponse.json({ url: checkoutSession.url });
 }

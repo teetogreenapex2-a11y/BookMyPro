@@ -561,6 +561,10 @@ export async function processStripeEvent(event: Stripe.Event): Promise<NextRespo
           body: `${meta.contactName || "A player"} joined the group session`,
           url: businessDestination(business.slug, "/instructor"),
         });
+      } else if (session.id.startsWith("venmo_")) {
+        // Paid by Venmo and the session filled up meanwhile: no card to refund -
+        // tell the owner so they can send the money back by hand.
+        console.error(`Venmo group payment ${session.id} arrived after the session filled - refund by hand.`);
       } else if (business.stripeAccountId || chargesOnPlatform(business)) {
         // The session filled up between checkout starting and payment
         // landing - refund automatically rather than leaving a player
@@ -600,6 +604,10 @@ export async function processStripeEvent(event: Stripe.Event): Promise<NextRespo
     }
 
     if (meta.kind === "gift_card") {
+      // Webhook and return-check can both land here: only ever issue one card per payment.
+      if (await prisma.giftCard.findFirst({ where: { stripeSessionId: session.id }, select: { id: true } })) {
+        return NextResponse.json({ received: true });
+      }
       const { generateGiftCardCode } = await import("@/lib/giftCards");
       const code = await generateGiftCardCode();
       const amountCents = Number(meta.amountCents) || session.amount_total || 0;

@@ -1,4 +1,5 @@
 "use client";
+import { choosePayMethod, showVenmoInstructions } from "@/lib/payChoiceClient";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -490,11 +491,14 @@ export default function BookingClient({
     if (!requireSignIn()) return;
     if (!selected || !pendingPackageType || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
+    const payMethod = await choosePayMethod(slug, selectedInstructorId);
+    if (!payMethod) return;
     setConfirming(true);
     const res = await fetch(`${apiBase}/packages/deposit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        paymentMethod: payMethod,
         packageType: pendingPackageType,
         instructorMembershipId: selectedInstructorId,
         availabilityId: selected.id,
@@ -506,6 +510,7 @@ export default function BookingClient({
     });
     setConfirming(false);
     const data = await res.json();
+    if (data.venmo) { showVenmoInstructions(data.venmo, () => { window.location.href = `${basePath}/book?purchase=venmo`; }); return; }
     if (data.url) window.location.href = data.url;
     else setMessage(data.error || "Something went wrong.");
   }
@@ -633,11 +638,14 @@ export default function BookingClient({
     if (!selected || !selectedInstructorId || !contactValid()) return;
     if (!pendingPackageType && !pendingDurationId && !pendingCustomOfferingSlot) return;
     saveProfileFieldsIfProvided();
+    const payMethod = await choosePayMethod(slug, selectedInstructorId);
+    if (!payMethod) return;
     setConfirming(true);
     const res = await fetch(`${apiBase}/packages/checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        paymentMethod: payMethod,
         ...(pendingCustomOfferingSlot
           ? { customOfferingSlot: pendingCustomOfferingSlot }
           : pendingDurationId
@@ -653,6 +661,7 @@ export default function BookingClient({
     });
     setConfirming(false);
     const data = await res.json();
+    if (data.venmo) { showVenmoInstructions(data.venmo, () => { window.location.href = `${basePath}/book?purchase=venmo`; }); return; }
     if (data.url) window.location.href = data.url;
     else setMessage(data.error || "Something went wrong.");
   }
@@ -661,11 +670,14 @@ export default function BookingClient({
     if (!requireSignIn()) return;
     if (!selected || !contactValid()) return;
     saveProfileFieldsIfProvided();
+    const payMethod = await choosePayMethod(slug, null);
+    if (!payMethod) return;
     setConfirming(true);
     const res = await fetch(`${apiBase}/groups/checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        paymentMethod: payMethod,
         availabilityId: selected.id,
         contactName: contact.name,
         contactPhone: contact.phone,
@@ -674,6 +686,7 @@ export default function BookingClient({
     });
     setConfirming(false);
     const data = await res.json();
+    if (data.venmo) { showVenmoInstructions(data.venmo, () => { window.location.href = `${basePath}/book?purchase=venmo`; }); return; }
     if (data.url) window.location.href = data.url;
     else setMessage(data.error || "Something went wrong.");
   }
@@ -682,11 +695,14 @@ export default function BookingClient({
     if (!requireSignIn()) return;
     if (!selected || !fittingType || !selectedInstructorId || !contactValid()) return;
     saveProfileFieldsIfProvided();
+    const payMethod = await choosePayMethod(slug, selectedInstructorId);
+    if (!payMethod) return;
     setConfirming(true);
     const res = await fetch(`${apiBase}/fittings/checkout`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        paymentMethod: payMethod,
         availabilityId: selected.id,
         fittingType,
         instructorMembershipId: selectedInstructorId,
@@ -697,6 +713,7 @@ export default function BookingClient({
     });
     setConfirming(false);
     const data = await res.json();
+    if (data.venmo) { showVenmoInstructions(data.venmo, () => { window.location.href = `${basePath}/book?purchase=venmo`; }); return; }
     if (data.url) window.location.href = data.url;
     else setMessage(data.error || "Something went wrong.");
   }

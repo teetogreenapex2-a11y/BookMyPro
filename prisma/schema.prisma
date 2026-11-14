@@ -145,6 +145,7 @@ model Business {
   products     Product[]
   orders       Order[]
   giftCards    GiftCard[]
+  venmoPayments VenmoPayment[]
   // Daily.co API key for remote/video-call lessons — same "bring your own
   // account" pattern as Stripe Connect, Square, and Google/Outlook
   // Calendar. Never sent to the client; only used server-side to create
@@ -1114,4 +1115,28 @@ model PersonalVideo {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+
+// A purchase the customer is paying for by Venmo. Venmo can't tell us when
+// money arrives, so it waits here as "pending" until the owner (or the
+// instructor being paid) taps Confirm - then the normal fulfilment runs
+// exactly as if Stripe had reported the payment.
+model VenmoPayment {
+  id                String    @id @default(cuid())
+  business          Business  @relation(fields: [businessId], references: [id])
+  businessId        String
+  userId            String?
+  payeeMembershipId String?
+  kind              String
+  description       String
+  amountCents       Int
+  metadata          Json
+  customerName      String?
+  customerEmail     String?
+  status            String    @default("pending") // pending | confirmed | cancelled
+  createdAt         DateTime  @default(now())
+  confirmedAt       DateTime?
+
+  @@index([businessId, status])
 }
