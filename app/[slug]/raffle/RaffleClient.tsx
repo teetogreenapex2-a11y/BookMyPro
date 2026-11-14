@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 
 type Tier = { label: string; count: number; prize: string; rest?: boolean };
 type Board = { title: string; spaceCount: number; maxPerPerson: number; status: string; drawnAt: string | null; giftCardCents: number; priceCents: number; pledgeMode?: boolean; giftCardsIssuedAt: string | null; tiers: Tier[] };
@@ -9,6 +10,9 @@ type VenmoInfo = { url: string; handle: string; amountCents: number; note: strin
 type Space = { number: number; name: string; held?: boolean; pledged?: boolean; winnerTier: number | null; email?: string; phone?: string | null };
 
 export default function RaffleClient({ apiBase, businessName, isOwner, boardKey = "main" }: { apiBase: string; businessName: string; isOwner: boolean; boardKey?: string }) {
+  // The native iOS tab bar floats over the page, so lift the pick bar and leave room at the bottom.
+  const [native, setNative] = useState(false);
+  useEffect(() => { setNative(Capacitor.isNativePlatform()); }, []);
   const [board, setBoard] = useState<Board | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [owner, setOwner] = useState(isOwner);
@@ -119,7 +123,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
   const restIndex = board ? board.tiers.findIndex((t) => t.rest) : -1;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--chalk)", paddingBottom: "calc(120px + env(safe-area-inset-bottom, 0px))" }}>
+    <div style={{ minHeight: "100vh", background: "var(--chalk)", paddingBottom: `calc(${native ? 220 : 120}px + env(safe-area-inset-bottom, 0px))` }}>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 760, margin: "0 auto" }}>
           {owner && raffleBase && (
@@ -295,7 +299,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
       </main>
 
       {picked.length > 0 && !formOpen && board && (
-        <div style={{ position: "fixed", left: 12, right: 12, bottom: "calc(12px + env(safe-area-inset-bottom, 0px))", zIndex: 10000, background: "var(--fairway)", color: "var(--chalk)", borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, boxShadow: "0 6px 24px rgba(0,0,0,0.25)", maxWidth: 520, margin: "0 auto" }}>
+        <div style={{ position: "fixed", left: 12, right: 12, bottom: `calc(${native ? 100 : 12}px + env(safe-area-inset-bottom, 0px))`, zIndex: 10000, background: "var(--fairway)", color: "var(--chalk)", borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, boxShadow: "0 6px 24px rgba(0,0,0,0.25)", maxWidth: 520, margin: "0 auto" }}>
           <div style={{ fontSize: 13.5, fontWeight: 700 }}>
             {picked.length} space{picked.length === 1 ? "" : "s"} selected{!owner && board.priceCents > 0 ? ` · ${dollars(board.priceCents * picked.length)}` : ""}
           </div>
