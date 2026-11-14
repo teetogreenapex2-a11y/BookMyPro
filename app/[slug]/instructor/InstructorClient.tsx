@@ -947,6 +947,18 @@ export default function InstructorClient({
               }}>
                 Reports
               </a>
+              <a href={`${basePath}/raffle`} style={{
+                fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+              }}>
+                Raffle
+              </a>
+              <a href={`${basePath}/venmo`} style={{
+                fontSize: 12.5, fontWeight: 600, color: "#D7DED9", textDecoration: "none",
+                border: "1px solid rgba(255,255,255,0.22)", borderRadius: 999, padding: "5px 13px",
+              }}>
+                Venmo payments
+              </a>
                 </>
               )}
               {!isNative && !hasMoreBar && !isSandboxPreview && (
