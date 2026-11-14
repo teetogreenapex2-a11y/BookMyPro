@@ -492,7 +492,7 @@ function drawAnatomicalBones(
     if (ok(12)) {
       withAlpha([12], () => {
         const nose = P[12];
-        const r = headRadius ?? u * 0.3;
+        const r = Math.max(headRadius ?? u * 0.3, L * 0.2); // torso-based floor: shoulders turn edge-on at the finish and shrink the head
         const down0 = unit(sub(S, nose));
         const zS = (Zv(0) + Zv(1)) / 2;
         const noseDepth = Zv(12) - zS; // negative = nose is in front of the shoulders (toward camera)
@@ -511,7 +511,13 @@ function drawAnatomicalBones(
         const eyeSpread = Math.sqrt(Math.max(0, 1 - tx * tx));
         // The nose is at the front of the face, so the skull sits back behind it - and the
         // neck is drawn to that skull position so head and spine stay joined.
-        const headC = add(nose, mul(lx0, -tx * r * 0.45));
+        const headC0 = add(nose, mul(lx0, -tx * r * 0.45));
+        // Keep the skull a believable neck-length from the shoulders - a bad nose reading
+        // (hat, head turned at the finish) can't fling it off the spine.
+        const hv = sub(headC0, S);
+        const hd = len(hv);
+        const hdc = clamp(hd, r * 1.5, r * 3.2);
+        const headC = hd > 0.001 ? add(S, mul(hv, hdc / hd)) : headC0;
         const down = unit(sub(S, headC));
         const A = Math.atan2(down.y, down.x) - Math.PI / 2;
         const base = add(headC, mul(down, r * 0.9));
