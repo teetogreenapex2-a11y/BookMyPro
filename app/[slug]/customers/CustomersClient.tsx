@@ -423,6 +423,26 @@ export default function CustomersClient({
     setUpgrading(null);
   }
 
+  // Everyone on the Customers page (signups, imports, hand-added) in one file; the
+  // columns are the names Wix and most contact tools expect.
+  function exportAllCsv() {
+    const cell = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = customers.map((c) => {
+      const parts = (c.name || "").trim().split(/\s+/);
+      const first = parts[0] || "";
+      const last = parts.slice(1).join(" ");
+      return [first, last, c.email, c.phone, c.source].map(cell).join(",");
+    });
+    const csv = ["First Name,Last Name,Email,Phone,Source", ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `all-customers-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let rows = customers.filter(
@@ -577,6 +597,17 @@ export default function CustomersClient({
               >
                 Merge duplicates
               </a>
+            )}
+            {isOwner && (
+              <button
+                onClick={exportAllCsv}
+                style={{
+                  background: "#FFF", color: "var(--fairway)", border: "1px solid var(--fairway)", borderRadius: 8,
+                  padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                }}
+              >
+                Export CSV
+              </button>
             )}
             {isOwner && (
               <button
