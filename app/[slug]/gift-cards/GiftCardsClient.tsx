@@ -92,12 +92,18 @@ export default function GiftCardsClient({ slug, basePath, apiBase, businessName,
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
+    <div className="gc-page" style={{ minHeight: "100vh", background: "var(--chalk)", width: "100%", maxWidth: "100vw", overflowX: "hidden" }}>
+      <style>{`
+        html, body { overflow-x: hidden; max-width: 100vw; overscroll-behavior-x: none; }
+        .gc-page input, .gc-page textarea { max-width: 100%; color: #20241D; }
+        .gc-page input::placeholder, .gc-page textarea::placeholder { color: #5C6459; opacity: 1; }
+        .gc-page label { color: #3A4038; }
+      `}</style>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <span className="display" style={{ fontSize: 18, fontWeight: 700 }}>{businessName}</span>
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <a href={`${basePath}/shop`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Shop</a>
               {!isNative && (
                 <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
@@ -167,11 +173,11 @@ export default function GiftCardsClient({ slug, basePath, apiBase, businessName,
         {isOwner && (
           <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 24 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Give out free gift cards</div>
-            <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 12px" }}>
+            <p style={{ fontSize: 12, color: "#4A5147", margin: "0 0 12px" }}>
               For raffle prizes or thank-yous. Paste one person per line as <em>Name, email</em>. Each gets a gift card in their own Gift Cards section, and can be emailed their code.
             </p>
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-              <label htmlFor="issue-amount" style={{ fontSize: 12, color: "var(--faint)" }}>Amount $</label>
+              <label htmlFor="issue-amount" style={{ fontSize: 12, color: "#4A5147" }}>Amount $</label>
               <input id="issue-amount" value={issueAmount} onChange={(e) => setIssueAmount(e.target.value)} inputMode="decimal"
                 style={{ width: 90, border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontSize: 14 }} />
             </div>
@@ -211,16 +217,16 @@ export default function GiftCardsClient({ slug, basePath, apiBase, businessName,
 
         {ownCards.length > 0 && (
           <>
-            <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 8, letterSpacing: "0.04em" }}>YOUR GIFT CARDS</div>
+            <div className="mono" style={{ fontSize: 11, color: "#4A5147", marginBottom: 8, letterSpacing: "0.04em" }}>YOUR GIFT CARDS</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {ownCards.map((c) => (
                 <div key={c.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div className="mono" style={{ fontSize: 13, fontWeight: 700 }}>{c.code}</div>
-                    {c.recipientName && <div style={{ fontSize: 11, color: "var(--faint)" }}>for {c.recipientName}</div>}
+                    {c.recipientName && <div style={{ fontSize: 11, color: "#4A5147" }}>for {c.recipientName}</div>}
                   </div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fairway)" }}>
-                    {dollars(c.remainingValueCents)} <span style={{ fontWeight: 400, color: "var(--faint)" }}>of {dollars(c.initialValueCents)}</span>
+                    {dollars(c.remainingValueCents)} <span style={{ fontWeight: 400, color: "#4A5147" }}>of {dollars(c.initialValueCents)}</span>
                   </div>
                 </div>
               ))}
