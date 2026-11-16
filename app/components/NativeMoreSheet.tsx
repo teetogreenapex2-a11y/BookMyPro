@@ -52,15 +52,20 @@ export default function NativeMoreSheet() {
   if (!open) return null;
   // On iPhone the native bar floats over the page, so lift the sheet above it.
   const bottomPad = Capacitor.getPlatform() === "ios" ? 96 : 0;
+  // On a wide browser window the More menu drops down from the top bar
+  // (top right) instead of sliding up from the bottom like on a phone.
+  const dropdown = !Capacitor.isNativePlatform() && typeof window !== "undefined" && window.innerWidth > 820;
 
   return (
     <div
       onClick={() => setOpen(false)}
-      style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.25)", display: "flex", alignItems: "flex-end" }}
+      style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.25)", display: "flex", alignItems: dropdown ? "flex-start" : "flex-end", justifyContent: dropdown ? "flex-end" : undefined }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", background: "rgba(27,58,47,0.58)", WebkitBackdropFilter: "blur(22px) saturate(1.5)", backdropFilter: "blur(22px) saturate(1.5)", borderTop: "1px solid rgba(255,255,255,0.28)", borderRadius: "20px 20px 0 0", padding: `16px 16px ${16 + bottomPad}px`, boxShadow: "0 -8px 30px rgba(0,0,0,0.2)" }}
+        style={dropdown
+          ? { width: 420, maxWidth: "calc(100vw - 24px)", margin: "56px 12px 0 0", background: "rgba(27,58,47,0.94)", WebkitBackdropFilter: "blur(22px) saturate(1.5)", backdropFilter: "blur(22px) saturate(1.5)", border: "1px solid rgba(255,255,255,0.28)", borderRadius: 16, padding: 16, boxShadow: "0 12px 30px rgba(0,0,0,0.3)" }
+          : { width: "100%", background: "rgba(27,58,47,0.58)", WebkitBackdropFilter: "blur(22px) saturate(1.5)", backdropFilter: "blur(22px) saturate(1.5)", borderTop: "1px solid rgba(255,255,255,0.28)", borderRadius: "20px 20px 0 0", padding: `16px 16px ${16 + bottomPad}px`, boxShadow: "0 -8px 30px rgba(0,0,0,0.2)" }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div style={{ fontWeight: 700, fontSize: 17, color: "#F6F4EE" }}>More</div>

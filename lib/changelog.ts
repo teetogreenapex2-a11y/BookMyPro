@@ -7,6 +7,13 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    id: "2026-11-16-topbar",
+    date: "Nov 16, 2026",
+    title: "A menu bar on the website",
+    text: "On a computer, the website now has a menu bar across the top with your main pages and a More menu for everything else - the same layout as the app.",
+    audience: "all",
+  },
+  {
     id: "2026-11-15-progress",
     date: "Nov 15, 2026",
     title: "Your swing progress",
