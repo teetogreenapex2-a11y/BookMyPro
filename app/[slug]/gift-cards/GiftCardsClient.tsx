@@ -13,7 +13,7 @@ function dollars(cents: number) {
   return `$${(cents / 100).toFixed(0)}`;
 }
 
-export default function GiftCardsClient({ slug, basePath, apiBase, businessName, isOwner = false }: { slug: string; basePath: string; apiBase: string; businessName: string; isOwner?: boolean }) {
+export default function GiftCardsClient({ slug, basePath, apiBase, businessName, isOwner = false, signedIn = true }: { slug: string; basePath: string; apiBase: string; businessName: string; isOwner?: boolean; signedIn?: boolean }) {
   const [issueAmount, setIssueAmount] = useState("75");
   const [issueList, setIssueList] = useState("");
   const [issueMessage, setIssueMessage] = useState("");
@@ -63,11 +63,18 @@ export default function GiftCardsClient({ slug, basePath, apiBase, businessName,
   const [error, setError] = useState<string | null>(null);
   const [ownCards, setOwnCards] = useState<OwnGiftCard[]>([]);
 
+  const [buyerName, setBuyerName] = useState("");
+  const [buyerEmail, setBuyerEmail] = useState("");
   useEffect(() => {
+    if (!signedIn) return;
     fetch(`${apiBase}/gift-cards`).then((r) => r.json()).then((list) => setOwnCards(Array.isArray(list) ? list : [])).catch(() => {});
-  }, [apiBase]);
+  }, [apiBase, signedIn]);
 
   async function purchase() {
+    if (!signedIn && (!buyerName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyerEmail.trim()))) {
+      setError("Enter your name and email so we can send your receipt.");
+      return;
+    }
     const payMethod = await choosePayMethod(slug);
     if (!payMethod) return;
     setPurchasing(true);
@@ -75,7 +82,7 @@ export default function GiftCardsClient({ slug, basePath, apiBase, businessName,
     const res = await fetch(`${apiBase}/gift-cards`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amountCents, recipientName, recipientEmail, message, paymentMethod: payMethod }),
+      body: JSON.stringify({ amountCents, buyerName, buyerEmail, recipientName, recipientEmail, message, paymentMethod: payMethod }),
     });
     const data = await res.json();
     setPurchasing(false);
@@ -95,7 +102,11 @@ export default function GiftCardsClient({ slug, basePath, apiBase, businessName,
               {!isNative && (
                 <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
               )}
-              <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>Sign out</button>
+              {signedIn ? (
+                <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>Sign out</button>
+              ) : (
+                <a href={`/login?callbackUrl=${encodeURIComponent(`${basePath}/gift-cards`)}`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Sign in</a>
+              )}
             </div>
           </div>
           <h1 className="display" style={{ fontSize: 24, margin: 0 }}>Gift Cards</h1>
@@ -127,6 +138,14 @@ export default function GiftCardsClient({ slug, basePath, apiBase, businessName,
             style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginBottom: 14 }}
           />
 
+          {!signedIn && (
+            <>
+              <input value={buyerName} onChange={(e) => setBuyerName(e.target.value)} placeholder="Your name"
+                style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginBottom: 8 }} />
+              <input value={buyerEmail} onChange={(e) => setBuyerEmail(e.target.value)} placeholder="Your email (for your receipt)" type="email"
+                style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginBottom: 14 }} />
+            </>
+          )}
           <input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Recipient name (optional — leave blank if it's for you)"
             style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginBottom: 8 }} />
           <input value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="Recipient email (optional — sends the code straight to them)"

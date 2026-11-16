@@ -5,6 +5,7 @@ import { stripe, getAccountStatus, chargesOnPlatform, connectOpts } from "@/lib/
 import { prisma } from "@/lib/prisma";
 import { checkoutOrVenmo } from "@/lib/venmoCheckout";
 import { getBusinessBySlug, getMembership } from "@/lib/tenant";
+import { resolveCheckoutUser } from "@/lib/guestCheckout";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
 
 const MIN_GIFT_CARD_CENTS = 1000; // $10
@@ -38,11 +39,16 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 // succeeds, in the webhook, not here. This route just starts checkout.
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
   const body = await req.json();
+  const buyer = await resolveCheckoutUser(
+    session, business.id,
+    { contactName: body?.buyerName, contactEmail: body?.buyerEmail, contactPhone: "" },
+    { membership: false, requirePhone: false }
+  );
+  if ("error" in buyer) return NextResponse.json({ error: buyer.error }, { status: buyer.status });
   const isVenmo = body?.paymentMethod === "venmo";
   if (!isVenmo && !chargesOnPlatform(business) && !business.stripeAccountId) {
     return NextResponse.json({ error: "This business hasn't connected a payment account yet" }, { status: 400 });
@@ -52,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "This business's payment account isn't fully set up yet" }, { status: 400 });
   }
 
-  const userId = (session.user as any).id;
+  const userId = buyer.id;
   const { amountCents, recipientName, recipientEmail, message } = body;
   const amount = Math.round(Number(amountCents));
 
@@ -64,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     {
       mode: "payment",
       payment_method_types: ["card", "klarna"],
-      customer_email: session.user?.email || undefined,
+      customer_email: buyer.email || undefined,
       line_items: [
         {
           price_data: {
@@ -88,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       cancel_url: getBusinessAbsoluteUrl(req, business.slug, "/gift-cards?purchase=cancelled"),
     },
     connectOpts(business),
-    { venmo: isVenmo, business, userId, userEmail: session.user?.email }
+    { venmo: isVenmo, business, userId, userEmail: buyer.email }
   );
   if (checkoutSession.error) return NextResponse.json({ error: checkoutSession.error }, { status: 400 });
   if (checkoutSession.venmo) return NextResponse.json({ venmo: checkoutSession.venmo });
