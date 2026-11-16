@@ -64,7 +64,7 @@ export default function FindProSearch() {
         const { latitude, longitude } = position.coords;
         setLoading(true);
         setSearched(true);
-        const res = await fetch(`/api/directory?lat=${latitude}&lng=${longitude}&radius=50`);
+        const res = await fetch(`/api/directory?lat=${latitude}&lng=${longitude}&radius=100`);
         const data = await res.json();
         setResults(Array.isArray(data) ? data : []);
         setLoading(false);

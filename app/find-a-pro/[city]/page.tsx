@@ -8,7 +8,7 @@ import FindProSearch from "@/app/components/FindProSearch";
 import ProListingLink from "@/app/components/ProListingLink";
 import { formatCityState } from "@/lib/format";
 
-const RADIUS_MILES = 30;
+const RADIUS_MILES = 100;
 
 export function generateStaticParams() {
   return REGION_CITIES.map((c) => ({ city: c.slug }));

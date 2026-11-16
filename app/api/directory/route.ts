@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { milesBetween } from "@/lib/geocoding";
+import { milesBetween, geocodeLocation } from "@/lib/geocoding";
 
 // GET /api/directory?q=chapel+hill
 //   or  ?lat=35.9&lng=-79.0&radius=50
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
   const lat = req.nextUrl.searchParams.get("lat");
   const lng = req.nextUrl.searchParams.get("lng");
-  const radiusMiles = Number(req.nextUrl.searchParams.get("radius")) || 50;
+  const radiusMiles = Number(req.nextUrl.searchParams.get("radius")) || 100;
 
   const baseSelect = {
     slug: true,
@@ -34,9 +34,20 @@ export async function GET(req: NextRequest) {
     },
   };
 
+  // A typed place name ("Raleigh", "Cary NC", a zip) is turned into real
+  // coordinates first, so it finds every pro within the radius - not just
+  // ones whose saved city text happens to match what was typed. If it
+  // can't be located, the text search below still runs as before.
+  let coords: { latitude: number; longitude: number } | null = null;
   if (lat && lng) {
-    const searchLat = parseFloat(lat);
-    const searchLng = parseFloat(lng);
+    coords = { latitude: parseFloat(lat), longitude: parseFloat(lng) };
+  } else if (q) {
+    coords = await geocodeLocation(q, "").catch(() => null);
+  }
+
+  if (coords) {
+    const searchLat = coords.latitude;
+    const searchLng = coords.longitude;
 
     const businesses = await prisma.business.findMany({
       where: { listedInDirectory: true, latitude: { not: null }, longitude: { not: null } },
@@ -52,7 +63,9 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => a.distanceMiles - b.distanceMiles)
       .slice(0, 50);
 
-    return NextResponse.json(withDistance);
+    // A typed search that finds nothing nearby still gets the old text
+    // match (for a business name, say) instead of an empty list.
+    if (withDistance.length > 0 || !q) return NextResponse.json(withDistance);
   }
 
   const businesses = await prisma.business.findMany({
