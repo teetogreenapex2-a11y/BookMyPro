@@ -17,7 +17,7 @@ function dollars(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export default function ShopClient({ slug, basePath, apiBase, businessName }: { slug: string; basePath: string; apiBase: string; businessName: string }) {
+export default function ShopClient({ slug, basePath, apiBase, businessName, signedIn = true }: { slug: string; basePath: string; apiBase: string; businessName: string; signedIn?: boolean }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   // Checking Capacitor.isNativePlatform() directly during render caused a
@@ -37,6 +37,7 @@ export default function ShopClient({ slug, basePath, apiBase, businessName }: { 
   const [shippingAddress, setShippingAddress] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  const [guestName, setGuestName] = useState("");
   const [giftCardCode, setGiftCardCode] = useState("");
   const [giftCardBalance, setGiftCardBalance] = useState<number | null>(null);
   const [giftCardError, setGiftCardError] = useState<string | null>(null);
@@ -99,6 +100,14 @@ export default function ShopClient({ slug, basePath, apiBase, businessName }: { 
       setOrderError("Enter a shipping name and address.");
       return;
     }
+    if (!signedIn && fulfillmentType === "pickup" && !guestName.trim()) {
+      setOrderError("Enter your name.");
+      return;
+    }
+    if (!signedIn && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
+      setOrderError("Enter your email so we can send your receipt.");
+      return;
+    }
     const payMethod = await choosePayMethod(slug);
     if (!payMethod) return;
     setPlacingOrder(true);
@@ -110,6 +119,7 @@ export default function ShopClient({ slug, basePath, apiBase, businessName }: { 
         items: cart.map((l) => ({ productId: l.productId, variantId: l.variantId, quantity: l.quantity })),
         paymentMethod: payMethod,
         fulfillmentType, shippingName, shippingAddress, contactPhone, contactEmail,
+        contactName: guestName.trim() || shippingName.trim() || undefined,
         giftCardCode: giftCardBalance !== null ? giftCardCode : undefined,
       }),
     });
@@ -122,7 +132,12 @@ export default function ShopClient({ slug, basePath, apiBase, businessName }: { 
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--chalk)" }}>
+    <div className="shop-page" style={{ minHeight: "100vh", background: "var(--chalk)", width: "100%", maxWidth: "100vw", overflowX: "hidden" }}>
+      <style>{`
+        html, body { overflow-x: hidden; max-width: 100vw; overscroll-behavior-x: none; }
+        .shop-page input, .shop-page textarea { max-width: 100%; color: #20241D; }
+        .shop-page input::placeholder, .shop-page textarea::placeholder { color: #5C6459; opacity: 1; }
+      `}</style>
       <header style={{ background: "var(--fairway)", color: "var(--chalk)", padding: "24px 20px" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -132,7 +147,11 @@ export default function ShopClient({ slug, basePath, apiBase, businessName }: { 
               {!isNative && (
                 <a href={`${basePath}/book`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Book</a>
               )}
-              <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>Sign out</button>
+              {signedIn ? (
+                <button onClick={() => signOut({ callbackUrl: "/login" })} style={{ background: "none", border: "none", color: "#D7DED9", fontSize: 13 }}>Sign out</button>
+              ) : (
+                <a href={`/login?callbackUrl=${encodeURIComponent(`${basePath}/shop`)}`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>Sign in</a>
+              )}
             </div>
           </div>
           <h1 className="display" style={{ fontSize: 24, margin: 0 }}>Shop</h1>
@@ -235,6 +254,10 @@ export default function ShopClient({ slug, basePath, apiBase, businessName }: { 
                   ))}
                 </div>
 
+                {!signedIn && fulfillmentType === "pickup" && (
+                  <input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Your name"
+                    style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 10px", fontSize: 13, marginBottom: 6 }} />
+                )}
                 {fulfillmentType === "shipping" && (
                   <>
                     <input value={shippingName} onChange={(e) => setShippingName(e.target.value)} placeholder="Full name"
