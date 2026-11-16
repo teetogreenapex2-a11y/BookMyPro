@@ -3,6 +3,7 @@
 import { downloadVideo } from "@/lib/downloadVideo";
 import ZoomFrame from "@/app/components/ZoomFrame";
 import VideoCompare from "@/app/components/VideoCompare";
+import SwingProgress from "@/app/components/SwingProgress";
 import ClubPathLayer from "@/app/components/ClubPathLayer";
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
@@ -19,6 +20,7 @@ type Submission = {
   instructorName: string | null; comments: Comment[];
   clubPath?: { x: number; y: number }[] | null;
   voiceNoteUrl?: string | null;
+  tempoRatio?: number | null;
 };
 
 function formatTimestamp(seconds: number) {
@@ -32,7 +34,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
   const isSandboxPreview = useSandboxPreview();
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [compareId, setCompareId] = useState<string | null>(null);
+  const [cmp, setCmp] = useState<{ l: string; r?: string } | null>(null);
   const [showPathFor, setShowPathFor] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
@@ -288,6 +290,11 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
           </button>
         </div>
 
+        <SwingProgress
+          items={submissions.map((x) => ({ id: x.id, date: x.submittedAt, title: x.title, tempo: x.tempoRatio ?? null }))}
+          onCompare={(l, r) => setCmp({ l, r })}
+        />
+
         <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginBottom: 8, letterSpacing: "0.04em" }}>
           YOUR SUBMISSIONS
         </div>
@@ -349,7 +356,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
                     )}
                     {submissions.length > 1 && (
                       <button
-                        onClick={() => setCompareId(s.id)}
+                        onClick={() => setCmp({ l: s.id })}
                         style={{ marginTop: 8, background: "none", border: "1px solid var(--border)", color: "var(--fairway)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
                       >
                         Compare with another swing
@@ -425,11 +432,12 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
             ))}
           </div>
         )}
-            {compareId && (
+            {cmp && (
         <VideoCompare
-          initialId={compareId}
+          initialId={cmp.l}
+          initialRightId={cmp.r}
           clips={submissions.map((x) => ({ id: x.id, url: x.videoUrl, label: `${x.title || "Swing"} · ${new Date(x.submittedAt).toLocaleDateString()}` }))}
-          onClose={() => setCompareId(null)}
+          onClose={() => setCmp(null)}
         />
       )}
 </main>

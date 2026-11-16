@@ -9,9 +9,9 @@ const FRAME = 1 / 30;
 
 // Two swings next to each other with shared controls. Scrub each side to the
 // same moment (usually impact or the top of the backswing), then play both.
-export default function VideoCompare({ clips, initialId, onClose }: { clips: CompareClip[]; initialId: string; onClose: () => void }) {
+export default function VideoCompare({ clips, initialId, initialRightId, onClose }: { clips: CompareClip[]; initialId: string; initialRightId?: string; onClose: () => void }) {
   const [leftId, setLeftId] = useState(initialId);
-  const [rightId, setRightId] = useState(() => clips.find((c) => c.id !== initialId)?.id || initialId);
+  const [rightId, setRightId] = useState(() => (initialRightId && clips.some((c) => c.id === initialRightId) ? initialRightId : clips.find((c) => c.id !== initialId)?.id) || initialId);
   const [rate, setRate] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [native, setNative] = useState(false);

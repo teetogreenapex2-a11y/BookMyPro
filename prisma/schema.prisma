@@ -632,6 +632,11 @@ model VideoSubmission {
   clubPath                Json?
   // Optional spoken feedback the instructor recorded over this video (audio file URL).
   voiceNoteUrl            String?
+  // Swing tempo measured in the instructor's browser (backswing time / downswing time).
+  tempoRatio              Float?
+  backswingMs             Int?
+  downswingMs             Int?
+  analyzedAt              DateTime?
 }
 
 model VideoComment {

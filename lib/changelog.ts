@@ -7,6 +7,13 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    id: "2026-11-15-progress",
+    date: "Nov 15, 2026",
+    title: "Your swing progress",
+    text: "Each student now has a Progress card: how their swing tempo has changed across their videos, plus one-tap First vs latest and Previous vs latest comparisons. It only ever compares a student with their own swings. Instructors can tap Measure tempo on any video to add it.",
+    audience: "all",
+  },
+  {
     id: "2026-11-15-compare-voice",
     date: "Nov 15, 2026",
     title: "Compare swings and voice-overs",

@@ -3,6 +3,8 @@
 import { downloadVideo } from "@/lib/downloadVideo";
 import ZoomFrame from "@/app/components/ZoomFrame";
 import VideoCompare from "@/app/components/VideoCompare";
+import SwingProgress from "@/app/components/SwingProgress";
+import { analyzeSwingTempo } from "@/lib/swingTempo";
 import VoiceOverRecorder from "@/app/components/VoiceOverRecorder";
 import ClubPathLayer, { type PathPoint } from "@/app/components/ClubPathLayer";
 import { useEffect, useRef, useState } from "react";
@@ -21,6 +23,7 @@ type Submission = {
   swingSessionId: string | null; angle: string | null;
   clubPath?: { x: number; y: number }[] | null;
   voiceNoteUrl?: string | null;
+  tempoRatio?: number | null;
 };
 
 function formatTimestamp(seconds: number) {
@@ -378,7 +381,18 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   }, []);
 
   const selected = submissions.find((s) => s.id === selectedId) || null;
-  const [compareOpen, setCompareOpen] = useState(false);
+  const [cmp, setCmp] = useState<{ l: string; r?: string } | null>(null);
+  const [measuring, setMeasuring] = useState<number | null>(null);
+  const [measureErr, setMeasureErr] = useState<string | null>(null);
+  async function measureTempo(id: string, url: string) {
+    setMeasuring(0); setMeasureErr(null);
+    const out = await analyzeSwingTempo(url, (p) => setMeasuring(p));
+    if (!out.ok) { setMeasureErr((out as { ok: false; error: string }).error); setMeasuring(null); return; }
+    const r = await fetch(`${apiBase}/videos/${id}/analysis`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(out.result) });
+    if (r.ok) setSubmissions((prev) => prev.map((x) => (x.id === id ? { ...x, tempoRatio: out.result.tempoRatio } : x)));
+    else setMeasureErr("Couldn't save the measurement.");
+    setMeasuring(null);
+  }
 
   // Club path tracing: the instructor taps the clubhead on paused frames; the app draws one smooth arc through the taps.
   const [tracing, setTracing] = useState(false);
@@ -886,7 +900,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                 </ZoomFrame>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
                   <button
-                    onClick={() => setCompareOpen(true)}
+                    onClick={() => setCmp({ l: selected.id })}
                     style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--fairway)", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
                   >
                     Compare side-by-side
@@ -1032,11 +1046,27 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   existingUrl={selected.voiceNoteUrl || null}
                   onChange={(url) => setSubmissions((prev) => prev.map((x) => (x.id === selected.id ? { ...x, voiceNoteUrl: url } : x)))}
                 />
-                {compareOpen && (
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+                  <button
+                    disabled={measuring !== null}
+                    onClick={() => measureTempo(selected.id, selected.videoUrl)}
+                    style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--fairway)", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    {measuring !== null ? `Measuring... ${Math.round(measuring)}%` : selected.tempoRatio != null ? "Re-measure tempo" : "Measure tempo"}
+                  </button>
+                  {selected.tempoRatio != null && measuring === null && <span style={{ fontSize: 13, fontWeight: 700 }}>Tempo {selected.tempoRatio.toFixed(1)} : 1</span>}
+                  {measureErr && <span style={{ fontSize: 12, color: "#B23A3A" }}>{measureErr}</span>}
+                </div>
+                <SwingProgress
+                  items={submissions.filter((x) => x.playerId === selected.playerId).map((x) => ({ id: x.id, date: x.submittedAt, title: x.title, tempo: x.tempoRatio ?? null }))}
+                  onCompare={(l, r) => setCmp({ l, r })}
+                />
+                {cmp && (
                   <VideoCompare
-                    initialId={selected.id}
+                    initialId={cmp.l}
+                    initialRightId={cmp.r}
                     clips={submissions.filter((x) => x.playerId === selected.playerId).map((x) => ({ id: x.id, url: x.videoUrl, label: `${x.title || "Swing"} · ${new Date(x.submittedAt).toLocaleDateString()}` }))}
-                    onClose={() => setCompareOpen(false)}
+                    onClose={() => setCmp(null)}
                   />
                 )}
                 {selected.comments.length > 0 && (
