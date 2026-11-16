@@ -335,7 +335,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                   {board.pledgeMode
                     ? `You won't be charged today. Your card is saved and charged ${dollars(board.priceCents * picked.length)} only when all ${board.spaceCount} spots are filled. If it doesn't fill, you're never charged.`
                     : method === "venmo"
-                    ? "Your spaces are reserved for 24 hours. Send the Venmo payment on the next screen and they're confirmed once it's received."
+                    ? "Your spaces are reserved for 24 hours. Send the Venmo payment on the next screen and they're confirmed once it's received. If Venmo asks for the last 4 digits of the phone number, enter 1896."
                     : "Pay by card on the next screen. Your spaces are held for 30 minutes while you pay."}
                 </p>
               </>
@@ -368,6 +368,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
             <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 12px" }}>
               Keep the note ("{venmoInfo.note}") so we can match your payment. We'll mark your spaces paid as soon as we see it.
             </p>
+            <p style={{ fontSize: 13.5, margin: "0 0 12px" }}>If Venmo asks for the last 4 digits of the phone number, enter <strong>1896</strong>.</p>
             <button onClick={() => setVenmoInfo(null)} style={{ width: "100%", background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 600 }}>Done</button>
           </div>
         </div>
