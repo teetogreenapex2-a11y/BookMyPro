@@ -957,7 +957,7 @@ export default function BookingClient({
             </a>
           )}
           <h1 className="display" style={{ fontSize: 26, margin: "0 0 4px" }}>
-            {service === "lesson" ? "Book a lesson" : "Book a club fitting"}
+            Book a Lesson/Fitting
           </h1>
           {business.instructorName && instructors.length === 1 && (
             <p style={{ fontSize: 16, fontWeight: 600, color: "#D7DED9", margin: "0 0 14px" }}>
