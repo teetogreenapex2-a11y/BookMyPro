@@ -56,7 +56,7 @@ export function showVenmoInstructions(v: VenmoInfo, onDone?: () => void) {
   const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
   box.innerHTML = `
     <div style="font-size:18px;font-weight:700;">Pay ${esc(money)} with Venmo</div>
-    <div style="font-size:14px;color:#555;margin-top:8px;line-height:1.5;">Send <b>${esc(money)}</b> to <b>@${esc(v.handle.replace(/^@/, ""))}</b> (${esc(v.payeeName)}) for <b>${esc(v.description)}</b>.<br/>Put <b>#${esc(v.ref)}</b> in the note so it's easy to match.</div>
+    <div style="font-size:14px;color:#555;margin-top:8px;line-height:1.5;">Send <b>${esc(money)}</b> to <b>@${esc(v.handle.replace(/^@/, ""))}</b> (${esc(v.payeeName)}) for <b>${esc(v.description)}</b>.<br/>Put <b>#${esc(v.ref)}</b> in the note so it's easy to match.<br/>If Venmo asks for the last 4 digits of the phone number, enter <b>1896</b>.</div>
     <div style="font-size:13px;color:#555;margin-top:10px;line-height:1.5;background:#F6F4EE;border-radius:8px;padding:10px;">Your purchase is saved. It's confirmed as soon as ${esc(v.payeeName)} sees your Venmo payment, and you'll get an email receipt then.</div>`;
   const open = btn("Open Venmo", true);
   open.onclick = () => { window.open(v.link, "_blank", "noopener"); };
