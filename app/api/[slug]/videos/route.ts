@@ -47,6 +47,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     swingSessionId: s.swingSessionId,
     angle: s.angle,
     clubPath: s.clubPath,
+    voiceNoteUrl: s.voiceNoteUrl,
     comments: s.comments.map((c) => ({ id: c.id, timestampSeconds: c.timestampSeconds, text: c.text, createdAt: c.createdAt })),
   }));
 

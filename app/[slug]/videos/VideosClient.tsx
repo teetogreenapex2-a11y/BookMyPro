@@ -2,6 +2,7 @@
 
 import { downloadVideo } from "@/lib/downloadVideo";
 import ZoomFrame from "@/app/components/ZoomFrame";
+import VideoCompare from "@/app/components/VideoCompare";
 import ClubPathLayer from "@/app/components/ClubPathLayer";
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
@@ -17,6 +18,7 @@ type Submission = {
   status: string; submittedAt: string; reviewedAt: string | null;
   instructorName: string | null; comments: Comment[];
   clubPath?: { x: number; y: number }[] | null;
+  voiceNoteUrl?: string | null;
 };
 
 function formatTimestamp(seconds: number) {
@@ -30,6 +32,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
   const isSandboxPreview = useSandboxPreview();
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [compareId, setCompareId] = useState<string | null>(null);
   const [showPathFor, setShowPathFor] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
@@ -338,6 +341,20 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
                         {showPathFor[s.id] === false ? "Show club path" : "Hide club path"}
                       </button>
                     )}
+                    {s.voiceNoteUrl && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Voice-over from {s.instructorName || "your instructor"}</div>
+                        <audio controls src={s.voiceNoteUrl} style={{ width: "100%" }} />
+                      </div>
+                    )}
+                    {submissions.length > 1 && (
+                      <button
+                        onClick={() => setCompareId(s.id)}
+                        style={{ marginTop: 8, background: "none", border: "1px solid var(--border)", color: "var(--fairway)", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                      >
+                        Compare with another swing
+                      </button>
+                    )}
                     <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
                       <button
                         onClick={() => stepFrame(s.id, -1)}
@@ -408,7 +425,14 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
             ))}
           </div>
         )}
-      </main>
+            {compareId && (
+        <VideoCompare
+          initialId={compareId}
+          clips={submissions.map((x) => ({ id: x.id, url: x.videoUrl, label: `${x.title || "Swing"} · ${new Date(x.submittedAt).toLocaleDateString()}` }))}
+          onClose={() => setCompareId(null)}
+        />
+      )}
+</main>
       {isSandboxPreview && <FakeNativeTabBar basePath={basePath} activeKey="videos" role="player" />}
     </div>
   );

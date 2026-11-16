@@ -2,6 +2,8 @@
 
 import { downloadVideo } from "@/lib/downloadVideo";
 import ZoomFrame from "@/app/components/ZoomFrame";
+import VideoCompare from "@/app/components/VideoCompare";
+import VoiceOverRecorder from "@/app/components/VoiceOverRecorder";
 import ClubPathLayer, { type PathPoint } from "@/app/components/ClubPathLayer";
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
@@ -18,6 +20,7 @@ type Submission = {
   status: string; submittedAt: string; playerName: string; playerId: string; comments: Comment[];
   swingSessionId: string | null; angle: string | null;
   clubPath?: { x: number; y: number }[] | null;
+  voiceNoteUrl?: string | null;
 };
 
 function formatTimestamp(seconds: number) {
@@ -375,6 +378,7 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
   }, []);
 
   const selected = submissions.find((s) => s.id === selectedId) || null;
+  const [compareOpen, setCompareOpen] = useState(false);
 
   // Club path tracing: the instructor taps the clubhead on paused frames; the app draws one smooth arc through the taps.
   const [tracing, setTracing] = useState(false);
@@ -881,6 +885,12 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                 </div>
                 </ZoomFrame>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                  <button
+                    onClick={() => setCompareOpen(true)}
+                    style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--fairway)", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Compare side-by-side
+                  </button>
                   {!tracing ? (
                     <button
                       onClick={() => setTracing(true)}
@@ -1016,6 +1026,19 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   </button>
                 </div>
 
+                <VoiceOverRecorder
+                  apiBase={apiBase}
+                  submissionId={selected.id}
+                  existingUrl={selected.voiceNoteUrl || null}
+                  onChange={(url) => setSubmissions((prev) => prev.map((x) => (x.id === selected.id ? { ...x, voiceNoteUrl: url } : x)))}
+                />
+                {compareOpen && (
+                  <VideoCompare
+                    initialId={selected.id}
+                    clips={submissions.filter((x) => x.playerId === selected.playerId).map((x) => ({ id: x.id, url: x.videoUrl, label: `${x.title || "Swing"} · ${new Date(x.submittedAt).toLocaleDateString()}` }))}
+                    onClose={() => setCompareOpen(false)}
+                  />
+                )}
                 {selected.comments.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {selected.comments.map((c) => (

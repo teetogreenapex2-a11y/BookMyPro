@@ -630,6 +630,8 @@ model VideoSubmission {
   angle                   String?   // "down_the_line" | "face_on" - only meaningful when swingSessionId is set
   // The instructor-traced club path: an ordered list of {x, y} points (0-1, relative to the video frame). Null when none has been traced.
   clubPath                Json?
+  // Optional spoken feedback the instructor recorded over this video (audio file URL).
+  voiceNoteUrl            String?
 }
 
 model VideoComment {

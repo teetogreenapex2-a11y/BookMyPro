@@ -7,6 +7,13 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    id: "2026-11-15-compare-voice",
+    date: "Nov 15, 2026",
+    title: "Compare swings and voice-overs",
+    text: "Videos now have a Compare button that puts two swings side by side with shared play, slow motion and frame-by-frame controls. Instructors can also record a spoken voice-over on a student's video, and the student hears it right with their review.",
+    audience: "all",
+  },
+  {
     id: "2026-11-13-venmo",
     date: "Nov 13, 2026",
     title: "Pay with Venmo",
