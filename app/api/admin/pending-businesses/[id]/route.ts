@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isPlatformAdmin } from "@/lib/tenant";
+import { sendBusinessApprovedEmail } from "@/lib/email";
 
 // PATCH /api/admin/pending-businesses/{id}  { action: "approve" | "deny" }
 // Approving flips the business live for real bookings. Denying removes
@@ -25,6 +26,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + 30);
     await prisma.business.update({ where: { id: params.id }, data: { approved: true, trialEndsAt } });
+    try {
+      const owner = await prisma.membership.findFirst({ where: { businessId: params.id, role: "owner" }, orderBy: { createdAt: "asc" }, include: { user: { select: { email: true } } } });
+      await sendBusinessApprovedEmail(owner?.user.email, { businessName: business.name, slug: business.slug, trialDays: 30 });
+    } catch (e) { console.error("Approval email failed:", e); }
   } else if (action === "deny") {
     await prisma.availability.deleteMany({ where: { businessId: params.id } });
     await prisma.membership.deleteMany({ where: { businessId: params.id } });

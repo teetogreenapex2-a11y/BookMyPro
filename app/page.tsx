@@ -61,8 +61,12 @@ export default async function HomePage() {
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#B8862B", marginBottom: 14 }}>BOOKMYPRO</div>
             <h1 style={{ fontSize: 22, marginBottom: 12, color: "#1B3A2F" }}>Almost there</h1>
             <p style={{ fontSize: 14, color: "#5C6459", lineHeight: 1.6 }}>
-              {m.business.name} has been created and is waiting for approval before it can start accepting real bookings. You'll be notified once it's live.
+              {m.business.name} has been created and is waiting for approval before it can start accepting real bookings. We review new businesses within a day, and we'll email you the moment it's live.
             </p>
+            <p style={{ fontSize: 13, color: "#8A8571", lineHeight: 1.6, marginTop: 14 }}>
+              Questions or in a hurry? Email <a href="mailto:teetogreenapex2@gmail.com" style={{ color: "#1B3A2F" }}>teetogreenapex2@gmail.com</a>.
+            </p>
+            <a href="/api/auth/signout" style={{ display: "inline-block", marginTop: 10, fontSize: 12, color: "#8A8571" }}>Sign out</a>
           </div>
         </div>
       );

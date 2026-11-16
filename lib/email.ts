@@ -522,3 +522,27 @@ export async function sendVenmoToConfirmEmail(
   `;
   await sendEmail(to, `Venmo payment to confirm: ${d.customer} ($${(d.amountCents / 100).toFixed(0)})`, html);
 }
+
+
+// Sent when the platform admin approves a new business, so the owner isn't left
+// staring at the "waiting for approval" screen.
+export async function sendBusinessApprovedEmail(to: string | null | undefined, d: { businessName: string; slug: string; trialDays: number }) {
+  if (!to) return;
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const url = `https://bookmypro.app/${d.slug}/instructor`;
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px;">
+      <h2 style="margin-bottom: 4px;">${esc(d.businessName)} is approved</h2>
+      <p style="color: #5C6459; margin-top: 0;">Welcome to BookMyPro. Your ${d.trialDays}-day free trial has started.</p>
+      <p>You can now take real bookings. A good first five minutes:</p>
+      <ol style="line-height: 1.7;">
+        <li>Open your calendar and add your open lesson times.</li>
+        <li>Connect Stripe in Settings so you can take card payments (or add your Venmo handle).</li>
+        <li>Share your booking link with your students.</li>
+      </ol>
+      <p><a href="${url}" style="display:inline-block;background:#1B3A2F;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">Open my dashboard</a></p>
+      <p style="color: #5C6459; font-size: 13px;">Questions? Email teetogreenapex2@gmail.com.</p>
+    </div>
+  `;
+  await sendEmail(to, `${d.businessName} is approved - you're live on BookMyPro`, html);
+}
