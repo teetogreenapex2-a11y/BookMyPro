@@ -8,6 +8,7 @@ import { Capacitor } from "@capacitor/core";
 import { navFor, keyForPage } from "@/lib/navCatalog";
 import NativeMoreSheet from "@/app/components/NativeMoreSheet";
 import WebTabBar from "@/app/components/WebTabBar";
+import VisitPing from "@/app/components/VisitPing";
 import WhatsNewBanner from "@/app/components/WhatsNewBanner";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -31,6 +32,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <TabBarSync />
       <NativeMoreSheet />
       <WebTabBar />
+      <VisitPing />
       <WhatsNewBanner />
       <NativeAuthListener />
       <AndroidBackButtonHandler />
