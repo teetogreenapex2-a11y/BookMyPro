@@ -7,6 +7,13 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    id: "2026-11-16-visitors",
+    date: "Nov 16, 2026",
+    title: "See who is on your website",
+    text: "A new Visitors page (in More) shows who is on your website and booking pages right now, where they are, which pages they went through and how long they stayed on each. You also get an instant alert when someone new arrives.",
+    audience: "staff",
+  },
+  {
     id: "2026-11-16-topbar",
     date: "Nov 16, 2026",
     title: "A menu bar on the website",

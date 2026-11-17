@@ -1147,3 +1147,23 @@ model VenmoPayment {
 
   @@index([businessId, status])
 }
+
+// One row per website/public-page visit (a browser session). `pages` is the
+// ordered list the visitor went through: [{ path, at, lastAt }], so time on
+// each page = lastAt - at. Only city/region/country - nothing identifying.
+model SiteVisit {
+  id         String   @id @default(cuid())
+  businessId String
+  sessionId  String
+  source     String   @default("website") // website | bookmypro
+  city       String   @default("")
+  region     String   @default("")
+  country    String   @default("")
+  referrer   String   @default("")
+  pages      Json     @default("[]")
+  startedAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@unique([businessId, sessionId])
+  @@index([businessId, lastSeenAt])
+}
