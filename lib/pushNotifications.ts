@@ -92,6 +92,8 @@ export async function sendPushToMembership(membershipId: string, payload: { titl
           await messaging.send({
             token: t.token,
             notification: { title: payload.title, body: payload.body },
+            android: { priority: "high", notification: { sound: "default", defaultVibrateTimings: true } },
+            apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } },
             data: payload.url ? { url: payload.url } : undefined,
           });
         } catch (err: any) {
