@@ -7,6 +7,13 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    id: "2026-11-18-raffle-inperson",
+    date: "Nov 18, 2026",
+    title: "Sell raffle spaces in person",
+    text: "On either raffle page, pick the open spaces, tap Continue, then choose Cash, Card in person or Free and enter their name. The spaces are marked paid right away. Email is optional for walk-ins.",
+    audience: "staff",
+  },
+  {
     id: "2026-11-16-visitors",
     date: "Nov 16, 2026",
     title: "See who is on your website",

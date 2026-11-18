@@ -7,7 +7,7 @@ type Tier = { label: string; count: number; prize: string; rest?: boolean };
 type Board = { title: string; spaceCount: number; maxPerPerson: number; status: string; drawnAt: string | null; giftCardCents: number; priceCents: number; pledgeMode?: boolean; giftCardsIssuedAt: string | null; tiers: Tier[] };
 type PendingVenmo = { groupId: string; name: string; email: string; phone: string | null; numbers: number[]; amountCents: number };
 type VenmoInfo = { url: string; handle: string; amountCents: number; note: string; numbers: number[] };
-type Space = { number: number; name: string; held?: boolean; pledged?: boolean; winnerTier: number | null; email?: string; phone?: string | null };
+type Space = { number: number; name: string; held?: boolean; pledged?: boolean; winnerTier: number | null; email?: string; phone?: string | null; payMethod?: string | null };
 
 export default function RaffleClient({ apiBase, businessName, isOwner, boardKey = "main" }: { apiBase: string; businessName: string; isOwner: boolean; boardKey?: string }) {
   // The native iOS tab bar floats over the page, so lift the pick bar and leave room at the bottom.
@@ -22,6 +22,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
   const [picked, setPicked] = useState<number[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [method, setMethod] = useState<"card" | "venmo">("card");
+  const [sale, setSale] = useState<"cash" | "card_inperson" | "free">("cash");
   const [venmoAvailable, setVenmoAvailable] = useState(false);
   const [pendingVenmo, setPendingVenmo] = useState<PendingVenmo[]>([]);
   const [venmoInfo, setVenmoInfo] = useState<VenmoInfo | null>(null);
@@ -77,7 +78,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
     const res = await fetch(`${apiBase}/raffle?key=${boardKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ numbers: picked, name, email, phone, method: board?.pledgeMode ? "card" : method }),
+      body: JSON.stringify({ numbers: picked, name, email, phone, method: board?.pledgeMode ? "card" : method, ...(owner ? { sale } : {}) }),
     });
     const d = await res.json().catch(() => ({}));
     // Going to Stripe: keep the button disabled so a second tap can't start a second payment.
@@ -96,6 +97,12 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
       return;
     }
     const mine = [...picked].sort((a, b) => a - b).join(", ");
+    if (owner) {
+      setNotice(`Space${picked.length === 1 ? "" : "s"} ${mine} sold to ${name}${sale === "cash" ? " (cash)" : sale === "card_inperson" ? " (card in person)" : " (free)"}.`);
+      setPicked([]); setFormOpen(false); setName(""); setEmail(""); setPhone("");
+      load();
+      return;
+    }
     setNotice(`You have space${picked.length === 1 ? "" : "s"} ${mine}. Good luck! ${d.left > 0 ? `You can claim ${d.left} more.` : "You've used all your spaces."}`);
     setPicked([]);
     setFormOpen(false);
@@ -285,7 +292,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Claimed spaces</div>
                 {spaces.map((s) => (
                   <div key={s.number} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "5px 0", borderTop: "1px solid var(--border)", alignItems: "center" }}>
-                    <span style={{ minWidth: 0, overflowWrap: "anywhere" }}><strong>#{s.number}</strong> {s.name}{s.held ? " (waiting on payment)" : s.pledged ? " (pledged - not charged)" : ""} · {s.email}{s.phone ? ` · ${s.phone}` : ""}</span>
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere" }}><strong>#{s.number}</strong> {s.name}{s.held ? " (waiting on payment)" : s.pledged ? " (pledged - not charged)" : ""} · {s.email && s.email.endsWith("@walkin.local") ? "no email" : s.email}{s.phone ? ` · ${s.phone}` : ""}{!s.held && !s.pledged ? ` · ${({ cash: "cash", card_inperson: "card in person", card: "online card", venmo: "Venmo" } as Record<string, string>)[s.payMethod || ""] || "free"}` : ""}</span>
                     {!drawn && (
                       <button onClick={() => { if (window.confirm(`Release space ${s.number}?`)) admin("release", { number: s.number }); }} disabled={adminBusy}
                         style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, fontSize: 11, padding: "3px 8px", flexShrink: 0 }}>Release</button>
@@ -340,15 +347,34 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                 </p>
               </>
             )}
+            {owner && board.priceCents > 0 && (
+              <>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "var(--fairway)", margin: "0 0 10px" }}>
+                  Sell in person: {picked.length} × {dollars(board.priceCents)} = {dollars(board.priceCents * picked.length)}
+                </p>
+                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                  {([["cash", "Cash"], ["card_inperson", "Card in person"], ["free", "Free"]] as [string, string][]).map(([m, label]) => (
+                    <button key={m} onClick={() => setSale(m as "cash" | "card_inperson" | "free")} style={{
+                      flex: 1, padding: "10px 6px", borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+                      border: sale === m ? "2px solid var(--fairway)" : "1px solid var(--border)",
+                      background: sale === m ? "#DDEBE2" : "#FFF", color: "var(--ink)",
+                    }}>{label}</button>
+                  ))}
+                </div>
+                <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 12px" }}>
+                  {sale === "free" ? "Hands the space out with no payment." : `Collect ${dollars(board.priceCents * picked.length)} ${sale === "cash" ? "in cash" : "on your card reader"} first, then tap the button. The space is marked paid right away. Email is optional - add it if they want their prize or gift card by email.`}
+                </p>
+              </>
+            )}
             <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "0 0 14px" }}>We use your email to count your spaces (limit {board.maxPerPerson}) and to send your prize or gift card. Other people only see your first name and last initial.</p>
             <input id="raffle-name" onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)} style={input} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
-            <input id="raffle-email" onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)} style={input} placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+            <input id="raffle-email" onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)} style={input} placeholder={owner ? "Email (optional)" : "Email"} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             <input id="raffle-phone" onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: "center", behavior: "smooth" }), 300)} style={input} placeholder="Phone (optional)" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
             {error && <p style={{ fontSize: 13, color: "#B23A3A", margin: "0 0 10px" }}>{error}</p>}
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setFormOpen(false)} style={{ flex: 1, background: "none", border: "1px solid var(--border)", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 600 }}>Back</button>
-              <button onClick={claim} disabled={saving || !name.trim() || !email.trim()} style={{ flex: 2, background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 700, opacity: saving ? 0.7 : 1 }}>
-                {saving ? "One moment…" : owner || !board.priceCents ? `Claim ${picked.length} space${picked.length === 1 ? "" : "s"}` : board.pledgeMode ? `Pledge ${dollars(board.priceCents * picked.length)} - charged only when full` : method === "venmo" ? `Reserve & pay ${dollars(board.priceCents * picked.length)} with Venmo` : `Pay ${dollars(board.priceCents * picked.length)} by card`}
+              <button onClick={claim} disabled={saving || !name.trim() || (!owner && !email.trim())} style={{ flex: 2, background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: 12, fontSize: 14, fontWeight: 700, opacity: saving ? 0.7 : 1 }}>
+                {saving ? "One moment…" : owner && board.priceCents > 0 ? `${sale === "free" ? "Give" : "Mark paid:"} ${picked.length} space${picked.length === 1 ? "" : "s"} ${sale === "cash" ? "(cash)" : sale === "card_inperson" ? "(card)" : "free"}` : owner || !board.priceCents ? `Claim ${picked.length} space${picked.length === 1 ? "" : "s"}` : board.pledgeMode ? `Pledge ${dollars(board.priceCents * picked.length)} - charged only when full` : method === "venmo" ? `Reserve & pay ${dollars(board.priceCents * picked.length)} with Venmo` : `Pay ${dollars(board.priceCents * picked.length)} by card`}
               </button>
             </div>
           </div>

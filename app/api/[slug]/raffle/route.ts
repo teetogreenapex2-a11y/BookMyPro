@@ -8,7 +8,7 @@ import { sendRaffleVenmoNotification } from "@/lib/email";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 import { randomUUID } from "crypto";
 import { markRaffleSessionPaid } from "@/lib/raffleNotify";
-import { fulfillPledgeSession } from "@/lib/rafflePledge";
+import { fulfillPledgeSession, chargeBoardIfFull } from "@/lib/rafflePledge";
 import { getOrCreateBoard, normalizeRaffleKey, publicName, RaffleTier } from "@/lib/raffle";
 
 async function viewerIsOwner(businessId: string) {
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       pledged: s.pledged,
       name: s.pending ? "Reserved" : isOwner ? s.name : publicName(s.name),
       winnerTier: s.winnerTier,
-      ...(isOwner ? { email: s.email, phone: s.phone } : {}),
+      ...(isOwner ? { email: s.email, phone: s.phone, payMethod: s.payMethod } : {}),
     })),
   });
 }
@@ -114,9 +114,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const rawNumbers: unknown[] = Array.isArray(body?.numbers) ? body.numbers : body?.number != null ? [body.number] : [];
   const numbers = Array.from(new Set(rawNumbers.map(Number)));
   const name = String(body?.name || "").replace(/\s+/g, " ").trim();
-  const email = String(body?.email || "").trim().toLowerCase();
+  let email = String(body?.email || "").trim().toLowerCase();
   const phone = String(body?.phone || "").trim().slice(0, 20) || null;
   const method = body?.method === "venmo" ? "venmo" : "card";
+  // The owner selling a space in person: cash, a card taken at the studio, or handed out free.
+  const isOwner = await viewerIsOwner(business.id);
+  const ownerSale = isOwner && ["cash", "card_inperson", "free"].includes(body?.sale) ? String(body.sale) : null;
+  // Walk-ins often have no email; give them a private placeholder so the space still counts.
+  if (isOwner && !email) email = `walkin-${randomUUID().slice(0, 8)}@walkin.local`;
 
   if (numbers.length === 0 || numbers.some((n) => !Number.isInteger(n) || n < 1 || n > board.spaceCount)) {
     return NextResponse.json({ error: "Pick a space on the board" }, { status: 400 });
@@ -131,13 +136,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   await prisma.raffleSpace.deleteMany({ where: { boardId: board.id, email, pending: true } });
 
   const mine = await prisma.raffleSpace.count({ where: { boardId: board.id, email } });
-  if (mine + numbers.length > board.maxPerPerson) {
+  if (!isOwner && mine + numbers.length > board.maxPerPerson) {
     const left = Math.max(0, board.maxPerPerson - mine);
     return NextResponse.json({ error: left === 0 ? `Limit ${board.maxPerPerson} spaces per person` : `Limit ${board.maxPerPerson} spaces per person - you can claim ${left} more` }, { status: 400 });
   }
 
-  // The owner can hand out spaces free; everyone else pays.
-  const isOwner = await viewerIsOwner(business.id);
+  // The owner sells or hands out spaces in person; everyone else pays online.
   const needsPayment = board.priceCents > 0 && !isOwner;
   const pledge = needsPayment && board.pledgeMode;
   if (pledge && method === "venmo") {
@@ -159,7 +163,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           data: {
             boardId: board.id, number: n, name, email, phone, groupId,
             pending: needsPayment,
-            payMethod: needsPayment ? method : null,
+            payMethod: needsPayment ? method : ownerSale && ownerSale !== "free" ? ownerSale : null,
             holdExpiresAt: needsPayment ? new Date(Date.now() + holdMinutes * 60 * 1000) : null,
           },
         })
@@ -171,6 +175,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   if (!needsPayment) {
+    // In-person sales count toward a pledge raffle filling up, which charges the saved cards.
+    if (board.pledgeMode) await chargeBoardIfFull(board.id).catch((e) => console.error("Pledge charge failed:", e));
     return NextResponse.json({ ok: true, count: numbers.length, yourSpaces: mine + numbers.length, left: board.maxPerPerson - (mine + numbers.length) }, { status: 201 });
   }
 

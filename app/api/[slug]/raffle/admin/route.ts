@@ -130,7 +130,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         },
       });
       created++;
-      if (sendEmail) {
+      if (sendEmail && !sp.email.endsWith("@walkin.local")) {
         try {
           await sendGiftCardEmail(sp.email, { businessName: business.name, code, amountCents: board.giftCardCents, recipientName: sp.name, message });
           emailed++;
