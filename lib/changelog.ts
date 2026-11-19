@@ -7,6 +7,13 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    id: "2026-11-17-chat",
+    date: "Nov 17, 2026",
+    title: "Chat with people on your website",
+    text: "Visitors to teetogreenapex.com can now chat with you from a bubble on the site, and you can start a chat with anyone who is on it. Open Visitors in More: tap Chat on a visitor to message them, and use the On/Off button at the top to show or hide the chat bubble.",
+    audience: "staff",
+  },
+  {
     id: "2026-11-18-raffle-inperson",
     date: "Nov 18, 2026",
     title: "Sell raffle spaces in person",

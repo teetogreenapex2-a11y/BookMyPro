@@ -1167,3 +1167,37 @@ model SiteVisit {
   @@unique([businessId, sessionId])
   @@index([businessId, lastSeenAt])
 }
+
+// Website live chat: visitors on teetogreenapex.com message the owner, who
+// answers from the BookMyPro Chat page. SiteChatSetting is the on/off switch.
+model SiteChatSetting {
+  businessId String   @id
+  enabled    Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+}
+
+model SiteChat {
+  id            String   @id @default(cuid())
+  businessId    String
+  sessionId     String
+  name          String   @default("")
+  contact       String   @default("")
+  city          String   @default("")
+  region        String   @default("")
+  ownerUnread   Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  lastMessageAt DateTime @default(now())
+
+  @@unique([businessId, sessionId])
+  @@index([businessId, lastMessageAt])
+}
+
+model SiteChatMessage {
+  id        String   @id @default(cuid())
+  chatId    String
+  fromOwner Boolean  @default(false)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([chatId, createdAt])
+}
