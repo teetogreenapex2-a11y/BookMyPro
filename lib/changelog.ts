@@ -7,6 +7,13 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    id: "2026-11-23-instructor-profile",
+    date: "Nov 23, 2026",
+    title: "Full instructor profile pages",
+    text: "Tap View full profile under an instructor's bio to see a bigger photo, their full bio, their rating and what students say, with a button to book with them. Instructors can edit their bio and photo in Settings.",
+    audience: "all",
+  },
+  {
     id: "2026-11-16-topbar",
     date: "Nov 16, 2026",
     title: "A menu bar on the website",

@@ -115,6 +115,7 @@ export default async function InstructorsPage({ params }: { params: { slug: stri
                     {m.bio}
                   </p>
                 )}
+                <a href={`/${params.slug}/instructors/${m.id}`} style={{ display: "inline-block", marginTop: 12, fontSize: 13, color: "#B8862B", fontWeight: 700, textDecoration: "none" }}>View full profile &rarr;</a>
               </div>
             ))}
           </div>

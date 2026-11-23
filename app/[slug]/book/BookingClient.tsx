@@ -417,7 +417,8 @@ export default function BookingClient({
           // existing package at all yet.
           const existingInstructorId = packages.find((p) => p.instructorMembershipId)?.instructorMembershipId;
           const owner = list.find((i) => i.role === "owner");
-          const defaultId = (existingInstructorId && list.some((i) => i.id === existingInstructorId)) ? existingInstructorId : owner?.id;
+          const bmpWantedInstructor = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("instructor") : null;
+          const defaultId = (bmpWantedInstructor && list.some((i) => i.id === bmpWantedInstructor)) ? bmpWantedInstructor : (existingInstructorId && list.some((i) => i.id === existingInstructorId)) ? existingInstructorId : owner?.id;
           if (defaultId) setSelectedInstructorId(defaultId);
         }
       })
@@ -1029,9 +1030,12 @@ export default function BookingClient({
                 />
               )}
               {selectedInstructor.bio && (
+                <div>
                 <p style={{ fontSize: 13, lineHeight: 1.6, color: "var(--fairway)", margin: 0, whiteSpace: "pre-wrap" }}>
                   {selectedInstructor.bio}
                 </p>
+                  <a href={`${basePath}/instructors/${selectedInstructor.id}`} style={{ display: "inline-block", marginTop: 8, fontSize: 12.5, color: "var(--gold)", fontWeight: 600, textDecoration: "none" }}>View full profile &rarr;</a>
+                </div>
               )}
             </div>
           )}
