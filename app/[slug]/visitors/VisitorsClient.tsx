@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type VPage = { path: string; at: string; lastAt: string };
 type Visit = {
-  id: string; sessionId: string; source: string; city: string; region: string; country: string; referrer: string;
+  id: string; sessionId: string; userId: string; visitorName: string; visitorEmail: string; source: string; city: string; region: string; country: string; referrer: string;
   pages: VPage[]; startedAt: string; lastSeenAt: string;
 };
 type ChatRow = {
@@ -266,13 +266,19 @@ export default function VisitorsClient({ basePath, apiBase }: { basePath: string
               <button onClick={() => setOpen(isOpen ? null : v.id)} style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: isLive ? "#2E9E52" : "#B9BFB6", flex: "none" }} />
-                  <strong style={{ fontSize: 15 }}>{where}</strong>
+                  <strong style={{ fontSize: 15 }}>{v.userId ? (v.visitorName || v.visitorEmail || where) : where}</strong>
                   <span style={{ marginLeft: "auto", fontSize: 12.5, color: "#4A5147" }}>
                     {isLive ? "On now" : ago(serverNow - new Date(v.lastSeenAt).getTime())}
                   </span>
                 </div>
+                {v.userId && (
+                  <div style={{ fontSize: 13, marginTop: 4 }}>
+                    <span style={{ background: "#FFF1D6", color: "#7A4E00", padding: "2px 8px", borderRadius: 999, fontWeight: 700, fontSize: 12 }}>Has an account · not a customer yet</span>
+                    {v.visitorEmail ? <span style={{ color: "#4A5147" }}> {v.visitorEmail}</span> : null}
+                  </div>
+                )}
                 <div style={{ fontSize: 13, color: "#4A5147", marginTop: 4 }}>
-                  {v.pages.length} {v.pages.length === 1 ? "page" : "pages"} · {dur(total)} on site
+                  {where}{" · "}{v.pages.length} {v.pages.length === 1 ? "page" : "pages"} · {dur(total)} on site
                   {from ? ` · from ${from}` : ""}{v.source === "bookmypro" ? " · booking pages" : ""}
                 </div>
               </button>

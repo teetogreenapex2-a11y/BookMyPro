@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Capacitor } from "@capacitor/core";
 
-// Lets the owner know when someone who ISN'T signed in opens one of the
-// business's public pages (booking, shop, gift cards, raffle). Signed-in
-// people - the owner, staff and customers - never count. The first ping of
+// Lets the owner know when someone opens one of the business's public pages
+// (booking, shop, gift cards, raffle) without being a customer: either not
+// signed in, or signed in with an account but never booked. The server skips
+// the owner, staff and customers. The first ping of
 // a visit sends the alert; a heartbeat every 15 seconds while the tab is open
 // feeds the owner's Visitors page (pages visited, time on each). Never inside
 // the native app, and a device opened once with ?noalert=1 is skipped for good.
@@ -19,7 +20,7 @@ export default function VisitPing() {
   const current = useRef<{ slug: string; page: string } | null>(null);
 
   useEffect(() => {
-    if (status !== "unauthenticated" || !pathname) { current.current = null; return; }
+    if (status === "loading" || !pathname) { current.current = null; return; }
     if (Capacitor.isNativePlatform()) return;
     const m = pathname.match(PUBLIC_PAGE);
     if (!m) { current.current = null; return; }

@@ -25,7 +25,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   return NextResponse.json({
     now: new Date().toISOString(),
     visits: rows.map((r) => ({
-      id: r.id, sessionId: r.sessionId, source: r.source, city: r.city, region: r.region, country: r.country,
+      id: r.id, sessionId: r.sessionId, userId: r.userId, visitorName: r.visitorName, visitorEmail: r.visitorEmail, source: r.source, city: r.city, region: r.region, country: r.country,
       referrer: r.referrer, pages: r.pages, startedAt: r.startedAt, lastSeenAt: r.lastSeenAt,
     })),
   });

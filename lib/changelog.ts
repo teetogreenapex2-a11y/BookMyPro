@@ -7,27 +7,6 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
-    id: "2026-11-17-chat",
-    date: "Nov 17, 2026",
-    title: "Chat with people on your website",
-    text: "Visitors to teetogreenapex.com can now chat with you from a bubble on the site, and you can start a chat with anyone who is on it. Open Visitors in More: tap Chat on a visitor to message them, and use the On/Off button at the top to show or hide the chat bubble.",
-    audience: "staff",
-  },
-  {
-    id: "2026-11-18-raffle-inperson",
-    date: "Nov 18, 2026",
-    title: "Sell raffle spaces in person",
-    text: "On either raffle page, pick the open spaces, tap Continue, then choose Cash, Card in person or Free and enter their name. The spaces are marked paid right away. Email is optional for walk-ins.",
-    audience: "staff",
-  },
-  {
-    id: "2026-11-16-visitors",
-    date: "Nov 16, 2026",
-    title: "See who is on your website",
-    text: "A new Visitors page (in More) shows who is on your website and booking pages right now, where they are, which pages they went through and how long they stayed on each. You also get an instant alert when someone new arrives.",
-    audience: "staff",
-  },
-  {
     id: "2026-11-16-topbar",
     date: "Nov 16, 2026",
     title: "A menu bar on the website",
@@ -75,20 +54,6 @@ export const CHANGELOG: ChangeEntry[] = [
     title: "Payment confirmation",
     text: "After you pay, you now see a clear \"Payment received\" message and get a receipt by email, so you never have to wonder whether it went through.",
     audience: "player",
-  },
-  {
-    id: "2026-11-10-raffle-200",
-    date: "Nov 10, 2026",
-    title: "New 200/20 raffle",
-    text: "A second raffle is open: 20 spots at $200 each, with a full bag, a set of irons and a Ping G450 driver up for grabs. Everyone else gets a $200 gift card. Pledge a spot now - your card is only charged when all 20 spots are filled. Owners can switch between both raffles at the top of the Raffle page.",
-    audience: "all",
-  },
-  {
-    id: "2026-11-05-raffle",
-    date: "Nov 5, 2026",
-    title: "Raffle: pick up to 3 spaces at once",
-    text: "The 50/50 raffle now lets you claim up to 3 spaces in one go and pay by card or Venmo. The sign-up box no longer gets covered by the keyboard or the tab bar.",
-    audience: "all",
   },
   {
     id: "2026-11-03-personal",

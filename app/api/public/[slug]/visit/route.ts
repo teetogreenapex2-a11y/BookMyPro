@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug } from "@/lib/tenant";
+import { getBusinessBySlug, getMembership } from "@/lib/tenant";
 import { businessDestination } from "@/lib/businessUrl";
 import { sendPushToMembership } from "@/lib/pushNotifications";
 
@@ -51,6 +53,18 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       if (body?.source === "bookmypro") source = "bookmypro";
     } catch {}
 
+    // Signed in? Customers, staff and owners are never tracked. Someone who has
+    // an account but is not (yet) a customer of this business is - that is the
+    // person worth a follow-up.
+    let who = { userId: "", name: "", email: "" };
+    const session = await getServerSession(authOptions);
+    const uid = (session?.user as any)?.id as string | undefined;
+    if (uid) {
+      const m = await getMembership(uid, business.id);
+      if (m && m.status === "active") return ok();
+      who = { userId: uid, name: String(session?.user?.name || "").slice(0, 80), email: String(session?.user?.email || "").slice(0, 120) };
+    }
+
     const city = clean(req.headers.get("x-vercel-ip-city"));
     const region = clean(req.headers.get("x-vercel-ip-country-region"));
     const country = clean(req.headers.get("x-vercel-ip-country"));
@@ -77,6 +91,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         await prisma.siteVisit.create({
           data: {
             businessId: business.id, sessionId: sid, source, city, region, country, referrer: ref,
+            userId: who.userId, visitorName: who.name, visitorEmail: who.email,
             pages: [{ path: page, at: now.toISOString(), lastAt: now.toISOString() }] as any,
           },
         }).catch(() => { isNew = false; }); // two first pings raced - the other one alerts
@@ -102,8 +117,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     });
     for (const o of owners) {
       await sendPushToMembership(o.id, {
-        title: "Someone is on your website",
-        body: `${where} · ${page}${from}`,
+        title: who.userId ? "An account holder is browsing" : "Someone is on your website",
+        body: who.userId
+          ? `${who.name || who.email} (has an account, not a customer yet) · ${where} · ${page}`
+          : `${where} · ${page}${from}`,
         url: businessDestination(business.slug, "/visitors"),
       }).catch(() => {});
     }
