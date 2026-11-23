@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { OAuth2Client } from "google-auth-library";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { alertNewSignup } from "@/lib/adminAlert";
 
 // POST /api/auth/google-native  { idToken }
 //
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
       user = await prisma.user.create({
         data: { email, name: payload.name || null, image: payload.picture || null },
       });
+      await alertNewSignup(user, "Google (app)");
     }
 
     // Link this Google account to the user if it isn't already - lets

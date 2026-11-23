@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import appleSignin from "apple-signin-auth";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { alertNewSignup } from "@/lib/adminAlert";
 
 // POST /api/auth/apple-native  { identityToken, name? }
 //
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
     user = await prisma.user.create({
       data: { email, name: name || null },
     });
+    await alertNewSignup(user, "Apple (app)");
   }
 
   const existingAccount = await prisma.account.findFirst({

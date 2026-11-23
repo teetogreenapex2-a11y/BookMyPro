@@ -6,6 +6,7 @@ import type { NextAuthOptions } from "next-auth";
 import { prisma } from "./prisma";
 import { sendMagicLinkEmail } from "./email";
 import { generateAppleClientSecret } from "./appleAuth";
+import { alertNewSignup } from "./adminAlert";
 
 // Built ahead of time, defensively - a malformed or misconfigured Apple
 // key should only ever mean the Apple button doesn't show up, never a
@@ -112,5 +113,10 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/login",
+  },
+  events: {
+    async createUser({ user }) {
+      await alertNewSignup(user, "Google, Apple or email link");
+    },
   },
 };

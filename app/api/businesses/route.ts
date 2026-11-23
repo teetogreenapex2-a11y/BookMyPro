@@ -6,6 +6,7 @@ import { generateUniqueSlug, slugify } from "@/lib/slug";
 import { seedInstructorAvailability } from "@/lib/seedAvailability";
 import { businessDestination } from "@/lib/businessUrl";
 import { sendNewBusinessNotification } from "@/lib/email";
+import { alertPlatformAdmin } from "@/lib/adminAlert";
 
 // POST /api/businesses  { name, email?, hours?, lessonRate?, slug? }
 // Creates a new Business, makes the current user its "owner", and seeds
@@ -67,6 +68,8 @@ export async function POST(req: NextRequest) {
     ownerEmail: session.user?.email || "",
     reviewUrl: `${process.env.NEXTAUTH_URL}/admin/pending-businesses`,
   });
+
+  await alertPlatformAdmin({ title: "New business signed up", body: `${business.name} (${session.user?.email || "unknown"}) is waiting for approval`, url: "/admin/pending-businesses" });
 
   return NextResponse.json({
     slug: business.slug,
