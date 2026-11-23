@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { randomInt } from "crypto";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O or 1/I — easy to misread when typing a gift card code in
 
 function randomSegment(length: number) {
   let s = "";
-  for (let i = 0; i < length; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  for (let i = 0; i < length; i++) s += CODE_CHARS[randomInt(CODE_CHARS.length)];
   return s;
 }
 

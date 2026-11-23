@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { tooMany } from "@/lib/rateLimit";
+import { getMembership } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { getBusinessBySlug } from "@/lib/tenant";
 
@@ -16,6 +18,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
+
+  const memberOf = await getMembership((session.user as any).id, business.id);
+  if (!memberOf || memberOf.status !== "active") return NextResponse.json({ error: "Not a member of this business" }, { status: 403 });
+  if (tooMany(`join:${(session.user as any).id}`, 8, 10 * 60 * 1000)) return NextResponse.json({ error: "Too many tries - wait a few minutes and try again" }, { status: 429 });
 
   const { joinCode } = await req.json();
   if (!joinCode?.trim()) return NextResponse.json({ error: "Enter the code shown on the other phone" }, { status: 400 });

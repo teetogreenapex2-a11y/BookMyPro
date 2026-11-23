@@ -60,7 +60,7 @@ export default async function InstructorProfilePage({ params }: { params: { slug
 
   return (
     <div style={{ minHeight: "100vh", background: "#F6F4EE", fontFamily: "sans-serif" }}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <header style={{ background: "#1B3A2F", color: "#F6F4EE", padding: "20px 20px 28px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
           <a href={`/${params.slug}/instructors`} style={{ fontSize: 13, color: "#D7DED9", textDecoration: "none" }}>&larr; All instructors</a>

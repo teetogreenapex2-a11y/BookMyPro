@@ -61,7 +61,7 @@ export default async function InstructorsPage({ params }: { params: { slug: stri
   return (
     <div style={{ minHeight: "100vh", background: "#F6F4EE", fontFamily: "sans-serif" }}>
       {jsonLd.map((entry, i) => (
-        <script key={i} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(entry) }} />
+        <script key={i} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(entry).replace(/</g, "\\u003c") }} />
       ))}
       <header style={{ background: "#1B3A2F", color: "#F6F4EE", padding: "28px 20px" }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>

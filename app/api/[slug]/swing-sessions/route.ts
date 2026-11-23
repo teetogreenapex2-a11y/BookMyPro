@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { randomInt } from "crypto";
 import { getBusinessBySlug, getMembership, getInstructorById } from "@/lib/tenant";
 
 function generateJoinCode() {
   // Six digits, easy to read aloud or type quickly on a second phone
   // that's about to be set up on a tripod down the target line.
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(randomInt(100000, 1000000));
 }
 
 // POST /api/{slug}/swing-sessions  { instructorMembershipId, playerId? }
