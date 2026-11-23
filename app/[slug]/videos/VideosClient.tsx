@@ -2,7 +2,7 @@
 
 import { downloadVideo } from "@/lib/downloadVideo";
 import ZoomFrame from "@/app/components/ZoomFrame";
-import VideoCompare from "@/app/components/VideoCompare";
+import VideoCompare, { submissionToClip } from "@/app/components/VideoCompare";
 import SwingProgress from "@/app/components/SwingProgress";
 import ClubPathLayer from "@/app/components/ClubPathLayer";
 import { useEffect, useRef, useState } from "react";
@@ -436,7 +436,7 @@ export default function VideosClient({ slug, basePath, apiBase }: { slug: string
         <VideoCompare
           initialId={cmp.l}
           initialRightId={cmp.r}
-          clips={submissions.map((x) => ({ id: x.id, url: x.videoUrl, label: `${x.title || "Swing"} · ${new Date(x.submittedAt).toLocaleDateString()}` }))}
+          clips={submissions.map(submissionToClip)}
           onClose={() => setCmp(null)}
         />
       )}

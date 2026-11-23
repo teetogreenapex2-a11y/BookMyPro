@@ -2,7 +2,7 @@
 
 import { downloadVideo } from "@/lib/downloadVideo";
 import ZoomFrame from "@/app/components/ZoomFrame";
-import VideoCompare from "@/app/components/VideoCompare";
+import VideoCompare, { submissionToClip } from "@/app/components/VideoCompare";
 import SwingProgress from "@/app/components/SwingProgress";
 import { analyzeSwingTempo } from "@/lib/swingTempo";
 import VoiceOverRecorder from "@/app/components/VoiceOverRecorder";
@@ -1065,8 +1065,14 @@ export default function InstructorVideosClient({ slug, basePath, apiBase, viewer
                   <VideoCompare
                     initialId={cmp.l}
                     initialRightId={cmp.r}
-                    clips={submissions.filter((x) => x.playerId === selected.playerId).map((x) => ({ id: x.id, url: x.videoUrl, label: `${x.title || "Swing"} · ${new Date(x.submittedAt).toLocaleDateString()}` }))}
+                    clips={submissions.filter((x) => x.playerId === selected.playerId).map(submissionToClip)}
                     onClose={() => setCmp(null)}
+                    sketchApiBase={apiBase}
+                    onAddNote={async (clipId, t, text) => {
+                      const r = await fetch(`${apiBase}/videos/${clipId}/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timestampSeconds: t, text }) });
+                      if (!r.ok) throw new Error("failed");
+                      load();
+                    }}
                   />
                 )}
                 {selected.comments.length > 0 && (

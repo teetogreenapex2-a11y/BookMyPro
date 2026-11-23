@@ -7,6 +7,13 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    id: "2026-11-23-compare-pro",
+    date: "Nov 23, 2026",
+    title: "Smarter swing compare",
+    text: "Compare now lets you tap Mark impact on each swing so both play in sync at impact, step both videos one frame at a time, switch to an Overlay that ghosts one swing over the other, and draw lines, angles and circles right on the video. You can filter by club, see notes pinned to a moment, and save the comparison as one video with the voice-over. Instructors can also save a frame to Swing Sketch. Progress now has a monthly recap and one-tap Then vs now buttons.",
+    audience: "all",
+  },
+  {
     id: "2026-11-23-instructor-profile",
     date: "Nov 23, 2026",
     title: "Full instructor profile pages",
