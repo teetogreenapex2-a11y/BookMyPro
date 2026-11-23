@@ -342,7 +342,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                   {board.pledgeMode
                     ? `You won't be charged today. Your card is saved and charged ${dollars(board.priceCents * picked.length)} only when all ${board.spaceCount} spots are filled. If it doesn't fill, you're never charged.`
                     : method === "venmo"
-                    ? "Your spaces are reserved for 24 hours. Send the Venmo payment on the next screen and they're confirmed once it's received. If Venmo asks for the last 4 digits of the phone number, enter 1896."
+                    ? "Your spaces are reserved for 3 days. Send the Venmo payment on the next screen and they're confirmed once it's received. If Venmo asks for the last 4 digits of the phone number, enter 1896."
                     : "Pay by card on the next screen. Your spaces are held for 30 minutes while you pay."}
                 </p>
               </>
@@ -386,7 +386,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
           <div onClick={(e) => e.stopPropagation()} style={{ width: "calc(100% - 32px)", maxWidth: 480, background: "#FFF", borderRadius: 18, padding: "20px 20px 24px", margin: "16px auto" }}>
             <div className="display" style={{ fontSize: 20, marginBottom: 6 }}>Spaces reserved</div>
             <p style={{ fontSize: 14, margin: "0 0 12px" }}>
-              Space{venmoInfo.numbers.length === 1 ? "" : "s"} <strong>{venmoInfo.numbers.join(", ")}</strong> {venmoInfo.numbers.length === 1 ? "is" : "are"} yours for 24 hours. Send <strong>{dollars(venmoInfo.amountCents)}</strong> to <strong>@{venmoInfo.handle}</strong> on Venmo to lock {venmoInfo.numbers.length === 1 ? "it" : "them"} in.
+              Space{venmoInfo.numbers.length === 1 ? "" : "s"} <strong>{venmoInfo.numbers.join(", ")}</strong> {venmoInfo.numbers.length === 1 ? "is" : "are"} yours for 3 days. Send <strong>{dollars(venmoInfo.amountCents)}</strong> to <strong>@{venmoInfo.handle}</strong> on Venmo to lock {venmoInfo.numbers.length === 1 ? "it" : "them"} in.
             </p>
             <a href={venmoInfo.url} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center", background: "#3D95CE", color: "#FFF", borderRadius: 10, padding: 14, fontSize: 15, fontWeight: 700, textDecoration: "none", marginBottom: 10 }}>
               Open Venmo and pay {dollars(venmoInfo.amountCents)}

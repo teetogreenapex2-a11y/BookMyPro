@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return NextResponse.json({ ok, already: !ok });
     } catch (e) {
       console.error("Venmo confirm failed:", e);
-      return NextResponse.json({ error: "Couldn't finish that - try Confirm again." }, { status: 500 });
+      return NextResponse.json({ error: String((e as any)?.message || "").startsWith("These raffle") ? (e as any).message : "Couldn't finish that - try Confirm again." }, { status: 500 });
     }
   }
   if (action === "cancel") {

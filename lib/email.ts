@@ -413,7 +413,7 @@ export async function sendRaffleVenmoNotification(
       <p style="color: #5C6459; margin-top: 0;">${esc(details.businessName)} raffle</p>
       <p><strong>${esc(details.name)}</strong> reserved space${details.numbers.length === 1 ? "" : "s"} <strong>${details.numbers.join(", ")}</strong> and is paying <strong>$${(details.amountCents / 100).toFixed(2)}</strong> by Venmo.</p>
       <p style="color: #5C6459;">${esc(details.email)}${details.phone ? " &middot; " + esc(details.phone) : ""}</p>
-      <p>Check your Venmo. Once you see the payment, open the raffle and tap <strong>Mark paid</strong>. Unpaid reservations are released after 24 hours.</p>
+      <p>Check your Venmo. Once you see the payment, open the raffle and tap <strong>Mark paid</strong>. Unpaid reservations are released after 3 days.</p>
       <p><a href="${details.raffleUrl}" style="display:inline-block;background:#1B3A2F;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">Open the raffle</a></p>
     </div>
   `;

@@ -103,7 +103,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 // Public: no sign-in needed. Up to maxPerPerson spaces can be claimed in one
 // go. Card: spaces are held while the customer is at Stripe Checkout and
 // become theirs when the webhook confirms payment. Venmo: spaces are
-// reserved for 24 hours and the owner is told to confirm the payment.
+// reserved for 3 days and the owner is told to confirm the payment.
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const business = await getBusinessBySlug(params.slug);
   if (!business || !business.approved) return NextResponse.json({ error: "Business not found" }, { status: 404 });
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "Venmo isn't available right now. Pay by card instead." }, { status: 400 });
   }
   const totalCents = board.priceCents * numbers.length;
-  const holdMinutes = method === "venmo" ? 24 * 60 : 31; // Stripe Checkout lasts at least 30 minutes
+  const holdMinutes = method === "venmo" ? 72 * 60 : 31; // Stripe Checkout lasts at least 30 minutes
   const groupId = randomUUID();
 
   let created;
@@ -188,6 +188,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const note = `${business.name} ${board.title} - space${sorted.length === 1 ? "" : "s"} ${sorted.join(", ")}`;
     const handle = String(venmoOwner!.venmoHandle).replace(/^@/, "");
     const venmoUrl = `https://venmo.com/${encodeURIComponent(handle)}?txn=pay&amount=${(totalCents / 100).toFixed(2)}&note=${encodeURIComponent(note)}`;
+    // Also list it under More > Venmo payments, next to the other Venmo payments.
+    await prisma.venmoPayment.create({
+      data: {
+        businessId: business.id, payeeMembershipId: venmoOwner!.id, kind: "raffle",
+        description: `${board.title} - space${sorted.length === 1 ? "" : "s"} ${sorted.join(", ")}`,
+        amountCents: totalCents, customerName: name, customerEmail: email,
+        metadata: { kind: "raffle", raffleGroupId: groupId, boardId: board.id, numbers: sorted, businessId: business.id },
+      },
+    }).catch((e) => console.error("Raffle Venmo record failed:", e));
     // Tell the owner someone is paying, so they know to confirm it.
     await Promise.allSettled([
       sendRaffleVenmoNotification(venmoOwner!.user.email, { businessName: business.name, name, email, phone, numbers: sorted, amountCents: totalCents, raffleUrl }),

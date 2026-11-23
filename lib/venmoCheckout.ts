@@ -72,6 +72,19 @@ export async function confirmVenmoPayment(id: string) {
   if (claimed.count === 0) return false;
   const pay = await prisma.venmoPayment.findUnique({ where: { id } });
   if (!pay) return false;
+  if (pay.kind === "raffle") {
+    // Raffle spaces were held when the customer reserved them; confirming makes them theirs.
+    const gid = String((pay.metadata as any)?.raffleGroupId || "");
+    const res = gid ? await prisma.raffleSpace.updateMany({ where: { groupId: gid, pending: true }, data: { pending: false, holdExpiresAt: null } }) : { count: 0 };
+    if (res.count === 0) {
+      const already = gid ? await prisma.raffleSpace.count({ where: { groupId: gid, pending: false } }) : 0;
+      if (already === 0) {
+        await prisma.venmoPayment.update({ where: { id }, data: { status: "pending", confirmedAt: null } });
+        throw new Error("These raffle spaces expired and were released. Use Claim on the raffle page to enter them.");
+      }
+    }
+    return true;
+  }
   const { processStripeEvent } = await import("@/lib/stripeEvents");
   const session = {
     id: `venmo_${pay.id}`, mode: "payment", payment_status: "paid", amount_total: pay.amountCents,
@@ -93,6 +106,11 @@ export async function cancelVenmoPayment(id: string) {
   const claimed = await prisma.venmoPayment.updateMany({ where: { id, status: "pending" }, data: { status: "cancelled" } });
   if (claimed.count === 0) return false;
   const pay = await prisma.venmoPayment.findUnique({ where: { id } });
+  if (pay?.kind === "raffle") {
+    const gid = String((pay.metadata as any)?.raffleGroupId || "");
+    if (gid) await prisma.raffleSpace.deleteMany({ where: { groupId: gid, pending: true } });
+    return true;
+  }
   const orderId = (pay?.metadata as any)?.orderId;
   if (pay?.kind === "order" && orderId) {
     const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });

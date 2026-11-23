@@ -39,6 +39,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       where: { boardId: board.id, pending: true, payMethod: "venmo", OR: [{ groupId }, { id: groupId }] },
       data: { pending: false, holdExpiresAt: null },
     });
+    await prisma.venmoPayment.updateMany({
+      where: { businessId: business.id, kind: "raffle", status: "pending", metadata: { path: ["raffleGroupId"], equals: groupId } },
+      data: { status: "confirmed", confirmedAt: new Date() },
+    });
     if (res.count === 0) return NextResponse.json({ error: "That reservation has expired or was already confirmed. Use Claim to enter it for them." }, { status: 400 });
     return NextResponse.json({ ok: true, confirmed: res.count });
   }
@@ -47,6 +51,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (body.action === "releasevenmo") {
     const groupId = String(body.groupId || "");
     await prisma.raffleSpace.deleteMany({ where: { boardId: board.id, pending: true, payMethod: "venmo", OR: [{ groupId }, { id: groupId }] } });
+    await prisma.venmoPayment.updateMany({
+      where: { businessId: business.id, kind: "raffle", status: "pending", metadata: { path: ["raffleGroupId"], equals: groupId } },
+      data: { status: "cancelled" },
+    });
     return NextResponse.json({ ok: true });
   }
 
