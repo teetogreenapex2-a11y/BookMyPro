@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessBySlug, getMembership } from "@/lib/tenant";
+import { getBusinessBySlug, getMembership, isPlatformAdmin } from "@/lib/tenant";
 
 // GET /api/{slug}/my-role
 // A small, dedicated endpoint whose only job is answering "what role does
@@ -34,5 +34,6 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     realRole: membership.role,
     status: membership.status,
     videoEnabled: business.videoEnabled !== false,
+    platformAdmin: await isPlatformAdmin(userId),
   });
 }

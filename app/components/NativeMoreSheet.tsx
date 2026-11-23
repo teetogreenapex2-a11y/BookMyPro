@@ -36,8 +36,8 @@ export default function NativeMoreSheet() {
     const onOpen = async () => {
       if (!currentSlug || status !== "authenticated") return;
       try {
-        const { role, videoEnabled, realRole } = await (await fetch(`/api/${currentSlug}/my-role`)).json();
-        const nav = navFor(role, videoEnabled !== false, realRole);
+        const { role, videoEnabled, realRole, platformAdmin } = await (await fetch(`/api/${currentSlug}/my-role`)).json();
+        const nav = navFor(role, videoEnabled !== false, realRole, platformAdmin === true);
         if (!nav) return;
         setSlug(currentSlug);
         setUnseen(hasUnseen(role));

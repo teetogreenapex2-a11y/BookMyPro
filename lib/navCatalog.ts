@@ -45,10 +45,11 @@ const PLAYER_ALL: NavItem[] = [
 
 export const MAX_MAIN_TABS = 4;
 
-export function navFor(role: string, videoEnabled = true, realRole?: string): { all: NavItem[]; main: NavItem[]; more: NavItem[] } | null {
+export function navFor(role: string, videoEnabled = true, realRole?: string, platformAdmin = false): { all: NavItem[]; main: NavItem[]; more: NavItem[] } | null {
   const base = role === "owner" ? OWNER_ALL : role === "instructor" ? STAFF_ALL : role === "player" ? PLAYER_ALL : null;
   if (!base) return null;
   let all = videoEnabled ? base : base.filter((i) => i.key !== "videos");
+  if (platformAdmin && role !== "player") all = [...all, I("platform", "Platform admin", "settings", "/platform-admin")];
   all = [...all, I("whatsnew", "What's new", "sparkle", "/whats-new")];
   // Owners and instructors can flip between staff and player tabs.
   const realIsStaff = realRole === "owner" || realRole === "instructor";
