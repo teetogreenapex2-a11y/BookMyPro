@@ -7,6 +7,13 @@ export type ChangeEntry = { id: string; date: string; title: string; text: strin
 
 export const CHANGELOG: ChangeEntry[] = [
   {
+    id: "2026-11-26-discounts",
+    date: "Nov 26, 2026",
+    title: "Discount codes for lessons and fittings",
+    text: "Offer a percent or dollar amount off. Open Discounts in More, make a code, and share it. Customers enter it when they book and see their new price before they pay. You can limit a code to lessons or fittings, one instructor, or an end date, and turn it off any time.",
+    audience: "staff",
+  },
+  {
     id: "2026-11-23-compare-pro",
     date: "Nov 23, 2026",
     title: "Smarter swing compare",

@@ -14,6 +14,7 @@ import { businessDestination } from "@/lib/businessUrl";
 import { sendPaymentReceivedEmails } from "@/lib/email";
 import { markRaffleSessionPaid } from "@/lib/raffleNotify";
 import { fulfillPledgeSession } from "@/lib/rafflePledge";
+import { recordDiscountUse } from "@/lib/discounts";
 
 // Shared by the Stripe webhook and by the return-from-checkout confirmation,
 // so a paid customer is fulfilled even if the webhook is late or never arrives.
@@ -105,6 +106,9 @@ export async function processStripeEvent(event: Stripe.Event): Promise<NextRespo
       console.error(`Webhook account mismatch: event.account=${event.account} vs business.stripeAccountId for businessId=${businessId}`);
       return NextResponse.json({ received: true });
     }
+
+    // A discount code only counts as used once the money is in.
+    if (meta.discountCode) await recordDiscountUse(businessId, meta.discountCode, meta.userId, meta.contactEmail).catch((e) => console.error("Discount record failed:", e));
 
     // Payment alert for the business + receipt for the customer, sent as soon as
     // the money is confirmed (before fulfilment) so a payment is never silent.

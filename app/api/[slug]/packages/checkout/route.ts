@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { checkoutOrVenmo } from "@/lib/venmoCheckout";
 import { getBusinessBySlug, getInstructorById } from "@/lib/tenant";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
+import { applyDiscountCode } from "@/lib/discounts";
 import { findPackage, getPackagePriceCents, isPackageEnabled, isPackagePriceSet, resolveDurationPurchase } from "@/lib/pricing";
 
 // POST /api/{slug}/packages/checkout  { packageType, availabilityId?, contactName?, contactPhone?, contactEmail? }
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
   const isVenmo = (await req.clone().json().catch(() => ({} as any)))?.paymentMethod === "venmo";
 
-  const { packageType, durationId, packageOptionId, customOfferingSlot, availabilityId, instructorMembershipId, contactName, contactPhone, contactEmail, isRemote: submittedIsRemote } = await req.json();
+  const { packageType, durationId, packageOptionId, customOfferingSlot, availabilityId, instructorMembershipId, contactName, contactPhone, contactEmail, isRemote: submittedIsRemote, discountCode } = await req.json();
 
   // Pricing is per-instructor now, not business-wide — every package
   // purchase needs to know who it's with in order to know what to charge,
@@ -133,7 +134,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
   }
 
-  const priceCents = purchase.priceCents;
+  let priceCents = purchase.priceCents;
+  let discountNote = "";
+  let appliedCode = "";
+  if (discountCode && String(discountCode).trim()) {
+    const d = await applyDiscountCode(business.id, discountCode, "lesson", instructorMembershipId, priceCents, { userId: (session.user as any).id, email: contactEmail || session.user?.email });
+    if ("error" in d) return NextResponse.json({ error: d.error }, { status: 400 });
+    priceCents = d.finalCents; appliedCode = d.code; discountNote = ` (${d.label} with ${d.code})`;
+  }
   const userId = (session.user as any).id;
 
   if (business.paymentProvider === "square" && !isVenmo) {
@@ -143,6 +151,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
     const pending = await prisma.pendingSquarePayment.create({
       data: {
+        discountCode: appliedCode || null,
         businessId: business.id,
         userId,
         kind: "package",
@@ -163,7 +172,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     try {
       const url = await createSquarePaymentLink(business.squareAccessToken, {
         amountCents: priceCents,
-        name: `${purchase.label} — ${business.name}`,
+        name: `${purchase.label} — ${business.name}${discountNote}`,
         referenceId: pending.id,
         redirectUrl: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=success"),
       });
@@ -196,7 +205,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         {
           price_data: {
             currency: "usd",
-            product_data: { name: `${purchase.label} — ${business.name}` },
+            product_data: { name: `${purchase.label} — ${business.name}${discountNote}` },
             unit_amount: priceCents,
           },
           quantity: 1,
@@ -204,6 +213,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       ],
       metadata: {
         kind: "package",
+        discountCode: appliedCode,
         userId,
         businessId: business.id,
         packageType: purchase.packageTypeForDb,

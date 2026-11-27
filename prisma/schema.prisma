@@ -16,6 +16,7 @@ datasource db {
 
 model Business {
   id     String @id @default(cuid())
+  discountCodes DiscountCode[]
   slug   String @unique // URL-friendly identifier, e.g. "tee-to-green" -> /tee-to-green/book
   name   String @default("My Golf Business")
   // IANA name (e.g. "America/Chicago"). Defaulted to the value every
@@ -885,6 +886,7 @@ model SyncLog {
 // unconsumed rows (abandoned checkouts) can be purged periodically.
 model PendingSquarePayment {
   id            String   @id @default(cuid())
+  discountCode  String?
   businessId    String
   userId        String
   kind          String   // "package" | "fitting" | "group"
@@ -1203,4 +1205,35 @@ model SiteChatMessage {
   createdAt DateTime @default(now())
 
   @@index([chatId, createdAt])
+}
+
+// A code a customer types at booking for a percent or dollar amount off lessons or fittings.
+model DiscountCode {
+  id                     String    @id @default(cuid())
+  business               Business  @relation(fields: [businessId], references: [id])
+  businessId             String
+  code                   String    // stored uppercase
+  kind                   String    // "percent" | "amount"
+  value                  Int       // percent (1-99) or cents
+  appliesTo              String    @default("all") // "all" | "lessons" | "fittings"
+  instructorMembershipId String?   // null = works with every instructor
+  expiresAt              DateTime?
+  active                 Boolean   @default(true)
+  createdAt              DateTime  @default(now())
+
+  @@unique([businessId, code])
+  @@index([businessId])
+}
+
+// One row each time a customer actually pays using a discount code.
+model DiscountRedemption {
+  id             String   @id @default(cuid())
+  discountCodeId String
+  businessId     String
+  userId         String
+  email          String?
+  createdAt      DateTime @default(now())
+
+  @@index([discountCodeId])
+  @@index([businessId])
 }

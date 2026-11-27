@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { checkoutOrVenmo } from "@/lib/venmoCheckout";
 import { getBusinessBySlug, getInstructorById } from "@/lib/tenant";
 import { getBusinessAbsoluteUrl } from "@/lib/businessUrl";
+import { applyDiscountCode } from "@/lib/discounts";
 import { findFitting, getFittingPriceCents, isFittingEnabled } from "@/lib/pricing";
 
 // POST /api/{slug}/fittings/checkout  { availabilityId, fittingType }
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const business = await getBusinessBySlug(params.slug);
   if (!business) return NextResponse.json({ error: "Business not found" }, { status: 404 });
 
-  const { availabilityId, fittingType, instructorMembershipId, contactName, contactPhone, contactEmail, paymentMethod } = await req.json();
+  const { availabilityId, fittingType, instructorMembershipId, contactName, contactPhone, contactEmail, paymentMethod, discountCode } = await req.json();
   const isVenmo = paymentMethod === "venmo";
   const fitting = findFitting(fittingType);
   if (!fitting) return NextResponse.json({ error: "Unknown fitting type" }, { status: 400 });
@@ -56,7 +57,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (!isFittingEnabled(instructorMembership, fitting.id)) {
     return NextResponse.json({ error: "This fitting type isn't currently offered by this instructor" }, { status: 400 });
   }
-  const priceCents = getFittingPriceCents(instructorMembership, fitting.id);
+  let priceCents = getFittingPriceCents(instructorMembership, fitting.id);
+  let discountNote = "";
+  let appliedCode = "";
+  if (discountCode && String(discountCode).trim()) {
+    const d = await applyDiscountCode(business.id, discountCode, "fitting", instructorMembershipId, priceCents, { userId: (session.user as any).id, email: contactEmail || session.user?.email });
+    if ("error" in d) return NextResponse.json({ error: d.error }, { status: 400 });
+    priceCents = d.finalCents; appliedCode = d.code; discountNote = ` (${d.label} with ${d.code})`;
+  }
   const userId = (session.user as any).id;
 
   if (business.paymentProvider === "square" && !isVenmo) {
@@ -66,6 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
     const pending = await prisma.pendingSquarePayment.create({
       data: {
+        discountCode: appliedCode || null,
         businessId: business.id,
         userId,
         kind: "fitting",
@@ -81,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     try {
       const url = await createSquarePaymentLink(business.squareAccessToken, {
         amountCents: priceCents,
-        name: `${fitting.label} — ${business.name}`,
+        name: `${fitting.label} — ${business.name}${discountNote}`,
         referenceId: pending.id,
         redirectUrl: getBusinessAbsoluteUrl(req, business.slug, "/book?purchase=success"),
       });
@@ -114,7 +123,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         {
           price_data: {
             currency: "usd",
-            product_data: { name: `${fitting.label} — ${business.name}` },
+            product_data: { name: `${fitting.label} — ${business.name}${discountNote}` },
             unit_amount: priceCents,
           },
           quantity: 1,
@@ -122,6 +131,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       ],
       metadata: {
         kind: "fitting",
+        discountCode: appliedCode,
         userId,
         businessId: business.id,
         availabilityId,

@@ -57,6 +57,8 @@ export async function deleteBusinessCompletely(businessId: string) {
     }
     await tx.product.deleteMany({ where: { businessId } });
     await tx.giftCard.deleteMany({ where: { businessId } });
+    await tx.discountRedemption.deleteMany({ where: { businessId } });
+    await tx.discountCode.deleteMany({ where: { businessId } });
     await tx.pendingSquarePayment.deleteMany({ where: { businessId } });
     await tx.syncLog.deleteMany({ where: { businessId } });
     await tx.membership.deleteMany({ where: { businessId } });

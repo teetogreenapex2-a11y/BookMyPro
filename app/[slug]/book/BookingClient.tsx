@@ -1,4 +1,5 @@
 "use client";
+import PromoCodeField from "@/app/components/PromoCodeField";
 import { choosePayMethod, showVenmoInstructions } from "@/lib/payChoiceClient";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -202,6 +203,7 @@ export default function BookingClient({
       messageRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [message]);
+  const [promoCode, setPromoCode] = useState("");
   const [contact, setContact] = useState({ name: initialContact?.name || "", phone: initialContact?.phone || "", email: initialContact?.email || "", handedness: "", scoreOrHandicap: "", commonIssues: "" });
   // Signed-in customers whose name, phone and email we already have just confirm -
   // the form only comes back if they tap Change, or something is missing.
@@ -647,6 +649,7 @@ export default function BookingClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         paymentMethod: payMethod,
+        discountCode: promoCode.trim() || undefined,
         ...(pendingCustomOfferingSlot
           ? { customOfferingSlot: pendingCustomOfferingSlot }
           : pendingDurationId
@@ -704,6 +707,7 @@ export default function BookingClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         paymentMethod: payMethod,
+        discountCode: promoCode.trim() || undefined,
         availabilityId: selected.id,
         fittingType,
         instructorMembershipId: selectedInstructorId,
@@ -1887,6 +1891,17 @@ export default function BookingClient({
                 style={{ ...contactInputStyle, resize: "vertical" }}
               />
             </div>
+            )}
+
+            {(service === "fitting" || (service === "lesson" && isBuyingPackage)) && (
+              <PromoCodeField
+                apiBase={apiBase}
+                service={service === "fitting" ? "fitting" : "lesson"}
+                instructorMembershipId={selectedInstructorId}
+                priceCents={service === "fitting" ? (activeFitting?.priceCents ?? 0) : (pendingPurchaseInfo?.priceCents ?? 0)}
+                value={promoCode}
+                onChange={setPromoCode}
+              />
             )}
 
             <button

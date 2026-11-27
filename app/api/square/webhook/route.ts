@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { recordDiscountUse } from "@/lib/discounts";
 import { prisma } from "@/lib/prisma";
 import { verifySquareWebhookSignature, getSquareOrder } from "@/lib/square";
 import { findPackage, findFitting } from "@/lib/pricing";
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
   if (!pending) return NextResponse.json({ received: true }); // already processed, or not ours
 
   const businessId = pending.businessId;
+  if (pending.discountCode) await recordDiscountUse(businessId, pending.discountCode, pending.userId, pending.contactEmail).catch((e) => console.error("Discount record failed:", e));
 
   if (pending.kind === "package" && pending.packageType) {
     const isCustomPurchase = pending.packageType === "custom";
