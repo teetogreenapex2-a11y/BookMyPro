@@ -108,6 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const business = await getBusinessBySlug(params.slug);
   if (!business || !business.approved) return NextResponse.json({ error: "Business not found" }, { status: 404 });
   const board = await getOrCreateBoard(business.id, normalizeRaffleKey(req.nextUrl.searchParams.get("key")));
+  if (board.status === "cancelled") return NextResponse.json({ error: "This raffle was cancelled" }, { status: 400 });
   if (board.status !== "open") return NextResponse.json({ error: "This raffle has already been drawn" }, { status: 400 });
 
   const body = await req.json().catch(() => null);

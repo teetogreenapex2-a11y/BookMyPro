@@ -26,8 +26,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const tiers = board.tiers as unknown as RaffleTier[];
 
   if (body.action === "release") {
-    if (board.status !== "open") return NextResponse.json({ error: "Already drawn" }, { status: 400 });
+    if (board.status !== "open" && board.status !== "cancelled") return NextResponse.json({ error: "Already drawn" }, { status: 400 });
     await prisma.raffleSpace.deleteMany({ where: { boardId: board.id, number: Number(body.number) } });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Cancel the raffle: stamps it CANCELLED and stops new claims. Spaces stay until released.
+  if (body.action === "cancelraffle") {
+    if (board.status === "drawn") return NextResponse.json({ error: "Already drawn" }, { status: 400 });
+    await prisma.raffleBoard.update({ where: { id: board.id }, data: { status: "cancelled" } });
     return NextResponse.json({ ok: true });
   }
 

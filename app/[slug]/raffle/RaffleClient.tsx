@@ -69,6 +69,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
   const byNumber = new Map(spaces.map((s) => [s.number, s]));
   const taken = spaces.filter((s) => !s.held).length;
   const drawn = board?.status === "drawn";
+  const cancelled = board?.status === "cancelled";
   const dollars = (c: number) => `$${(c / 100).toFixed(0)}`;
 
   async function claim() {
@@ -149,7 +150,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
           )}
           {board && (
             <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-              {[[String(taken), "Claimed"], [String(board.spaceCount - taken), "Open"], [drawn ? "Drawn" : "Open", "Status"]].map(([n, l]) => (
+              {[[String(taken), "Claimed"], [String(board.spaceCount - taken), "Open"], [drawn ? "Drawn" : cancelled ? "Cancelled" : "Open", "Status"]].map(([n, l]) => (
                 <div key={l} style={{ flex: "1 1 90px", background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 10, padding: "9px 12px" }}>
                   <div className="display" style={{ fontSize: 22 }}>{n}</div>
                   <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "#BFE3CC" }}>{l}</div>
@@ -190,7 +191,12 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
               ))}
             </div>
 
-            <div style={{ background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <div style={{ position: "relative", overflow: "hidden", background: "#FFF", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              {cancelled && (
+                <div aria-label="Cancelled" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 5, background: "rgba(255,255,255,0.45)" }}>
+                  <div style={{ transform: "rotate(-30deg)", border: "6px solid #B23A3A", color: "#B23A3A", borderRadius: 12, padding: "6px 22px", fontSize: "clamp(40px, 13vw, 96px)", fontWeight: 900, letterSpacing: "0.08em", background: "rgba(255,255,255,0.8)" }}>CANCELLED</div>
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 6 }}>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{drawn ? "Final board" : "Pick your space"}</div>
                 <div style={{ fontSize: 12, color: "var(--muted)" }}>{drawn ? "Winners are highlighted" : `${dollars(board.priceCents)} per space · tap up to ${board.maxPerPerson}`}</div>
@@ -200,7 +206,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                   const s = byNumber.get(n);
                   const prize = s && s.winnerTier != null && s.winnerTier !== restIndex;
                   const tierLabel = prize ? board.tiers[s!.winnerTier!]?.label : null;
-                  const open = !s && !drawn;
+                  const open = !s && !drawn && !cancelled;
                   return (
                     <button
                       key={n}
@@ -234,7 +240,7 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                 onClick={() => { if (window.confirm("Draw the winners now? This can't be undone.")) admin("draw"); }}
                 style={{ background: "var(--fairway)", color: "var(--chalk)", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, fontWeight: 700, opacity: adminBusy || drawn || taken < board.spaceCount || pledgedCount > 0 ? 0.45 : 1 }}
               >
-                {drawn ? "Winners drawn" : pledgedCount > 0 ? "Draw unlocks after the cards are charged" : taken < board.spaceCount ? `Draw unlocks when full (${board.spaceCount - taken} to go)` : "Draw winners"}
+                {drawn ? "Winners drawn" : cancelled ? "Raffle cancelled" : pledgedCount > 0 ? "Draw unlocks after the cards are charged" : taken < board.spaceCount ? `Draw unlocks when full (${board.spaceCount - taken} to go)` : "Draw winners"}
               </button>
               {drawn && !board.giftCardsIssuedAt && restIndex !== -1 && (
                 <>
@@ -251,6 +257,15 @@ export default function RaffleClient({ apiBase, businessName, isOwner, boardKey 
                 </>
               )}
               {board.giftCardsIssuedAt && <span style={{ fontSize: 12.5, color: "#1F6B3A", fontWeight: 700, alignSelf: "center" }}>Gift cards created</span>}
+              {!drawn && !cancelled && (
+                <button
+                  disabled={adminBusy}
+                  onClick={() => { if (window.confirm("Cancel this raffle? It gets a CANCELLED stamp and nobody can claim spaces. Spaces stay until you release them (and refund anyone who paid).")) admin("cancelraffle"); }}
+                  style={{ background: "#B23A3A", color: "#FFF", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, fontWeight: 700 }}
+                >
+                  Cancel raffle
+                </button>
+              )}
               <button
                 disabled={adminBusy}
                 onClick={() => { if (window.confirm("Reset the whole raffle? This clears every claimed space and any winners.")) admin("reset"); }}
